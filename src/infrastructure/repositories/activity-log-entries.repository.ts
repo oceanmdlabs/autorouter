@@ -1,5 +1,5 @@
 import { ApplicationContext } from "@/src/entities/models/application-context";
-import { eq, and, or, ilike, desc, sql } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import type { IActivityLogEntriesRepository } from "@/src/application/repositories/activity-log-entries.repository.interface";
 import { activityLogEntry as table } from "@/drizzle/schema";
 import type { NewActivityLogEntry } from "@/src/entities/models/activity-log-entry";
@@ -28,7 +28,7 @@ const buildSearchText = (record: NewActivityLogEntry): string => {
 export const createActivityLogEntriesRepository = ({
   cxt,
 }: Dependencies): IActivityLogEntriesRepository => {
-  const db = cxt.getDbService().getDb();
+  const dbService = cxt.getDbService();
   return {
     async getAllAtTenant(options?: SearchOptions) {
       const page = options?.page ?? 1;
@@ -36,24 +36,17 @@ export const createActivityLogEntriesRepository = ({
       const searchTerm = options?.searchTerm?.toLowerCase();
 
       const whereClause = searchTerm
-        ? and(
-            eq(table.tenantId, cxt.getNonEmptyTenantId()),
-            sql`to_tsvector('english', ${table.searchText}) @@ plainto_tsquery('english', ${searchTerm})`
-          )
-        : eq(table.tenantId, cxt.getNonEmptyTenantId());
+        ? sql`to_tsvector('english', ${table.searchText}) @@ plainto_tsquery('english', ${searchTerm})`
+        : undefined;
 
       const [logs, total] = await Promise.all([
-        db.query.activityLogEntry.findMany({
+        dbService.findMany(table, {
           where: whereClause,
-          orderBy: [desc(table.createdAt)],
+          orderBy: desc(table.createdAt),
           limit: pageSize,
           offset: (page - 1) * pageSize,
         }),
-        db
-          .select({ count: sql<number>`count(*)` })
-          .from(table)
-          .where(whereClause)
-          .then((result) => result[0]?.count ?? 0),
+        dbService.count(table, { where: whereClause }),
       ]);
 
       return {
@@ -66,18 +59,16 @@ export const createActivityLogEntriesRepository = ({
     },
 
     async get(id: string) {
-      return (
-        (await db.query.activityLogEntry.findFirst({
-          where: eq(table.id, id),
-        })) ?? null
-      );
+      return await dbService.findFirst(table, {
+        where: eq(table.id, id),
+      });
     },
 
     async create(record: NewActivityLogEntry) {
       const searchText = buildSearchText(record);
 
-      await db.insert(table).values({
-        ...cxt.getDbService().initMetadataAndTenant(record),
+      await dbService.insert(table, {
+        ...dbService.initMetadataAndTenant(record),
         searchText,
       });
     },
@@ -85,23 +76,18 @@ export const createActivityLogEntriesRepository = ({
     async update(record) {
       const searchText = buildSearchText(record);
 
-      cxt.getDbService().updateMetadata(record);
-      await db
-        .update(table)
-        .set({ ...record, searchText })
-        .where(eq(table.id, record.id));
+      dbService.updateMetadata(record);
+      await dbService.update(table, { ...record, searchText }, eq(table.id, record.id));
     },
 
     async remove(id) {
       cxt.logger.info("Removing activity log entry", { id });
-      await db.delete(table).where(eq(table.id, id));
+      await dbService.delete(table, eq(table.id, id));
     },
 
     async removeAll() {
       cxt.logger.info("Removing all activity log entries");
-      await db
-        .delete(table)
-        .where(eq(table.tenantId, cxt.getNonEmptyTenantId()));
+      await dbService.delete(table, sql`TRUE`);
     },
   };
 };

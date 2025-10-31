@@ -9,7 +9,8 @@ import {
   type TenantConfined,
 } from "@/src/entities/models/base";
 import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
-import { sql } from "drizzle-orm/sql";
+import { sql, eq, and, type SQL } from "drizzle-orm";
+import type { PgTable, PgColumn } from "drizzle-orm/pg-core";
 import pg from "pg";
 import type { FhirData } from "@/src/entities/models/resource";
 import { UnauthorizedError } from "@/src/entities/errors/auth";
@@ -21,9 +22,17 @@ type Dependencies = {
   cxt: ApplicationContext;
 };
 
+const DB_URL = process.env.DB_URL;
+if (!DB_URL) {
+  throw new AppInitializationError("Missing DB_URL");
+}
+const pool = new Pool({
+  connectionString: DB_URL,
+});
+const db = drizzle(pool, { schema });
+
 export const createDbService = (deps: Dependencies): IDbService => {
   const { cxt } = deps;
-  let db: NodePgDatabase<typeof schema> | null = null;
 
   function initMetadata<T>(insert: T): T & BaseResource {
     const baseResource = insert as Partial<BaseResource>;
@@ -85,23 +94,140 @@ export const createDbService = (deps: Dependencies): IDbService => {
     return null;
   }
 
-  return {
-    getDb() {
-      if (!db) {
-        const DB_URL = process.env.DB_URL;
-        if (!DB_URL) {
-          throw new AppInitializationError("Missing DB_URL");
-        }
-        const pool = new Pool({
-          connectionString: DB_URL,
-        });
-        db = drizzle(pool, { schema });
+  function withSiteFilter<T extends PgTable & { tenantId: PgColumn }>(
+    table: T,
+    where?: SQL<unknown>
+  ): SQL<unknown> | undefined {
+    const tenantId = cxt.getTenantId();
+    if (!tenantId) {
+      return undefined;
+    }
+    const tenantFilter = eq(table.tenantId, tenantId);
+    return where ? and(tenantFilter, where) : tenantFilter;
+  }
+
+  async function findMany<T extends PgTable & { tenantId: PgColumn }>(
+    table: T,
+    options: {
+      where?: SQL<unknown>;
+      orderBy?: any;
+      limit?: number;
+      offset?: number;
+    } = {}
+  ): Promise<any[]> {
+    const { where, orderBy, limit, offset } = options;
+    const siteWhere = withSiteFilter(table, where);
+    if (!siteWhere) {
+      throw new Error("Cannot query without site context");
+    }
+
+    let query: any = db
+      .select()
+      .from(table as any)
+      .where(siteWhere);
+
+    if (orderBy) {
+      // Handle both single value and array for orderBy
+      if (Array.isArray(orderBy)) {
+        query = query.orderBy(...orderBy);
+      } else {
+        query = query.orderBy(orderBy);
       }
-      return db;
-    },
+    }
+
+    if (limit !== undefined) {
+      query = query.limit(limit);
+    }
+
+    if (offset !== undefined) {
+      query = query.offset(offset);
+    }
+
+    return await query;
+  }
+
+  async function findFirst<T extends PgTable & { tenantId: PgColumn }>(
+    table: T,
+    options: { where?: SQL<unknown> } = {}
+  ): Promise<any | null> {
+    const { where } = options;
+    const siteWhere = withSiteFilter(table, where);
+    if (!siteWhere) {
+      throw new Error("Cannot query without site context");
+    }
+
+    const result = await db
+      .select()
+      .from(table as any)
+      .where(siteWhere)
+      .limit(1);
+
+    return result[0] ?? null;
+  }
+
+  async function insert<T extends PgTable & { tenantId: PgColumn }>(
+    table: T,
+    values: any
+  ): Promise<void> {
+    await db.insert(table as any).values(values);
+  }
+
+  async function update<T extends PgTable & { tenantId: PgColumn }>(
+    table: T,
+    values: any,
+    where: SQL<unknown>
+  ): Promise<void> {
+    const siteWhere = withSiteFilter(table, where);
+    if (!siteWhere) {
+      throw new Error("Cannot update without site context");
+    }
+
+    await db
+      .update(table as any)
+      .set(values)
+      .where(siteWhere);
+  }
+
+  async function deleteRecord<T extends PgTable & { tenantId: PgColumn }>(
+    table: T,
+    where: SQL<unknown>
+  ): Promise<void> {
+    const siteWhere = withSiteFilter(table, where);
+    if (!siteWhere) {
+      throw new Error("Cannot delete without site context");
+    }
+
+    await db.delete(table as any).where(siteWhere);
+  }
+
+  async function count<T extends PgTable & { tenantId: PgColumn }>(
+    table: T,
+    options: { where?: SQL<unknown> } = {}
+  ): Promise<number> {
+    const { where } = options;
+    const siteWhere = withSiteFilter(table, where);
+    if (!siteWhere) {
+      throw new Error("Cannot count without site context");
+    }
+
+    const result = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(table as any)
+      .where(siteWhere);
+
+    return result[0]?.count ?? 0;
+  }
+
+  return {
     initMetadata,
     initMetadataAndTenant,
     updateMetadata,
     findExistingResourceBasedOnIdOrIdentifier,
+    findMany,
+    findFirst,
+    insert,
+    update,
+    delete: deleteRecord,
+    count,
   };
 };

@@ -115,11 +115,7 @@ export const createSiteConfigurationRepository = ({
     async update(record: UpdateSiteConfiguration) {
       const dbRecord = mapToDbRecordForUpdate(record);
       dbService.updateMetadata(dbRecord);
-      await dbService.update(
-        siteConfig,
-        dbRecord,
-        eq(siteConfig.id, record.id)
-      );
+      await dbService.update(siteConfig, dbRecord, eq(siteConfig.id, record.id));
     },
   };
 };

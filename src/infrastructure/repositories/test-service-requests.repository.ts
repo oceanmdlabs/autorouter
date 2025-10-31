@@ -16,9 +16,7 @@ export function createTestServiceRequestsRepository({
   const dbService = cxt.getDbService();
   return {
     async getAllAtTenant() {
-      return (await dbService.findMany(
-        testServiceRequests
-      )) as TestServiceRequest[];
+      return (await dbService.findMany(testServiceRequests)) as TestServiceRequest[];
     },
 
     async get(id: string): Promise<TestServiceRequest | null> {
@@ -45,10 +43,7 @@ export function createTestServiceRequestsRepository({
     },
 
     async remove(id) {
-      await dbService.delete(
-        testServiceRequests,
-        eq(testServiceRequests.id, id)
-      );
+      await dbService.delete(testServiceRequests, eq(testServiceRequests.id, id));
     },
   };
 }

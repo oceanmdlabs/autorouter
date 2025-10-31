@@ -15,7 +15,7 @@ type Dependencies = {
 export const createSiteConfigurationRepository = ({
   cxt,
 }: Dependencies): ISiteConfigurationRepository => {
-  const db = cxt.getDbService().getDb();
+  const dbService = cxt.getDbService();
   const cryptoService = cxt.getCryptoService();
 
   function mapToEntity(
@@ -81,46 +81,41 @@ export const createSiteConfigurationRepository = ({
 
   return {
     async getAll(): Promise<SiteConfigurationReference[]> {
-      const records = await db.query.siteConfig.findMany({
-        columns: {
-          id: true,
-          name: true,
-          tenantId: true,
-        },
+      const records = await dbService.findMany(siteConfig, {
+        where: undefined,
       });
-      return records;
+      return records.map((record) => ({
+        id: record.id,
+        name: record.name,
+        tenantId: record.tenantId,
+      }));
     },
 
     async getForTenant(): Promise<SiteConfiguration | null> {
-      const record =
-        (await db.query.siteConfig.findFirst({
-          where: eq(siteConfig.tenantId, cxt.getNonEmptyTenantId()),
-        })) ?? null;
+      const record = await dbService.findFirst(siteConfig, {
+        where: undefined,
+      });
       return mapToEntity(record);
     },
 
     async findByClientId(clientId: string): Promise<SiteConfiguration | null> {
-      const record =
-        (await db.query.siteConfig.findFirst({
-          where: eq(siteConfig.clientId, clientId),
-        })) ?? null;
+      const record = await dbService.findFirst(siteConfig, {
+        where: eq(siteConfig.clientId, clientId),
+      });
       return mapToEntity(record);
     },
 
     async create(record: SiteConfiguration) {
-      await db
-        .insert(siteConfig)
-        .values(
-          cxt.getDbService().initMetadataAndTenant(mapToDbRecord(record))
-        );
+      await dbService.insert(
+        siteConfig,
+        dbService.initMetadataAndTenant(mapToDbRecord(record))
+      );
     },
 
     async update(record: UpdateSiteConfiguration) {
       const dbRecord = mapToDbRecordForUpdate(record);
-      await db
-        .update(siteConfig)
-        .set(dbRecord)
-        .where(eq(siteConfig.id, record.id));
+      dbService.updateMetadata(dbRecord);
+      await dbService.update(siteConfig, dbRecord, eq(siteConfig.id, record.id));
     },
   };
 };

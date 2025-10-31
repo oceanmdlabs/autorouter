@@ -20,11 +20,16 @@ class TestApplicationContext extends ApplicationContext {
 
   override getDbService(): IDbService {
     return {
-      getDb: vi.fn(),
       initMetadata: vi.fn(),
       initMetadataAndTenant: vi.fn(),
       updateMetadata: vi.fn(),
       findExistingResourceBasedOnIdOrIdentifier: vi.fn(),
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      insert: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
     };
   }
 }

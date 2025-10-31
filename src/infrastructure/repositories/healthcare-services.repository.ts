@@ -10,35 +10,29 @@ type Dependencies = {
 export const createHealthcareServicesRepository = ({
   cxt,
 }: Dependencies): IHealthcareServicesRepository => {
-  const db = cxt.getDbService().getDb();
+  const dbService = cxt.getDbService();
   return {
     async getAllAtTenant() {
-      return await db.query.healthcareServices.findMany({
-        where: eq(table.tenantId, cxt.getNonEmptyTenantId()),
-      });
+      return await dbService.findMany(table);
     },
 
     async get(id: string) {
-      return (
-        (await db.query.healthcareServices.findFirst({
-          where: eq(table.id, id),
-        })) ?? null
-      );
+      return await dbService.findFirst(table, {
+        where: eq(table.id, id),
+      });
     },
 
     async create(record) {
-      await db
-        .insert(table)
-        .values(cxt.getDbService().initMetadataAndTenant(record));
+      await dbService.insert(table, dbService.initMetadataAndTenant(record));
     },
 
     async update(record) {
-      cxt.getDbService().updateMetadata(record);
-      await db.update(table).set(record).where(eq(table.id, record.id));
+      dbService.updateMetadata(record);
+      await dbService.update(table, record, eq(table.id, record.id));
     },
 
     async remove(id) {
-      await db.delete(table).where(eq(table.id, id));
+      await dbService.delete(table, eq(table.id, id));
     },
 
     async searchByName(name: string) {

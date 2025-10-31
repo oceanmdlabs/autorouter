@@ -13,39 +13,37 @@ export function createTestServiceRequestsRepository({
 }: {
   cxt: ApplicationContext;
 }): ITestServiceRequestsRepository {
-  const db = cxt.getDbService().getDb();
+  const dbService = cxt.getDbService();
   return {
     async getAllAtTenant() {
-      return (await db.query.testServiceRequests.findMany({
-        where: eq(testServiceRequests.tenantId, cxt.getNonEmptyTenantId()),
-      })) as TestServiceRequest[];
+      return (await dbService.findMany(testServiceRequests)) as TestServiceRequest[];
     },
 
     async get(id: string): Promise<TestServiceRequest | null> {
-      const result = (await db.query.testServiceRequests.findFirst({
+      const result = (await dbService.findFirst(testServiceRequests, {
         where: eq(testServiceRequests.id, id),
       })) as TestServiceRequest | null;
       return result;
     },
 
     async create(record: NewTestServiceRequest) {
-      await db
-        .insert(testServiceRequests)
-        .values(cxt.getDbService().initMetadataAndTenant(record));
+      await dbService.insert(
+        testServiceRequests,
+        dbService.initMetadataAndTenant(record)
+      );
     },
 
     async update(record: UpdateTestServiceRequest) {
-      cxt.getDbService().updateMetadata(record);
-      await db
-        .update(testServiceRequests)
-        .set(record)
-        .where(eq(testServiceRequests.id, record.id));
+      dbService.updateMetadata(record);
+      await dbService.update(
+        testServiceRequests,
+        record,
+        eq(testServiceRequests.id, record.id)
+      );
     },
 
     async remove(id) {
-      await db
-        .delete(testServiceRequests)
-        .where(eq(testServiceRequests.id, id));
+      await dbService.delete(testServiceRequests, eq(testServiceRequests.id, id));
     },
   };
 }

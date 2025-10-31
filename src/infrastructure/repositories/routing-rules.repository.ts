@@ -15,12 +15,10 @@ type Dependencies = {
 export const createRoutingRulesRepository = ({
   cxt,
 }: Dependencies): IRoutingRulesRepository => {
-  const db = cxt.getDbService().getDb();
+  const dbService = cxt.getDbService();
   return {
     async getAllAtTenant(): Promise<RoutingRule[]> {
-      const results = await db.query.routingRules.findMany({
-        where: eq(routingRules.tenantId, cxt.getNonEmptyTenantId()),
-      });
+      const results = await dbService.findMany(routingRules);
       return results.map((rule) => ({
         ...rule,
         enabledTools: (rule.enabledTools || []) as RoutingToolName[],
@@ -28,7 +26,7 @@ export const createRoutingRulesRepository = ({
     },
 
     async get(id: string): Promise<RoutingRule | null> {
-      const result = await db.query.routingRules.findFirst({
+      const result = await dbService.findFirst(routingRules, {
         where: eq(routingRules.id, id),
       });
       if (!result) return null;
@@ -39,21 +37,16 @@ export const createRoutingRulesRepository = ({
     },
 
     async create(record: NewRoutingRule) {
-      await db
-        .insert(routingRules)
-        .values(cxt.getDbService().initMetadataAndTenant(record));
+      await dbService.insert(routingRules, dbService.initMetadataAndTenant(record));
     },
 
     async update(record) {
-      cxt.getDbService().updateMetadata(record);
-      await db
-        .update(routingRules)
-        .set(record)
-        .where(eq(routingRules.id, record.id));
+      dbService.updateMetadata(record);
+      await dbService.update(routingRules, record, eq(routingRules.id, record.id));
     },
 
     async remove(id) {
-      await db.delete(routingRules).where(eq(routingRules.id, id));
+      await dbService.delete(routingRules, eq(routingRules.id, id));
     },
   };
 };

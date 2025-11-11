@@ -91,6 +91,7 @@ bin
 obj
 appsettings.json
 local.settings.json
+settings.local.json
 
 # Azurite artifacts
 __blobstorage__

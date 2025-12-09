@@ -22,6 +22,7 @@ type EReferralEventV11 =
   | "notify-update-process-request"
   | "send-communication-from-provider"
   | "send-communication-from-requester"
+  | "send-communication"
   | "notify-data-correction";
 
 // type EReferralEventV12 =
@@ -392,6 +393,33 @@ export function createSendCommunicationFromProviderMessage(
   });
 }
 
+export function createSendCommunicationMessage(
+  serviceRequestBundle: Bundle,
+  { message }: { message: string }
+): Bundle {
+  const resources = prepareResourcesForResponse(serviceRequestBundle);
+  const serviceRequest = getServiceRequest(resources);
+  const communication: Communication = createCommunication(
+    serviceRequest,
+    message
+  );
+  return createMessageBundle({
+    resources: [
+      createMessageHeader({
+        eventCode: "send-communication",
+        referralRef: getReferralRef(serviceRequestBundle),
+        focus: [
+          {
+            reference: "Communication/" + communication.id,
+          },
+        ],
+      }),
+      communication,
+      ...resources,
+    ],
+  });
+}
+
 export function createSendCommunicationFromRequesterMessage(
   serviceRequestBundle: Bundle,
   { message }: { message: string }
@@ -462,6 +490,11 @@ function createCommunication(
         contentString: message,
       },
     ],
+    sender: {
+      identifier: {
+        value: "Autorouter",
+      },
+    },
   };
 }
 

@@ -1,4 +1,4 @@
-import { createSendCommunicationFromRequesterMessage } from "../../ocean-message.service";
+import { createSendCommunicationMessage } from "../../ocean-message.service";
 import type { RoutingToolHandler } from "@/src/entities/models/routing-tool";
 
 const TOOL_NAME = "summarizeAttachments";
@@ -28,7 +28,7 @@ export const summarizeAttachmentsHandler: RoutingToolHandler<
     summary = `Error analyzing attachments: ${(error as Error).message}`;
   }
 
-  const message = createSendCommunicationFromRequesterMessage(
+  const message = createSendCommunicationMessage(
     eventContext.serviceRequestBundle,
     {
       message: `Attachment Summary: ${summary}`,

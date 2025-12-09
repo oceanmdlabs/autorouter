@@ -1,4 +1,4 @@
-import { createSendCommunicationFromRequesterMessage } from "../../ocean-message.service";
+import { createSendCommunicationMessage } from "../../ocean-message.service";
 import type { RoutingToolHandler } from "@/src/entities/models/routing-tool";
 
 const TOOL_NAME = "markAsNeedsReview";
@@ -6,7 +6,7 @@ const TOOL_NAME = "markAsNeedsReview";
 export const markAsNeedsReviewHandler: RoutingToolHandler<
   typeof TOOL_NAME
 > = async (action, eventContext, cxt) => {
-  const message = createSendCommunicationFromRequesterMessage(
+  const message = createSendCommunicationMessage(
     eventContext.serviceRequestBundle,
     {
       message: "Autorouter marked as needing review: " + action.input.message,

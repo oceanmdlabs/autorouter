@@ -8,7 +8,7 @@ import {
   type NewBaseResource,
   type TenantConfined,
 } from "@/src/entities/models/base";
-import { drizzle, type NodePgDatabase } from "drizzle-orm/node-postgres";
+import { drizzle } from "drizzle-orm/node-postgres";
 import { sql, eq, and, type SQL } from "drizzle-orm";
 import type { PgTable, PgColumn } from "drizzle-orm/pg-core";
 import pg from "pg";
@@ -22,17 +22,16 @@ type Dependencies = {
   cxt: ApplicationContext;
 };
 
-const DB_URL = process.env.DB_URL;
-if (!DB_URL) {
-  throw new AppInitializationError("Missing DB_URL");
-}
-const pool = new Pool({
-  connectionString: DB_URL,
-});
-const db = drizzle(pool, { schema });
-
 export const createDbService = (deps: Dependencies): IDbService => {
   const { cxt } = deps;
+  const DB_URL = process.env.DB_URL;
+  if (!DB_URL) {
+    throw new AppInitializationError("Missing DB_URL");
+  }
+  const pool = new Pool({
+    connectionString: DB_URL,
+  });
+  const db = drizzle(pool, { schema });
 
   function initMetadata<T>(insert: T): T & BaseResource {
     const baseResource = insert as Partial<BaseResource>;

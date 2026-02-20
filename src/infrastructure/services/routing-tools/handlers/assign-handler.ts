@@ -10,6 +10,11 @@ export const assignHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
 ) => {
   let details = null;
   let error = null;
+  const serviceRequestBundle = "serviceRequestBundle" in eventContext ? eventContext.serviceRequestBundle : null;
+  if (!serviceRequestBundle) {
+    error = "No service request bundle available";
+  }
+  else {
   const { targetListingName } = action.input;
   const targetListing = await cxt
     .getHealthcareServicesRepository()
@@ -17,7 +22,7 @@ export const assignHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
   if (!targetListing) {
     error = `The target listing '${targetListingName}' was not found. Make sure you have declared the listing in the Listings section.`;
   } else {
-    const message = createAssignMessage(eventContext.serviceRequestBundle, {
+    const message = createAssignMessage(serviceRequestBundle, {
       forwardToListingRef: targetListing.oceanReference,
     });
     const response = await cxt.getOceanClientService().sendMessage({
@@ -28,6 +33,7 @@ export const assignHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
       error = "Failed to assign service request";
     } else {
       details = "Assigned";
+      }
     }
   }
   await cxt.getActivityLogEntriesRepository().create({

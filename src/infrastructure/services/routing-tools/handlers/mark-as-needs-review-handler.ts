@@ -6,27 +6,36 @@ const TOOL_NAME = "markAsNeedsReview";
 export const markAsNeedsReviewHandler: RoutingToolHandler<
   typeof TOOL_NAME
 > = async (action, eventContext, cxt) => {
-  const message = createSendCommunicationFromRequesterMessage(
-    eventContext.serviceRequestBundle,
-    {
-      message: "Autorouter marked as needing review: " + action.input.message,
-    }
-  );
   let details = null;
   let error = null;
 
-  const response = await cxt.getOceanClientService().sendMessage({
-    message,
-    version: "v12",
-  });
-  if (response.status !== 200) {
-    cxt.logger.warn(
-      `Failed to send communication to provider (to mark as needing review): ${response.status}`
-    );
-    error =
-      "Failed to send communication to provider (to mark as needing review)";
+  const serviceRequestBundle =
+    "serviceRequestBundle" in eventContext
+      ? eventContext.serviceRequestBundle
+      : null;
+  if (!serviceRequestBundle) {
+    error = "No service request bundle available";
   } else {
-    details = `Marked as needing review: "${action.input.message}"`;
+    const message = createSendCommunicationFromRequesterMessage(
+      serviceRequestBundle,
+      {
+        message: "Autorouter marked as needing review: " + action.input.message,
+      }
+    );
+
+    const response = await cxt.getOceanClientService().sendMessage({
+      message,
+      version: "v12",
+    });
+    if (response.status !== 200) {
+      cxt.logger.warn(
+        `Failed to send communication to provider (to mark as needing review): ${response.status}`
+      );
+      error =
+        "Failed to send communication to provider (to mark as needing review)";
+    } else {
+      details = `Marked as needing review: "${action.input.message}"`;
+    }
   }
 
   await cxt.getActivityLogEntriesRepository().create({

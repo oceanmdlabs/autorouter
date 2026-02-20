@@ -52,8 +52,14 @@ describe("summarizeServiceRequestMessage", () => {
             {
               resource: {
                 resourceType: "ServiceRequest",
+                intent: "order",
+                status: "active",
+                subject: {
+                  reference: "Patient/123",
+                },
                 text: {
                   div: "Service Request Text",
+                  status: "generated",
                 },
               },
             },
@@ -62,7 +68,9 @@ describe("summarizeServiceRequestMessage", () => {
       },
     };
 
-    const summary = summarizeServiceRequestMessage(cdsHookRequest);
+    const summary = summarizeServiceRequestMessage(
+      cdsHookRequest.prefetch?.v11Bundle as Bundle
+    );
     expect(summary).toContain("Service Request Summary");
   });
 

@@ -21,6 +21,9 @@ const showOceanClientSecret = ref(false);
 const showTwilioAuthToken = ref(false);
 const showAiApiKey = ref(false);
 const showEmailApiKey = ref(false);
+const showSiteKey = ref(false);
+const showSiteCredential = ref(false);
+const showSharedEncryptionKey = ref(false);
 
 // Test email and SMS variables
 const isTestingEmail = ref(false)
@@ -69,7 +72,10 @@ const hasChanges = computed(() => {
 		loadedSite.emailProvider !== formValues.value.emailProvider ||
 		loadedSite.emailFromAddress !== formValues.value.emailFromAddress ||
 		loadedSite.emailApiKey !== formValues.value.emailApiKey ||
-		loadedSite.emailFromName !== formValues.value.emailFromName
+		loadedSite.emailFromName !== formValues.value.emailFromName ||
+		loadedSite.siteKey !== formValues.value.siteKey ||
+		loadedSite.siteCredential !== formValues.value.siteCredential ||
+		loadedSite.sharedEncryptionKey !== formValues.value.sharedEncryptionKey
 });
 const { data: loadedData, status } = useAsyncData('site', async () => {
 	return await useRequestFetch()<{
@@ -116,7 +122,10 @@ watch(() => loadedData.value, (data) => {
 			emailProvider: site.emailProvider ?? 'smtp2go',
 			emailFromAddress: site.emailFromAddress ?? '',
 			emailApiKey: site.emailApiKey ?? '',
-			emailFromName: site.emailFromName ?? ''
+			emailFromName: site.emailFromName ?? '',
+			siteKey: site.siteKey ?? '',
+			siteCredential: site.siteCredential ?? '',
+			sharedEncryptionKey: site.sharedEncryptionKey ?? ''
 		};
 		showEmptyState.value = false;
 	}
@@ -791,6 +800,72 @@ function copyToClipboard(text: string) {
 											testEmailResult.error }}</p>
 									</Alert>
 								</div>
+							</div>
+						</CardContent>
+					</Card>
+
+					<Card v-if="!isNewConfig">
+						<CardHeader>
+							<CardTitle>Ocean Open API Credentials</CardTitle>
+						</CardHeader>
+						<CardContent>
+							<p class="text-sm text-gray-600 mt-2 leading-relaxed">
+								Configure your Ocean Open API credentials for patient engagement use cases, such as
+								patient messaging and
+								forms completion. This is an optional connection that enables advanced patient
+								interaction features.
+							</p>
+							<div class="space-y-4 bg-gray-50 p-4 rounded-lg">
+								<div class="space-y-2">
+									<Label for="siteKey">Site Key</Label>
+									<div class="flex items-center gap-2">
+										<Input id="siteKey" v-model="formValues.siteKey"
+											:type="showSiteKey ? 'text' : 'password'"
+											:aria-invalid="errors.siteKey ? 'true' : undefined" class="flex-1" />
+										<Button variant="outline" size="icon" @click="showSiteKey = !showSiteKey">
+											<component :is="showSiteKey ? EyeOff : Eye" class="h-4 w-4" />
+										</Button>
+									</div>
+									<p v-if="errors.siteKey" class="text-sm text-destructive">
+										{{ errors.siteKey }}
+									</p>
+								</div>
+								<div class="space-y-2">
+									<Label for="siteCredential">Site Credential</Label>
+									<div class="flex items-center gap-2">
+										<Input id="siteCredential" v-model="formValues.siteCredential"
+											:type="showSiteCredential ? 'text' : 'password'"
+											:aria-invalid="errors.siteCredential ? 'true' : undefined" class="flex-1" />
+										<Button variant="outline" size="icon"
+											@click="showSiteCredential = !showSiteCredential">
+											<component :is="showSiteCredential ? EyeOff : Eye" class="h-4 w-4" />
+										</Button>
+									</div>
+									<p v-if="errors.siteCredential" class="text-sm text-destructive">
+										{{ errors.siteCredential }}
+									</p>
+								</div>
+								<div class="space-y-2">
+									<Label for="sharedEncryptionKey">Shared Encryption Key</Label>
+									<div class="flex items-center gap-2">
+										<Input id="sharedEncryptionKey" v-model="formValues.sharedEncryptionKey"
+											:type="showSharedEncryptionKey ? 'text' : 'password'"
+											:aria-invalid="errors.sharedEncryptionKey ? 'true' : undefined"
+											class="flex-1" />
+										<Button variant="outline" size="icon"
+											@click="showSharedEncryptionKey = !showSharedEncryptionKey">
+											<component :is="showSharedEncryptionKey ? EyeOff : Eye" class="h-4 w-4" />
+										</Button>
+									</div>
+									<p v-if="errors.sharedEncryptionKey" class="text-sm text-destructive">
+										{{ errors.sharedEncryptionKey }}
+									</p>
+								</div>
+								<p class="text-sm text-gray-600 mt-4">
+									These credentials are used for secure communication with Ocean's Open API for
+									patient engagement
+									features.
+								</p>
 							</div>
 						</CardContent>
 					</Card>

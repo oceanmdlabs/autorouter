@@ -8,32 +8,37 @@ export const updateCategoryHandler: RoutingToolHandler<
 > = async (action, eventContext, cxt) => {
   const { snomedCode } = action.input;
 
-  if (!snomedCode) {
-    return;
-  }
-
-  const message = await createDataCorrectionMessageWithNewCode(
-    eventContext.serviceRequestBundle,
-    {
-      coding: [
-        {
-          system: "http://snomed.info/sct",
-          code: snomedCode,
-          display: snomedCode,
-        },
-      ],
-    }
-  );
   let details = null;
   let error = null;
-  const response = await cxt.getOceanClientService().sendMessage({ message });
-  if (response.status !== 200) {
-    cxt.logger.warn(
-      `Failed to change service request category: ${response.status}`
+  if (!snomedCode) {
+    error = "No SNOMED code provided";
+  }
+  const serviceRequestBundle = "serviceRequestBundle" in eventContext ? eventContext.serviceRequestBundle : null;
+  if (!serviceRequestBundle) {
+    error = "No service request bundle available";
+  }
+  else {
+    const message = await createDataCorrectionMessageWithNewCode(
+      serviceRequestBundle,
+      {
+        coding: [
+          {
+            system: "http://snomed.info/sct",
+            code: snomedCode,
+            display: snomedCode,
+          },
+        ],
+      }
     );
-    error = "Failed to change service request category";
-  } else {
-    details = `Changed service request category to ${snomedCode}`;
+    const response = await cxt.getOceanClientService().sendMessage({ message });
+    if (response.status !== 200) {
+      cxt.logger.warn(
+        `Failed to change service request category: ${response.status}`
+      );
+      error = "Failed to change service request category";
+    } else {
+      details = `Changed service request category to ${snomedCode}`;
+    }
   }
 
   await cxt.getActivityLogEntriesRepository().create({

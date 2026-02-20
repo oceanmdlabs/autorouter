@@ -29,7 +29,11 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
 
   // Generate referral link if referral reference is available
   let referralLink: string | undefined;
-  if (eventContext.referralRef && siteConfig.oceanSiteNum) {
+  if (
+    "referralRef" in eventContext &&
+    eventContext.referralRef &&
+    siteConfig.oceanSiteNum
+  ) {
     referralLink = getReferralUrl(
       eventContext.referralRef,
       siteConfig.oceanSiteNum

@@ -1,23 +1,27 @@
 import type {
-  RuleEvaluationResult,
-  ServiceRequestMessage,
-} from "@/src/entities/models/routing-evaluation";
+  ToolCall,
+  ToolSet,
+} from "@/src/application/services/ai.service.interface";
 import type { ApplicationContext } from "@/src/entities/models/application-context";
+import { isPatientEngagementEventMessage } from "@/src/entities/models/patient-engagement-event-context";
+import type {
+  RoutingEventMessage,
+  RuleEvaluationResult,
+  ServiceRequestEventMessage,
+} from "@/src/entities/models/routing-evaluation";
+import type { RoutingEventType } from "@/src/entities/models/routing-event-type";
+import type { RoutingRule } from "@/src/entities/models/routing-rule";
 import type {
   RoutingToolAction,
   RoutingToolDefinition,
 } from "@/src/entities/models/routing-tool";
-import type { ZodTypeAny } from "zod";
-import type {
-  ToolCall,
-  ToolSet,
-} from "@/src/application/services/ai.service.interface";
-import type { RoutingEventType } from "@/src/entities/models/routing-event-type";
-import type { RoutingRule } from "@/src/entities/models/routing-rule";
-import type { RoutingToolName } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
-import { createEvaluateRulePrompt } from "./prompts/evaluate-rule.prompt";
-import { routingToolRegistry } from "./routing-tools/routing-tool-registry";
 import { uuid } from "@/src/entities/models/uuid";
+import type { RoutingToolName } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
+import type { ZodTypeAny } from "zod";
+import { createEvaluatePEEventRulePrompt } from "./prompts/evaluate-pe-rule-prompt";
+import { evaluateServiceRequestRulePrompt } from "./prompts/evaluate-service-request-rule-prompt";
+import { routingToolRegistry } from "./routing-tools/routing-tool-registry";
+import type { Bundle, QuestionnaireResponse, ServiceRequest } from "fhir/r4";
 
 type Dependencies = {
   cxt: ApplicationContext;
@@ -26,16 +30,29 @@ type Dependencies = {
 export const createEvaluateRuleService = (deps: Dependencies) => {
   const { cxt } = deps;
 
+  function avoidProcessingDueToPatientOptOut(bundle: Bundle): boolean {
+    const questionnaireResponse = bundle.entry?.find(
+      (e) => e.resource?.resourceType === "QuestionnaireResponse"
+    )?.resource as QuestionnaireResponse;
+    // find the item with linkId "ai-opt-out"
+    const optOutItemAnswer = questionnaireResponse?.item?.find(
+      (i) => i.linkId === "ai_opt_out"
+    )?.answer?.[0];
+    return Boolean(
+      optOutItemAnswer?.valueBoolean || optOutItemAnswer?.valueString === "true"
+    );
+  }
+
   async function evaluateRule({
     rule,
-    serviceRequestMessage,
+    routingEventMessage,
     eventType,
-    referralRef,
+    requestDescription,
   }: {
     rule: RoutingRule;
-    serviceRequestMessage: ServiceRequestMessage;
+    routingEventMessage: RoutingEventMessage;
     eventType: RoutingEventType;
-    referralRef?: string;
+    requestDescription: string;
   }): Promise<RuleEvaluationResult> {
     if (!rule.active) {
       return {
@@ -59,15 +76,14 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
         },
       };
     }
-
-    const prompt = createEvaluateRulePrompt({
+    const prompt = createEvaluationPrompt({
       rule,
-      serviceRequestMessage,
+      routingEventMessage,
       eventType,
     });
 
     cxt.logger.info(
-      `Evaluating rule ${rule.name} for request ${referralRef} with prompt:\n${prompt}`
+      `Evaluating rule ${rule.name} for request ${requestDescription} with prompt:\n${prompt}`
     );
 
     try {
@@ -97,7 +113,7 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
       const toolCalls: ToolCall[] = await cxt
         .getAiService()
         .getToolCalls(prompt, toolSet);
-      cxt.logger.info(`Received tool calls for request ${referralRef}`, {
+      cxt.logger.info(`Received tool calls for request ${requestDescription}`, {
         toolCalls: toolCalls.map((toolCall) => ({
           tool: toolCall.tool,
           params: JSON.stringify(toolCall.input),
@@ -144,9 +160,34 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
   }
 
   return {
+    avoidProcessingDueToPatientOptOut,
     evaluateRule,
   };
 };
+
+function createEvaluationPrompt({
+  rule,
+  routingEventMessage,
+  eventType,
+}: {
+  rule: RoutingRule;
+  routingEventMessage: RoutingEventMessage;
+  eventType: RoutingEventType;
+}): string {
+  if (isPatientEngagementEventMessage(routingEventMessage)) {
+    return createEvaluatePEEventRulePrompt({
+      rule,
+      peEventMessage: routingEventMessage,
+      eventType,
+    });
+  } else {
+    return evaluateServiceRequestRulePrompt({
+      rule,
+      routingEventMessage: routingEventMessage as ServiceRequestEventMessage,
+      eventType,
+    });
+  }
+}
 
 function toolSupportsEvent(
   tool: RoutingToolDefinition<RoutingToolName, ZodTypeAny>,

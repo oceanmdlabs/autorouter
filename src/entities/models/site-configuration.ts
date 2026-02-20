@@ -58,6 +58,10 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
     .nullable(),
   emailFromName: z.string().trim().max(255).optional().nullable(),
   emailApiKey: z.string().trim().max(255).optional().nullable(),
+  // Open API Credentials - Optional connection for Ocean patient engagement
+  siteKey: z.string().trim().max(255).optional().nullable(),
+  siteCredential: z.string().trim().max(255).optional().nullable(),
+  sharedEncryptionKey: z.string().trim().max(255).optional().nullable(),
 });
 const newSchema = schema.merge(newBaseResourceSchema);
 const updateSchema = schema.partial().merge(updateBaseResourceSchema);

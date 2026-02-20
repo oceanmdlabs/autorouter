@@ -10,6 +10,11 @@ export const forwardHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
 ) => {
   let details = null;
   let error = null;
+  const serviceRequestBundle = "serviceRequestBundle" in eventContext ? eventContext.serviceRequestBundle : null;
+  if (!serviceRequestBundle) {
+    error = "No service request bundle available";
+  }
+  else {
   const { targetListingName } = action.input;
   const targetListing = await cxt
     .getHealthcareServicesRepository()
@@ -17,7 +22,7 @@ export const forwardHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
   if (!targetListing) {
     error = `The target listing '${targetListingName}' was not found. Make sure you have declared the listing in the Listings section.`;
   } else {
-    const message = createForwardMessage(eventContext.serviceRequestBundle, {
+    const message = createForwardMessage(serviceRequestBundle, {
       forwardToListingRef: targetListing.oceanReference,
     });
     const response = await cxt.getOceanClientService().sendMessage({ message });
@@ -34,5 +39,6 @@ export const forwardHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
     tool: TOOL_NAME,
     details,
     error,
-  });
+    });
+  }
 };

@@ -8,10 +8,15 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare",
+    "infra:aws:install": "npm --prefix infrastructure/pulumi/aws install",
+    "infra:aws:preview": "npm --prefix infrastructure/pulumi/aws run pulumi:preview",
+    "infra:aws:up": "npm --prefix infrastructure/pulumi/aws run pulumi:up",
+    "infra:aws:destroy": "npm --prefix infrastructure/pulumi/aws run pulumi:destroy",
     "push": "drizzle-kit push",
     "typecheck": "npx nuxi typecheck",
     "test": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:send-communication": "tsx src/scripts/test-send-communication.ts"
   },
   "dependencies": {
     "@ai-sdk/cohere": "^2.0.3",
@@ -62,6 +67,7 @@
     "@vitest/coverage-v8": "^3.0.9",
     "drizzle-kit": "^0.30.6",
     "netlify-cli": "^20.1.1",
+    "tsx": "^4.20.6",
     "typescript": "^5.8.2",
     "vitest": "^3.0.9",
     "vue-tsc": "^2.2.8"

@@ -2,28 +2,33 @@
 
 ## Overview
 
-The Autorouter is a standalone web application that integrates with your Ocean site to enable
-intelligent, rules-based automation for managing eReferral workflows. It uses AI to analyze
+The Autorouter is a standalone web application that integrates with your Ocean site to enable intelligent, rules-based automation for managing eReferral workflows. It uses AI to analyze
 referrals in real-time and take predefined routing actions—reducing administrative workload,
 improving response time, and supporting virtual care models.
 
+## For OceanMD Developers
+
+**📋 [OCEANMD_WORKFLOW.md](OCEANMD_WORKFLOW.md)** - Required reading for internal developers. Covers the dual-repository workflow, creating PRs, and avoiding common pitfalls.
+
+**🤖 [AGENTS.md](AGENTS.md)** - Guide for AI coding assistants (Claude Code, Copilot) working on this codebase.
+
 ## Tech Stack
 
-- [Nuxt](https://nuxt.com/)
+- [Nuxt](https://nuxt.com/) - Full-stack Vue framework
+- [Tailwind CSS](https://tailwindcss.com/) - Utility-first CSS framework
+- [Vue.js](https://vuejs.org/) - Progressive JavaScript framework
+- [TypeScript](https://www.typescriptlang.org/) - Typed JavaScript
+- [Drizzle ORM](https://orm.drizzle.team/) - TypeScript ORM for SQL databases
+- [PostgreSQL](https://www.postgresql.org/) - Relational database (any managed PostgreSQL service compatible with Drizzle ORM)
+- [AI SDK](https://www.npmjs.com/package/ai) - AI model integration (supports OpenAI, Azure OpenAI, Google AI, Cohere, and others)
 
-- [Tailwind CSS](https://tailwindcss.com/)
+**Note:** This is the default tech stack used in development. The application is designed to be flexible and can be adapted to work with alternative services. For example:
 
-- [Vue.js](https://vuejs.org/)
+- **Database:** While development uses [Neon](https://neon.tech/) for serverless Postgres, you can use any managed PostgreSQL service (AWS RDS, Google Cloud SQL, Azure Database for PostgreSQL, etc.)
+- **AI Provider:** The AI SDK supports multiple providers including Azure OpenAI, Google AI (Gemini), Cohere, and OpenAI API
+- **Hosting:** The application can be deployed to various platforms including Google Cloud Platform, AWS, Azure, or Netlify (requiring only minor code changes)
 
-- [TypeScript](https://www.typescriptlang.org/)
-
-- [Drizzle ORM](https://orm.drizzle.team/)
-
-- [Postgres](https://www.postgresql.org/)
-
-- [Neon (for serverless Postgres)](https://neon.tech/)
-
-- [AI SDK](https://www.npmjs.com/package/ai)
+See [HOSTING.md](HOSTING.md) for detailed deployment options and infrastructure requirements.
 
 # Nuxt Framework
 
@@ -86,20 +91,17 @@ Build the application for production:
 ```bash
 # npm
 npm run build
-
-# pnpm
-pnpm build
-
-# yarn
-yarn build
-
-# bun
-bun run build
-
-Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
-
-The application is currently deployed to Netlify automatically via CI/CD with Git repository integration.
 ```
+
+### Deployment
+
+The application can be deployed to various platforms including Google Cloud Platform, AWS, Azure, or Netlify. Each platform has different requirements for database hosting, AI model access, and external services.
+
+**For detailed hosting and deployment options, see [HOSTING.md](HOSTING.md).**
+
+Additional resources:
+- [Nuxt deployment documentation](https://nuxt.com/docs/getting-started/deployment)
+- Current deployment: Netlify with automatic CI/CD from Git repository
 
 ## Using the Autorouter
 

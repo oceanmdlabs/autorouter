@@ -108,3 +108,8 @@ __azurite_db*__.json
 .DS_Store
 
 .claude/settings.local.json
+
+# Pulumi (local caches and stack config may contain secrets)
+infrastructure/pulumi/**/node_modules/
+infrastructure/pulumi/**/.pulumi/
+infrastructure/pulumi/**/Pulumi.*.yaml

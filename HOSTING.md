@@ -61,6 +61,10 @@ The Autorouter has been successfully deployed on Google Cloud.
 - **AWS Amplify Hosting** - https://nuxt.com/deploy/aws-amplify
 - **Amazon RDS for PostgreSQL** (Serverless v2) or **Aurora Serverless PostgreSQL** - Database
 
+**Infrastructure as Code (Pulumi):**
+
+This repo includes an AWS Pulumi program under `infrastructure/pulumi/aws` that provisions a VPC, ECS/Fargate + ALB, and either Aurora Serverless v2 Postgres or RDS Postgres.
+
 **AI Hosting Options:**
 
 - Amazon Bedrock (for Claude, other models)

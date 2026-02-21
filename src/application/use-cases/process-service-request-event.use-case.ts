@@ -1,8 +1,8 @@
 import { ApplicationContext } from "@/src/entities/models/application-context";
 import { getRoutingToolActionDescription } from "@/src/entities/models/routing-tool";
-import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
 import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluate-rule.service";
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
+import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
 export interface ProcessServiceRequestEventOutput {
   message: string;
 }
@@ -20,16 +20,24 @@ export async function processServiceRequestEventUseCase(
   if (event.triggeringEvent) {
     const rules = await cxt.getRoutingRulesRepository().getAllAtTenant();
     const evaluationResults: RuleEvaluationResult[] = [];
-
-    for (const rule of rules) {
-      evaluationResults.push(
-        await createEvaluateRuleService({ cxt }).evaluateRule({
-          rule,
-          serviceRequestMessage: event.serviceRequestBundle,
-          eventType: event.triggeringEvent,
-          referralRef: event.referralRef,
-        })
-      );
+    const evaluateRuleService = createEvaluateRuleService({ cxt });
+    if (
+      evaluateRuleService.avoidProcessingDueToPatientOptOut(
+        event.serviceRequestBundle
+      )
+    ) {
+      details = "Patient has opted out of AI processing.";
+    } else {
+      for (const rule of rules) {
+        evaluationResults.push(
+          await evaluateRuleService.evaluateRule({
+            rule,
+            routingEventMessage: event.serviceRequestBundle,
+            eventType: event.triggeringEvent,
+            requestDescription: event.referralRef || "pendingServiceRequest",
+          })
+        );
+      }
     }
 
     for (const result of evaluationResults) {

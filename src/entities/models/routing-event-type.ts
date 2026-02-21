@@ -8,6 +8,8 @@ export const routingEventTypeEnum = [
   "request_accepted",
   "request_declined",
   "request_message",
+  "patient_message_forms_completion",
+  "patient_note_added",
 ] as const;
 
 export const routingEventTypeSchema = z.enum(routingEventTypeEnum);
@@ -34,6 +36,10 @@ export function getRoutingEventTypeDescription(
       return "An eRequest was declined.";
     case "request_message":
       return "An eRequest has received a new message.";
+    case "patient_message_forms_completion":
+      return "A patient has completed their forms.";
+    case "patient_note_added":
+      return "A patient has responded to a form or message.";
   }
 }
 export function getRoutingEventTypeTitle(eventType?: RoutingEventType | null) {
@@ -55,5 +61,9 @@ export function getRoutingEventTypeTitle(eventType?: RoutingEventType | null) {
       return "Declined request";
     case "request_message":
       return "New message";
+    case "patient_message_forms_completion":
+      return "Patient forms completed";
+    case "patient_note_added":
+      return "Patient note added";
   }
 }

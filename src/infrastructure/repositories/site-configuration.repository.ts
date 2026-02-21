@@ -1,4 +1,4 @@
-import { ApplicationContext } from "@/src/entities/models/application-context";
+import type { ApplicationContext } from "@/src/entities/models/application-context";
 import { eq } from "drizzle-orm";
 import { siteConfig } from "@/drizzle/schema";
 import type {
@@ -22,28 +22,59 @@ export const createSiteConfigurationRepository = ({
     dbRecord: typeof siteConfig.$inferSelect | null
   ): SiteConfiguration | null {
     if (!dbRecord) return null;
+
+    // Proxy function to handle decryption errors gracefully
+    const decrypt = (
+      encryptedValue: string | null,
+      fieldName: string
+    ): string => {
+      if (!encryptedValue) return "";
+      try {
+        return cryptoService.decrypt(encryptedValue);
+      } catch (error) {
+        console.warn(`Failed to decrypt field '${fieldName}':`, error);
+        return "";
+      }
+    };
+
     const {
       clientSecretEncrypted,
       oceanClientSecretEncrypted,
       aiApiKeyEncrypted,
       emailApiKeyEncrypted,
+      siteKeyEncrypted,
+      siteCredentialEncrypted,
+      sharedEncryptionKeyEncrypted,
       ...rest
     } = dbRecord;
     return {
       ...rest,
-      clientSecret: cryptoService.decrypt(clientSecretEncrypted),
-      oceanClientSecret: cryptoService.decrypt(oceanClientSecretEncrypted),
-      aiApiKey: aiApiKeyEncrypted
-        ? cryptoService.decrypt(aiApiKeyEncrypted)
-        : undefined,
-      emailApiKey: emailApiKeyEncrypted
-        ? cryptoService.decrypt(emailApiKeyEncrypted)
-        : undefined,
+      clientSecret: decrypt(clientSecretEncrypted, "clientSecret"),
+      oceanClientSecret: decrypt(
+        oceanClientSecretEncrypted,
+        "oceanClientSecret"
+      ),
+      aiApiKey: decrypt(aiApiKeyEncrypted, "aiApiKey"),
+      emailApiKey: decrypt(emailApiKeyEncrypted, "emailApiKey"),
+      siteKey: decrypt(siteKeyEncrypted, "siteKey"),
+      siteCredential: decrypt(siteCredentialEncrypted, "siteCredential"),
+      sharedEncryptionKey: decrypt(
+        sharedEncryptionKeyEncrypted,
+        "sharedEncryptionKey"
+      ),
     };
   }
   function mapToDbRecord(record: SiteConfiguration) {
-    const { clientSecret, oceanClientSecret, aiApiKey, emailApiKey, ...rest } =
-      record;
+    const {
+      clientSecret,
+      oceanClientSecret,
+      aiApiKey,
+      emailApiKey,
+      siteKey,
+      siteCredential,
+      sharedEncryptionKey,
+      ...rest
+    } = record;
     return {
       ...rest,
       clientSecretEncrypted: cryptoService.encrypt(clientSecret),
@@ -54,13 +85,31 @@ export const createSiteConfigurationRepository = ({
       ...(emailApiKey && {
         emailApiKeyEncrypted: cryptoService.encrypt(emailApiKey),
       }),
+      ...(siteKey && {
+        siteKeyEncrypted: cryptoService.encrypt(siteKey),
+      }),
+      ...(siteCredential && {
+        siteCredentialEncrypted: cryptoService.encrypt(siteCredential),
+      }),
+      ...(sharedEncryptionKey && {
+        sharedEncryptionKeyEncrypted:
+          cryptoService.encrypt(sharedEncryptionKey),
+      }),
     };
   }
 
   function mapToDbRecordForUpdate(record: UpdateSiteConfiguration) {
-    const { clientSecret, oceanClientSecret, aiApiKey, emailApiKey, ...rest } =
-      record;
-    const result: Record<string, any> = { ...rest };
+    const {
+      clientSecret,
+      oceanClientSecret,
+      aiApiKey,
+      emailApiKey,
+      siteKey,
+      siteCredential,
+      sharedEncryptionKey,
+      ...rest
+    } = record;
+    const result: Record<string, unknown> = { ...rest };
 
     if (clientSecret != null) {
       result.clientSecretEncrypted = cryptoService.encrypt(clientSecret);
@@ -75,6 +124,16 @@ export const createSiteConfigurationRepository = ({
     if (emailApiKey != null) {
       result.emailApiKeyEncrypted = cryptoService.encrypt(emailApiKey);
     }
+    if (siteKey != null) {
+      result.siteKeyEncrypted = cryptoService.encrypt(siteKey);
+    }
+    if (siteCredential != null) {
+      result.siteCredentialEncrypted = cryptoService.encrypt(siteCredential);
+    }
+    if (sharedEncryptionKey != null) {
+      result.sharedEncryptionKeyEncrypted =
+        cryptoService.encrypt(sharedEncryptionKey);
+    }
 
     return result;
   }
@@ -82,7 +141,7 @@ export const createSiteConfigurationRepository = ({
   return {
     async getAll(): Promise<SiteConfigurationReference[]> {
       const records = await dbService.findMany(siteConfig, {
-        where: undefined,
+        where: undefined, // No additional filtering needed, tenant filtering is automatic
       });
       return records.map((record) => ({
         id: record.id,
@@ -92,9 +151,7 @@ export const createSiteConfigurationRepository = ({
     },
 
     async getForTenant(): Promise<SiteConfiguration | null> {
-      const record = await dbService.findFirst(siteConfig, {
-        where: undefined,
-      });
+      const record = await dbService.findFirst(siteConfig);
       return mapToEntity(record);
     },
 

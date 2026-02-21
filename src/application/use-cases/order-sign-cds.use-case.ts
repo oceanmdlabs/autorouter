@@ -5,6 +5,7 @@ import type {
   CDSHookResponse,
   CDSSource,
 } from "@/src/entities/models/cds-hooks";
+import type { ServiceRequestEventMessage } from "@/src/entities/models/routing-evaluation";
 import type { RoutingRule } from "@/src/entities/models/routing-rule";
 import type { RoutingToolAction } from "@/src/entities/models/routing-tool";
 import { uuid } from "@/src/entities/models/uuid";
@@ -13,6 +14,7 @@ import {
   routingToolRegistry,
   type RoutingToolName,
 } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
+import type { Bundle } from "fhir/r4";
 export const ORDER_SIGN_CDS_ID = "order-sign-cds";
 
 interface Deps {
@@ -40,9 +42,17 @@ export async function orderSignCds({
   const cards: CDSCard[] = [];
 
   for (const rule of orderSignRules) {
+    const routingEventMessage: ServiceRequestEventMessage = request.prefetch
+      ?.v11Bundle as Bundle;
+
     const ruleEvaluationResult = await createEvaluateRuleService({
       cxt,
-    }).evaluateRule({ rule, serviceRequestMessage: request, eventType });
+    }).evaluateRule({
+      rule,
+      routingEventMessage,
+      eventType,
+      requestDescription: "orderSignCds",
+    });
     for (const action of ruleEvaluationResult.evaluation.actions) {
       const tool = routingToolRegistry[action.tool as RoutingToolName];
       if (tool === routingToolRegistry.showCdsCard) {

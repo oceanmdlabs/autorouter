@@ -6,19 +6,25 @@ const TOOL_NAME = "toggleEConsult";
 export const toggleEConsultHandler: RoutingToolHandler<
   typeof TOOL_NAME
 > = async (action, eventContext, cxt) => {
-  const message = createToggleEConsultMessage(
-    eventContext.serviceRequestBundle,
-    { changeToEConsult: action.input.changeToEConsult }
-  );
   let details = null;
   let error = null;
 
-  const response = await cxt.getOceanClientService().sendMessage({ message });
-  if (response.status !== 200) {
-    cxt.logger.warn(`Failed to toggle eConsult status: ${response.status}`);
-    error = "Failed to toggle eConsult status";
-  } else {
-    details = "Toggled eConsult status";
+  const serviceRequestBundle = "serviceRequestBundle" in eventContext ? eventContext.serviceRequestBundle : null;
+  if (!serviceRequestBundle) {
+    error = "No service request bundle available";
+  }
+  else {
+    const message = createToggleEConsultMessage(
+      serviceRequestBundle,
+      { changeToEConsult: action.input.changeToEConsult }
+    );
+    const response = await cxt.getOceanClientService().sendMessage({ message });
+    if (response.status !== 200) {
+      cxt.logger.warn(`Failed to toggle eConsult status: ${response.status}`);
+      error = "Failed to toggle eConsult status";
+    } else {
+      details = "Toggled eConsult status";
+    }
   }
 
   await cxt.getActivityLogEntriesRepository().create({
@@ -27,4 +33,4 @@ export const toggleEConsultHandler: RoutingToolHandler<
     details,
     error,
   });
-};
+}

@@ -1,4 +1,4 @@
-import type { ServiceRequestMessage } from "@/src/entities/models/routing-evaluation";
+import type { RoutingEventMessage } from "@/src/entities/models/routing-evaluation";
 import type { CDSHookRequest } from "@/src/entities/models/cds-hooks";
 import type {
   Bundle,
@@ -12,13 +12,7 @@ import type {
 } from "fhir/r4";
 import { InvalidArgumentsError } from "@/src/entities/errors/common";
 
-export function summarizeServiceRequestMessage(
-  serviceRequestMessage: ServiceRequestMessage
-): string {
-  const bundle = isCDSHookRequest(serviceRequestMessage)
-    ? ((serviceRequestMessage as CDSHookRequest).prefetch?.v11Bundle as Bundle)
-    : (serviceRequestMessage as Bundle);
-
+export function summarizeServiceRequestMessage(bundle: Bundle): string {
   if (!bundle || !bundle.entry) {
     return "No valid bundle found in message";
   }
@@ -204,12 +198,6 @@ export function summarizeServiceRequestMessage(
   }
 
   return summary;
-}
-
-function isCDSHookRequest(
-  message: ServiceRequestMessage
-): message is CDSHookRequest {
-  return "hook" in message && "hookInstance" in message;
 }
 
 function calculateAge(birthDateStr: string) {

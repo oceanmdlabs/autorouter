@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ApplicationContext } from "./application-context";
-import type { ServiceRequestEventContext } from "./service-request-event-context";
+import type { RoutingEventContext } from "./routing-event-context";
 import {
   routingToolRegistry,
   type RoutingToolName,
@@ -15,7 +15,7 @@ export type RoutingToolAction<T extends RoutingToolName> = {
 
 export type RoutingToolHandler<T extends RoutingToolName> = (
   action: RoutingToolAction<T>,
-  eventContext: ServiceRequestEventContext,
+  eventContext: RoutingEventContext,
   cxt: ApplicationContext
 ) => Promise<void>;
 

@@ -1,10 +1,10 @@
 import type { RoutingToolAction } from "@/src/entities/models/routing-tool";
-import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
+import type { RoutingEventContext } from "@/src/entities/models/routing-event-context";
 import type { ApplicationContext } from "@/src/entities/models/application-context";
 
 export async function commentHandler(
   action: RoutingToolAction<"comment">,
-  eventContext: ServiceRequestEventContext,
+  eventContext: RoutingEventContext,
   cxt: ApplicationContext
 ): Promise<void> {
   const { comment } = action.input;

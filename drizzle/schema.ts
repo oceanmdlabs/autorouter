@@ -42,7 +42,7 @@ export const healthcareServices = pgTable(
   })
 );
 
-export const routingEventTypeEnum = [
+const routingEventTypeEnum = [
   "request_pre_submission",
   "request_received",
   "request_updated",
@@ -50,6 +50,8 @@ export const routingEventTypeEnum = [
   "request_accepted",
   "request_declined",
   "request_message",
+  "patient_message_forms_completion",
+  "patient_note_added",
 ] as const;
 
 export const triggeringEventEnum = pgEnum(
@@ -149,6 +151,10 @@ export const siteConfig = pgTable(
     emailApiKeyEncrypted: text("email_api_key_encrypted"),
     emailFromAddress: text("email_from_address"),
     emailFromName: text("email_from_name"),
+    // Open API Credentials - Optional connection for Ocean patient engagement
+    siteKeyEncrypted: text("site_key_encrypted"),
+    siteCredentialEncrypted: text("site_credential_encrypted"),
+    sharedEncryptionKeyEncrypted: text("shared_encryption_key_encrypted"),
   },
   (table) => ({
     tenantIdx: index("idx_site_config_tenant_id").on(table.tenantId),

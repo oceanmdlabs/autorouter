@@ -2,7 +2,7 @@ import type { IRoutingToolActionService } from "@/src/application/services/routi
 import type { ApplicationContext } from "@/src/entities/models/application-context";
 import { InvalidArgumentsError } from "@/src/entities/errors/common";
 import type { RoutingToolAction } from "@/src/entities/models/routing-tool";
-import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
+import type { RoutingEventContext } from "@/src/entities/models/routing-event-context";
 import {
   routingToolRegistry,
   type RoutingToolName,
@@ -19,7 +19,7 @@ export const createRoutingToolActionService = (
 
   async function executeActions(
     actions: RoutingToolAction<RoutingToolName>[],
-    eventContext: ServiceRequestEventContext
+    eventContext: RoutingEventContext
   ) {
     for (const action of actions) {
       await executeAction(action, eventContext);
@@ -28,7 +28,7 @@ export const createRoutingToolActionService = (
 
   async function executeAction(
     action: RoutingToolAction<RoutingToolName>,
-    eventContext: ServiceRequestEventContext
+    eventContext: RoutingEventContext
   ): Promise<void> {
     // Log the action being executed
     cxt.logger.info(
@@ -46,7 +46,7 @@ export const createRoutingToolActionService = (
 
     const handler = tool.handler as (
       action: RoutingToolAction<RoutingToolName>,
-      eventContext: ServiceRequestEventContext,
+      eventContext: RoutingEventContext,
       cxt: ApplicationContext
     ) => Promise<void>;
     try {

@@ -1,7 +1,7 @@
 import type { RoutingToolAction } from "@/src/entities/models/routing-tool";
-import type { Bundle } from "fhir/r4";
-import type { CDSHookRequest } from "@/src/entities/models/cds-hooks";
 import type { RoutingToolName } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
+import type { Bundle } from "fhir/r4";
+import type { PatientEngagementEventMessage } from "./patient-engagement-event-context";
 
 export type RuleEvaluation = {
   actions: RoutingToolAction<RoutingToolName>[];
@@ -17,4 +17,8 @@ export type RuleEvaluationResult = {
   evaluation: RuleEvaluation;
 };
 
-export type ServiceRequestMessage = Bundle | CDSHookRequest;
+export type ServiceRequestEventMessage = Bundle;
+
+export type RoutingEventMessage =
+  | ServiceRequestEventMessage
+  | PatientEngagementEventMessage;

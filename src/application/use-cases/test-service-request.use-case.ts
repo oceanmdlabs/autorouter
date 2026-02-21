@@ -28,8 +28,9 @@ export const testServiceRequestUseCase =
         evaluationResults.push(
           await evaluateRuleService.evaluateRule({
             rule,
-            serviceRequestMessage: testServiceRequest.content,
+            routingEventMessage: testServiceRequest.content,
             eventType,
+            requestDescription: "testServiceRequest",
           })
         );
       }

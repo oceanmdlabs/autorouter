@@ -14,21 +14,27 @@ export const changeStatusHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
   eventContext,
   cxt
 ) => {
+  let details = null;
+  let error = null;
+
   const description = getDescriptionForStatusChange(action);
-  const message = createStatusChangeMessage(eventContext.serviceRequestBundle, {
+  const serviceRequestBundle = "serviceRequestBundle" in eventContext ? eventContext.serviceRequestBundle : null;
+  if (!serviceRequestBundle) {
+    error = "No service request bundle available";
+  }
+  else {
+    const message = createStatusChangeMessage(serviceRequestBundle, {
     status: action.input.status as TaskStatus,
     reason: action.input.reason ?? "",
     description: description,
   });
-  let details = null;
-  let error = null;
-
   const response = await cxt.getOceanClientService().sendMessage({ message });
   if (response.status !== 200) {
     cxt.logger.warn(`Failed to accept service request: ${response.status}`);
     error = `Failed to ${action.input.status} service request`;
   } else {
-    details = description;
+      details = description;
+    }
   }
 
   await cxt.getActivityLogEntriesRepository().create({

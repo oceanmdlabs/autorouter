@@ -1,3 +1,5 @@
+import type { Bundle } from "fhir/r4";
+
 export interface CDSService {
   id: string;
   hook: string;
@@ -16,7 +18,9 @@ export interface CDSHookRequest {
   hook: string;
   hookInstance: string;
   context: Record<string, unknown>;
-  prefetch?: Record<string, unknown>;
+  prefetch?: {
+    v11Bundle: Bundle;
+  };
 }
 
 export interface Coding {

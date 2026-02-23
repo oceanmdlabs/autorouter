@@ -1,22 +1,21 @@
 import * as pulumi from "@pulumi/pulumi";
 
 export type DbEngine = "aurora-serverless-v2" | "rds-postgres";
+export type NatGatewayStrategy = "Single" | "OnePerAz";
 
 export type InfraConfig = {
   namePrefix: string;
   tags: Record<string, string>;
 
   vpcCidr: string;
-  albIngressCidrs: string[];
+  natGatewayStrategy: NatGatewayStrategy;
 
   publicUrl?: string;
 
   app: {
-    cpu: number;
-    memory: number;
-    desiredCount: number;
-    containerPort: number;
-    imageUri?: string;
+    memorySize: number;
+    timeoutSeconds: number;
+    lambdaBundlePath: string;
     env: Record<string, string>;
     secretEnv: pulumi.Output<Record<string, string>>;
   };
@@ -28,6 +27,9 @@ export type InfraConfig = {
     rdsInstanceClass: string;
     auroraMinAcu: number;
     auroraMaxAcu: number;
+    deletionProtection: boolean;
+    skipFinalSnapshot: boolean;
+    finalSnapshotIdentifierPrefix: string;
   };
 };
 
@@ -37,8 +39,9 @@ export function getInfraConfig(): InfraConfig {
   const namePrefix = pulumiConfig.get("namePrefix") ?? "ocean-autorouter";
 
   const vpcCidr = pulumiConfig.get("vpcCidr") ?? "10.0.0.0/16";
-  const albIngressCidrs =
-    pulumiConfig.getObject<string[]>("albIngressCidrs") ?? ["0.0.0.0/0"];
+  const natGatewayStrategy =
+    (pulumiConfig.get("natGatewayStrategy") as NatGatewayStrategy | undefined) ??
+    "Single";
 
   const publicUrl = pulumiConfig.get("publicUrl") ?? undefined;
 
@@ -49,11 +52,10 @@ export function getInfraConfig(): InfraConfig {
       | pulumi.Output<Record<string, string>>
       | undefined) ?? pulumi.secret({} as Record<string, string>);
 
-  const appCpu = pulumiConfig.getNumber("appCpu") ?? 256;
-  const appMemory = pulumiConfig.getNumber("appMemory") ?? 512;
-  const appDesiredCount = pulumiConfig.getNumber("appDesiredCount") ?? 1;
-  const appContainerPort = pulumiConfig.getNumber("appContainerPort") ?? 3000;
-  const appImageUri = pulumiConfig.get("appImageUri") ?? undefined;
+  const appMemorySize = pulumiConfig.getNumber("appMemorySize") ?? 1024;
+  const appTimeoutSeconds = pulumiConfig.getNumber("appTimeoutSeconds") ?? 30;
+  const appLambdaBundlePath =
+    pulumiConfig.get("appLambdaBundlePath") ?? "../../../.output/server";
 
   const dbEngine = (pulumiConfig.get("dbEngine") ??
     "aurora-serverless-v2") as DbEngine;
@@ -62,10 +64,18 @@ export function getInfraConfig(): InfraConfig {
 
   const rdsInstanceClass =
     pulumiConfig.get("rdsInstanceClass") ?? "db.t4g.micro";
-  const auroraMinAcu = pulumiConfig.getNumber("auroraMinAcu") ?? 0.5;
+  const auroraMinAcu = pulumiConfig.getNumber("auroraMinAcu") ?? 0;
   const auroraMaxAcu = pulumiConfig.getNumber("auroraMaxAcu") ?? 2;
 
   const stack = pulumi.getStack();
+  const isProdStack = /\bprod(uction)?\b/i.test(stack);
+  const dbDeletionProtection =
+    pulumiConfig.getBoolean("dbDeletionProtection") ?? isProdStack;
+  const dbSkipFinalSnapshot =
+    pulumiConfig.getBoolean("dbSkipFinalSnapshot") ?? !isProdStack;
+  const dbFinalSnapshotIdentifierPrefix =
+    pulumiConfig.get("dbFinalSnapshotIdentifierPrefix") ?? `${namePrefix}-${stack}`;
+
   const tags: Record<string, string> = {
     "ocean:app": "autorouter",
     "pulumi:stack": stack,
@@ -75,14 +85,12 @@ export function getInfraConfig(): InfraConfig {
     namePrefix,
     tags,
     vpcCidr,
-    albIngressCidrs,
+    natGatewayStrategy,
     publicUrl,
     app: {
-      cpu: appCpu,
-      memory: appMemory,
-      desiredCount: appDesiredCount,
-      containerPort: appContainerPort,
-      imageUri: appImageUri,
+      memorySize: appMemorySize,
+      timeoutSeconds: appTimeoutSeconds,
+      lambdaBundlePath: appLambdaBundlePath,
       env: appEnv,
       secretEnv: appSecretEnv,
     },
@@ -93,6 +101,9 @@ export function getInfraConfig(): InfraConfig {
       rdsInstanceClass,
       auroraMinAcu,
       auroraMaxAcu,
+      deletionProtection: dbDeletionProtection,
+      skipFinalSnapshot: dbSkipFinalSnapshot,
+      finalSnapshotIdentifierPrefix: dbFinalSnapshotIdentifierPrefix,
     },
   };
 }

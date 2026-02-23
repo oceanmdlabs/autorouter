@@ -21,6 +21,9 @@ export function createDatabase(args: {
   rdsInstanceClass: string;
   auroraMinAcu: number;
   auroraMaxAcu: number;
+  deletionProtection: boolean;
+  skipFinalSnapshot: boolean;
+  finalSnapshotIdentifierPrefix: string;
 }): DatabaseOutputs {
   const dbSg = new aws.ec2.SecurityGroup(`${args.name}-db-sg`, {
     vpcId: args.vpcId,
@@ -57,6 +60,7 @@ export function createDatabase(args: {
     overrideSpecial: "_%@",
   });
   const encodedPassword = password.result.apply(encodeURIComponent);
+  const finalSnapshotId = `${args.finalSnapshotIdentifierPrefix}-final`;
 
   if (args.engine === "aurora-serverless-v2") {
     const cluster = new aws.rds.Cluster(`${args.name}-aurora`, {
@@ -67,7 +71,9 @@ export function createDatabase(args: {
       dbSubnetGroupName: subnetGroup.name,
       vpcSecurityGroupIds: [dbSg.id],
       storageEncrypted: true,
-      skipFinalSnapshot: true,
+      skipFinalSnapshot: args.skipFinalSnapshot,
+      finalSnapshotIdentifier: args.skipFinalSnapshot ? undefined : `${finalSnapshotId}-aurora`,
+      deletionProtection: args.deletionProtection,
       serverlessv2ScalingConfiguration: {
         minCapacity: args.auroraMinAcu,
         maxCapacity: args.auroraMaxAcu,
@@ -100,8 +106,9 @@ export function createDatabase(args: {
     vpcSecurityGroupIds: [dbSg.id],
     publiclyAccessible: false,
     storageEncrypted: true,
-    skipFinalSnapshot: true,
-    deletionProtection: false,
+    skipFinalSnapshot: args.skipFinalSnapshot,
+    finalSnapshotIdentifier: args.skipFinalSnapshot ? undefined : `${finalSnapshotId}-rds`,
+    deletionProtection: args.deletionProtection,
     tags: args.tags,
   });
 

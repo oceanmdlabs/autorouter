@@ -77,14 +77,14 @@ Used by `nuxt-auth-utils` to seal/encrypt session cookies. In practice, it prote
 ### `ENCRYPTION_KEY`
 
 Used by the app crypto service for:
-- Encrypting/decrypting stored site secrets in DB (for example client secrets and API keys)
+- Encrypting/decrypting stored site secrets in DB (for example client secrets and API keys stored by the tenants to integrate withOcean and other services)
 
 Important operational note:
 - Rotating this key without a migration/re-encryption plan can make previously stored encrypted values unreadable.
 
 ### `JWT_SECRET`
 
-Used to sign and verify OAuth2 JWT access tokens.
+Signs and verifies OAuth2 bearer tokens used by API clients.
 
 Important operational note:
 - Rotating this key invalidates existing JWT access tokens signed with the previous value.
@@ -134,42 +134,7 @@ Fill in `.env.deploy`:
 - `ENCRYPTION_KEY`
 - `JWT_SECRET`
 - Optional `PUBLIC_URL` (recommended for stable OAuth callback URLs)
-
-### App-level system admin (recommended: DB allowlist)
-
-System admin is resolved at OAuth login time and stored in the session (`roles.admin = "system"`). It is not looked up on every request.
-
-Preferred method: database allowlist (`system_admin_allowlist`):
-- `provider`: `google` or `github`
-- `subject`: OAuth identity subject
-  - Google: `sub`
-  - GitHub: numeric `user.id` as text
-- `active`: `true` to grant system admin
-
-Create rows with SQL after migrations:
-
-```sql
-insert into system_admin_allowlist (provider, subject, notes)
-values
-  ('google', '123456789012345678901', 'On-call admin'),
-  ('github', '123456789', 'Automation admin');
-```
-
-Current privileged operations guarded by this role include:
-- cross-tenant session switching (`POST /api/auth/update-tenant`)
-- listing all site configurations (`GET /api/site-configuration/all`)
-
-Security/practicality notes:
-- Practical: one DB lookup per login, zero per-request DB overhead.
-- Revocation behavior: changes apply on next login/session refresh (not instantly for already-issued sessions).
-- Risk: if DB migrations are missing or table is unavailable, no users can be promoted to system admin.
-
-Recommended guardrails if you use this option:
-- Keep allowlist small and review entries as privileged changes.
-- Treat updates as privileged changes (change review + deploy audit trail).
-- Confirm provider/ID values directly from live OAuth claims before enabling.
-- Do not use personal accounts for long-term admin; prefer dedicated controlled identities.
-
+  
 ## 4) Build + deploy
 
 From `infrastructure/cdk`:
@@ -190,42 +155,14 @@ Build + deploy + apply SQL migrations:
 npm run cdk:deploy:app:env:migrate -- --profile "$AWS_PROFILE" --require-approval never
 ```
 
-## Optional: use AWS Secrets Manager for deploy secrets
+## Keep deploy secrets in `.env.deploy` (simplest path)
 
-Store deployment secrets in one JSON secret and reference it from `.env.deploy`.
+For simplicity, you can keep all deploy values directly in `infrastructure/cdk/.env.deploy` and run deploy commands with that file loaded by the wrapper scripts.
 
-Create secret (first time):
-
-```bash
-aws secretsmanager create-secret \
-  --name ocean-autorouter/dev/app-secrets \
-  --secret-string '{
-    "NUXT_OAUTH_GOOGLE_CLIENT_ID":"<google-client-id>",
-    "NUXT_OAUTH_GOOGLE_CLIENT_SECRET":"<google-client-secret>",
-    "NUXT_OAUTH_GITHUB_CLIENT_ID":"<github-client-id>",
-    "NUXT_OAUTH_GITHUB_CLIENT_SECRET":"<github-client-secret>",
-    "NUXT_SESSION_PASSWORD":"<session-password>",
-    "ENCRYPTION_KEY":"<encryption-key>",
-    "JWT_SECRET":"<jwt-secret>",
-    "PUBLIC_URL":"https://your-app.example.com"
-  }'
-```
-
-Set in `.env.deploy`:
-
-```bash
-APP_SECRETS_SECRET_ID=ocean-autorouter/dev/app-secrets
-```
-
-Then deploy as normal. Values in `.env.deploy` override Secrets Manager values when both are set.
+For added security, you can keep deploy secrets in AWS Secrets Manager.
+This quickstart focuses on the `.env.deploy` path.
 
 ## Database migrations
-
-Generate migrations (repo root):
-
-```bash
-npm run db:migrate:generate
-```
 
 Apply migrations to deployed AWS environment:
 
@@ -236,6 +173,85 @@ npm --prefix infrastructure/cdk run db:migrate:apply
 Notes:
 - `db:migrate:apply` currently requires Aurora Data API (`dbUseDataApi=true`).
 - If using private RDS Postgres without Data API, run migrations from inside VPC (for example a migration Lambda/CodeBuild job in VPC).
+- Migration generation for schema changes is documented in the root [`README.md`](../../README.md).
+
+## Optional post-deployment: grant app-level system admin
+
+System admin is resolved at OAuth login time and stored in the session (`roles.admin = "system"`). It is not looked up on every request.
+
+Allowlist table: `system_admin_allowlist`
+- `provider`: `google` or `github`
+- `subject`: OAuth identity subject
+  - Google: `sub`
+  - GitHub: numeric `user.id` as text
+- `active`: set to `true`
+
+Run this from repo root (set `ADMIN_PROVIDER` and `ADMIN_SUBJECT` first):
+
+```bash
+set -a; source infrastructure/cdk/.env.deploy; set +a
+
+ADMIN_PROVIDER="google" # or github
+ADMIN_SUBJECT="YOUR_PROVIDER_SUBJECT"
+
+LAMBDA_NAME=$(aws cloudformation describe-stacks \
+  --stack-name "${CDK_STACK_NAME:-dev}-autorouter" \
+  --query 'Stacks[0].Outputs[?OutputKey==`lambdaName`].OutputValue' \
+  --output text)
+
+DB_RESOURCE_ARN=$(aws lambda get-function-configuration \
+  --function-name "$LAMBDA_NAME" \
+  --query 'Environment.Variables.DB_RESOURCE_ARN' \
+  --output text)
+DB_SECRET_ARN=$(aws lambda get-function-configuration \
+  --function-name "$LAMBDA_NAME" \
+  --query 'Environment.Variables.DB_SECRET_ARN' \
+  --output text)
+DB_NAME=$(aws lambda get-function-configuration \
+  --function-name "$LAMBDA_NAME" \
+  --query 'Environment.Variables.DB_NAME' \
+  --output text)
+
+aws rds-data execute-statement \
+  --resource-arn "$DB_RESOURCE_ARN" \
+  --secret-arn "$DB_SECRET_ARN" \
+  --database "$DB_NAME" \
+  --sql "insert into system_admin_allowlist (provider, subject, notes, active) values ('$ADMIN_PROVIDER', '$ADMIN_SUBJECT', 'system admin', true);"
+```
+
+- Insert that value into `system_admin_allowlist` (`provider`, `subject`, `active=true`).
+- Log out and log back in (admin role is determined at login time).
+
+Quick verification SQL:
+
+```sql
+select provider, subject, active, notes
+from system_admin_allowlist
+where provider='<provider>' and subject='<subject>';
+```
+
+Current privileged operations guarded by this role include:
+- cross-tenant session switching (`POST /api/auth/update-tenant`)
+- listing all site configurations (`GET /api/site-configuration/all`)
+
+## System admin troubleshooting
+
+If you are logged in but `roles.admin` is still `tenant` after adding an allowlist row:
+
+- Confirm you are using the deployed stack URL output from CDK (not another environment).
+- Sign in, then open `/api/_auth/session` and copy:
+  - GitHub: `user.gitHubId`
+  - Google: `user.googleId`
+- Insert that value into `system_admin_allowlist` with the matching `provider` (`github` or `google`), `subject`, and `active=true`.
+- Log out and log back in (admin role is determined at login time).
+
+Quick verification SQL:
+
+```sql
+select provider, subject, active, notes
+from system_admin_allowlist
+where provider='<provider>' and subject='<subject>';
+```
 
 ## Configuration tuning (for non-experts)
 
@@ -319,21 +335,3 @@ OAuth providers must exactly match the deployed host callback paths:
 - `https://<host>/auth/github`
 
 If no custom domain is provisioned yet, the host is often unknown until the first deploy. Deploy once, capture the host, then update provider callback URLs and redeploy if needed.
-
-7. Logged in but `roles.admin` is still `tenant` after adding allowlist row
-
-Post-deploy checklist for system admin:
-- Confirm you are using the deployed stack URL output from CDK (not another environment).
-- Sign in, then open `/api/_auth/session` and copy:
-  - GitHub: `user.gitHubId`
-  - Google: `user.googleId`
-- Insert that value into `system_admin_allowlist` (`provider`, `subject`, `active=true`).
-- Log out and log back in (admin role is determined at login time).
-
-Quick verification SQL:
-
-```sql
-select provider, subject, active, notes
-from system_admin_allowlist
-where provider='github' and subject='<github-id>';
-```

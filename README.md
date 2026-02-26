@@ -69,7 +69,7 @@ Push schema changes (development only):
 npm run push
 ```
 
-Generate SQL migrations:
+When `drizzle/schema.ts` changes, generate SQL migrations:
 
 ```bash
 npm run db:migrate:generate
@@ -95,4 +95,3 @@ Deployment and hosting guidance:
 
 - [HOSTING.md](HOSTING.md) - hosting options, requirements, and provider-specific guidance
 - [infrastructure/cdk/README.md](infrastructure/cdk/README.md) - AWS CDK deployment path
-

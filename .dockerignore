@@ -1,0 +1,11 @@
+node_modules
+.nuxt
+.output
+coverage
+.git
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+infrastructure/pulumi/aws/node_modules
+infrastructure/pulumi/aws/.pulumi

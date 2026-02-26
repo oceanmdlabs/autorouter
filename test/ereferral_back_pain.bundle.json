@@ -1,0 +1,561 @@
+{
+  "resourceType": "Bundle",
+  "id": "7ea1dd78-8b77-4f8b-968b-d6ab36391350",
+  "meta": {
+    "lastUpdated": "2025-05-27T11:45:06.783-04:00"
+  },
+  "type": "message",
+  "timestamp": "2025-05-27T11:45:06.783-04:00",
+  "entry": [
+    {
+      "fullUrl": "fdd94a37-22a7-41ce-8140-6604a1f10908",
+      "resource": {
+        "resourceType": "MessageHeader",
+        "id": "fdd94a37-22a7-41ce-8140-6604a1f10908",
+        "meta": {
+          "profile": [
+            "http://ehealthontario.ca/fhir/StructureDefinition/ca-on-eReferral-profile-MessageHeader|1.0.1"
+          ]
+        },
+        "extension": [
+          {
+            "url": "http://ehealthontario.ca/fhir/StructureDefinition/ext-referral-identifier",
+            "valueIdentifier": {
+              "system": "http://localhost:8081/svc/fhir/v1/NamingSystem/id-ereferral-reference",
+              "value": "71db1a5c-89ce-41d5-bc71-8466f6c2f182"
+            }
+          }
+        ],
+        "eventCoding": {
+          "system": "https://ehealthontario.ca/fhir/CodeSystem/message-event-code",
+          "code": "add-service-request",
+          "display": "add-service-request"
+        },
+        "destination": [
+          {
+            "name": "Autorouter Test",
+            "endpoint": "http://localhost:4001/api/cds/cds-services/order-sign-cds",
+            "receiver": {
+              "reference": "urn:uuid:163dd763-3947-442a-82d5-3d0c598142bd"
+            }
+          }
+        ],
+        "sender": {
+          "reference": "urn:uuid:2ae02c27-5bad-446f-a458-f00f20c86b0c"
+        },
+        "author": {
+          "reference": "urn:uuid:2ae02c27-5bad-446f-a458-f00f20c86b0c"
+        },
+        "source": {
+          "name": "Ocean",
+          "endpoint": "http://localhost:8081/svc/fhir/v1/$process-messages"
+        },
+        "reason": {
+          "text": "Initial"
+        },
+        "focus": [
+          {
+            "reference": "urn:uuid:71db1a5c-89ce-41d5-bc71-8466f6c2f182"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:a5f0e549-754c-4a09-a96f-555e981aa3d1",
+      "resource": {
+        "resourceType": "Patient",
+        "meta": {
+          "profile": [
+            "http://ehealthontario.ca/fhir/StructureDefinition/ca-on-eReferral-profile-Patient|1.0.1"
+          ]
+        },
+        "identifier": [
+          {
+            "use": "official",
+            "type": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                  "code": "JHN",
+                  "display": "Jurisdictional health number (Canada)"
+                }
+              ],
+              "text": "Personal Health Number"
+            },
+            "system": "https://fhir.infoway-inforoute.ca/NamingSystem/ca-on-patient-hcn"
+          },
+          {
+            "type": {
+              "coding": [
+                {
+                  "system": "http://terminology.hl7.org/CodeSystem/v2-0203",
+                  "code": "MR",
+                  "display": "Medical record number"
+                }
+              ],
+              "text": "EMR/EHR Medical Record Number"
+            },
+            "system": "http://localhost:8081/svc/fhir/v1/NamingSystem/id-external-patient-reference"
+          }
+        ],
+        "active": true,
+        "name": [
+          {
+            "use": "official",
+            "text": "DKTest",
+            "family": "DKTest"
+          }
+        ],
+        "gender": "male",
+        "deceasedBoolean": false,
+        "address": [
+          {
+            "use": "home",
+            "type": "postal"
+          },
+          {
+            "use": "home",
+            "type": "postal"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:163dd763-3947-442a-82d5-3d0c598142bd",
+      "resource": {
+        "resourceType": "PractitionerRole",
+        "meta": {
+          "profile": [
+            "http://ehealthontario.ca/fhir/StructureDefinition/ca-on-eReferral-profile-PractitionerRole|1.0.0"
+          ]
+        },
+        "identifier": [
+          {
+            "system": "http://localhost:8081/svc/fhir/v1/NamingSystem/id-referral-target-reference",
+            "value": "autorouter_test49721437"
+          },
+          {
+            "system": "http://localhost:8081/svc/fhir/v1/NamingSystem/id-site-number",
+            "value": "1234"
+          }
+        ],
+        "active": true,
+        "specialty": [
+          {
+            "coding": [
+              {
+                "system": "https://fhir.infoway-inforoute.ca/CodeSystem/snomedctcaextension",
+                "code": "410223002"
+              }
+            ]
+          },
+          {
+            "coding": [
+              {
+                "system": "https://fhir.infoway-inforoute.ca/CodeSystem/snomedctcaextension",
+                "code": "49634009"
+              }
+            ]
+          }
+        ],
+        "location": [
+          {
+            "reference": "urn:uuid:fba2ce57-13b6-49a6-b850-a04022ef3ccd"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:2ae02c27-5bad-446f-a458-f00f20c86b0c",
+      "resource": {
+        "resourceType": "PractitionerRole",
+        "meta": {
+          "profile": [
+            "http://ehealthontario.ca/fhir/StructureDefinition/ca-on-eReferral-profile-PractitionerRole|1.0.0"
+          ]
+        },
+        "active": true,
+        "practitioner": {
+          "reference": "urn:uuid:5f40a1da-aca8-4b58-b2eb-78bc6dcd3dec"
+        },
+        "location": [
+          {
+            "reference": "urn:uuid:da015453-704f-4797-be3b-5733ba6b8c36"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:5f40a1da-aca8-4b58-b2eb-78bc6dcd3dec",
+      "resource": {
+        "resourceType": "Practitioner",
+        "meta": {
+          "profile": [
+            "http://ehealthontario.ca/fhir/StructureDefinition/ca-on-eReferral-profile-Practitioner|1.0.0"
+          ]
+        },
+        "active": true,
+        "address": [
+          {
+            "use": "work",
+            "type": "both"
+          }
+        ],
+        "name": [
+          {
+            "family": "Kavanagh",
+            "given": ["Doug"]
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:da015453-704f-4797-be3b-5733ba6b8c36",
+      "resource": {
+        "resourceType": "Location",
+        "meta": {
+          "profile": [
+            "http://ehealthontario.ca/fhir/StructureDefinition/ca-on-eReferral-profile-Location|1.0.1"
+          ]
+        },
+        "status": "active",
+        "mode": "instance",
+        "address": {
+          "use": "work",
+          "type": "physical"
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:fba2ce57-13b6-49a6-b850-a04022ef3ccd",
+      "resource": {
+        "resourceType": "Location",
+        "meta": {
+          "profile": [
+            "http://ehealthontario.ca/fhir/StructureDefinition/ca-on-eReferral-profile-Location|1.0.1"
+          ]
+        },
+        "status": "active",
+        "mode": "instance",
+        "address": {
+          "use": "work",
+          "type": "physical",
+          "line": ["3080 Yonge St"],
+          "city": "Toronto",
+          "state": "ON",
+          "postalCode": "M4P 0C6"
+        },
+        "position": {
+          "longitude": -79.40261840820312,
+          "latitude": 43.72555923461914
+        }
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:2c94573d-5538-44d1-ada8-ee567b4bc52f",
+      "resource": {
+        "resourceType": "DocumentReference",
+        "meta": {
+          "profile": [
+            "http://ehealthontario.ca/fhir/StructureDefinition/ca-on-eReferral-profile-DocumentReference|1.0.0"
+          ]
+        },
+        "identifier": [
+          {
+            "system": "http://localhost:8081/svc/fhir/v1/NamingSystem/id-ereferral-reference",
+            "value": "71db1a5c-89ce-41d5-bc71-8466f6c2f182"
+          }
+        ],
+        "status": "current",
+        "date": "2025-05-27T11:38:00.000-04:00",
+        "content": [
+          {
+            "attachment": {
+              "contentType": "application/pdf",
+              "url": "http://localhost:8081/svc/fhir/v1/ServiceRequest/71db1a5c-89ce-41d5-bc71-8466f6c2f182/$letter",
+              "title": "DKTest--2025-05-27.pdf",
+              "creation": "2025-05-27T11:38:00-04:00"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:71db1a5c-89ce-41d5-bc71-8466f6c2f182",
+      "resource": {
+        "resourceType": "ServiceRequest",
+        "meta": {
+          "profile": [
+            "http://ehealthontario.ca/fhir/StructureDefinition/ca-on-eReferral-profile-ServiceRequest|1.0.1"
+          ]
+        },
+        "identifier": [
+          {
+            "system": "http://localhost:8081/svc/fhir/v1/NamingSystem/id-ereferral-reference",
+            "value": "71db1a5c-89ce-41d5-bc71-8466f6c2f182"
+          }
+        ],
+        "status": "active",
+        "intent": "proposal",
+        "category": [
+          {
+            "coding": [
+              {
+                "system": "http://snomed.info/sct",
+                "code": "410223002",
+                "display": "MENTAL_HEALTH_ASSESSMENT_AND_REFERRAL"
+              }
+            ]
+          }
+        ],
+        "subject": {
+          "reference": "urn:uuid:a5f0e549-754c-4a09-a96f-555e981aa3d1"
+        },
+        "authoredOn": "2025-05-27T11:38:00-04:00",
+        "requester": {
+          "reference": "urn:uuid:2ae02c27-5bad-446f-a458-f00f20c86b0c"
+        },
+        "performer": [
+          {
+            "reference": "urn:uuid:163dd763-3947-442a-82d5-3d0c598142bd"
+          }
+        ],
+        "supportingInfo": [
+          {
+            "reference": "urn:uuid:2c94573d-5538-44d1-ada8-ee567b4bc52f"
+          },
+          {
+            "reference": "urn:uuid:c771a805-856d-45e6-a2e7-aa2bfe659260"
+          }
+        ],
+        "note": [
+          {
+            "authorReference": {
+              "reference": "urn:uuid:5f40a1da-aca8-4b58-b2eb-78bc6dcd3dec"
+            },
+            "time": "2025-05-27T11:38:00-04:00",
+            "text": "<b>Reason for Referral:</b> Back pain with no red flags&nbsp;"
+          }
+        ]
+      }
+    },
+    {
+      "fullUrl": "urn:uuid:c771a805-856d-45e6-a2e7-aa2bfe659260",
+      "resource": {
+        "resourceType": "QuestionnaireResponse",
+        "meta": {
+          "profile": [
+            "http://ehealthontario.ca/fhir/StructureDefinition/ca-on-eReferral-profile-QuestionnaireResponse|1.0.0"
+          ]
+        },
+        "identifier": {
+          "system": "http://localhost:8081/svc/fhir/v1/NamingSystem/id-form-reference",
+          "value": "quickReferral"
+        },
+        "status": "completed",
+        "subject": {
+          "reference": "urn:uuid:a5f0e549-754c-4a09-a96f-555e981aa3d1"
+        },
+        "author": {
+          "reference": "urn:uuid:5f40a1da-aca8-4b58-b2eb-78bc6dcd3dec"
+        },
+        "item": [
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "allergies",
+            "text": "Allergies:"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "tx"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "rx"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "soc"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "i_ntreatments_n",
+            "text": "Treatments:"
+          },
+          {
+            "linkId": "includeCPP",
+            "text": "Include CPP:"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "allg"
+          },
+          {
+            "linkId": "hx"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "s__section"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "i_ncurrent_problems_n",
+            "text": "Current Problems:"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "i_nfamily_history_n",
+            "text": "Family History:"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "i_nsocial_history_n",
+            "text": "Social History:"
+          },
+          {
+            "linkId": "__section"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "prob"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "i_nmedications_n",
+            "text": "Medications:"
+          },
+          {
+            "linkId": "history",
+            "text": "History:"
+          },
+          {
+            "linkId": "includeLabs",
+            "text": "Include Labs:"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "i_npast_medical_histo",
+            "text": "Past Medical History:"
+          },
+          {
+            "linkId": "s"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "labs2",
+            "text": "Labs:"
+          },
+          {
+            "linkId": "reason_for_referral",
+            "text": "Reason for Referral:"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "labs"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "fhx"
+          },
+          {
+            "extension": [
+              {
+                "url": "http://localhost:8081/svc/fhir/v1/StructureDefinition/ext-ocean-eform-item-visibility",
+                "valueString": "hidden"
+              }
+            ],
+            "linkId": "pmhx"
+          },
+          {
+            "linkId": "rfr",
+            "answer": [
+              {
+                "valueString": "back pain with no red flags"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

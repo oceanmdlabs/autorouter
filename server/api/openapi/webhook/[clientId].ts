@@ -64,7 +64,7 @@ export default defineEventHandler(async (event) => {
       challenge,
     };
   } else {
-    console.log("webhook event", body);
+    cxt.logger.info("Received patient engagement webhook event");
 
     const peEvent = OceanPatientEngagementWebhookEventSchema.parse(body);
     const patient = await getPatient({

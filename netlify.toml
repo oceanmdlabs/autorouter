@@ -7,6 +7,3 @@
 	framework = "nuxt"
 	port = 8888
 	targetPort = 4000
-
-[functions]
-	directory = "src/infrastructure/adapters/netlify/functions"

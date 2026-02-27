@@ -7,6 +7,7 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
+    "deploy:aws": "npm --prefix infrastructure/cdk run cdk:deploy:app:env:migrate -- --require-approval never",
     "postinstall": "nuxt prepare",
     "db:migrate:generate": "drizzle-kit generate",
     "push": "drizzle-kit push",

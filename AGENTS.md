@@ -12,16 +12,16 @@ This is the **Ocean Autorouter** - a Nuxt/Vue.js application that uses AI to int
 
 2. **Before Creating PRs**:
    ```bash
-   # Always check sync status first
-   git fetch origin && git fetch opensource
-   git log --oneline origin/main..opensource/main
+   # Always check local branch is synced with origin/main
+   git fetch origin
+   git log --oneline HEAD..origin/main
    ```
-   If commits are listed, the branches are out of sync and need attention before creating a PR.
+   If commits are listed, pull/rebase before creating a PR.
 
 3. **Commit Workflow**:
    - Develop on feature branches created from `origin/main`
-   - Push to `origin` remote (not `opensource`)
-   - Create cross-repo PRs via Bitbucket UI to `opensource`
+   - Push feature branches to `origin`
+   - Create PRs targeting `main` in GitHub
 
 4. **After Merge Conflicts During Rebase**:
    - Read the conflict markers carefully

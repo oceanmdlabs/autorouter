@@ -188,6 +188,8 @@ export const siteConfig = pgTable(
     siteKeyEncrypted: text("site_key_encrypted"),
     siteCredentialEncrypted: text("site_credential_encrypted"),
     sharedEncryptionKeyEncrypted: text("shared_encryption_key_encrypted"),
+    webhookKeyEncrypted: text("webhook_key_encrypted"),
+    webhookUnsignedChallengeUntil: timestamp("webhook_unsigned_challenge_until"),
   },
   (table) => ({
     tenantIdx: index("idx_site_config_tenant_id").on(table.tenantId),

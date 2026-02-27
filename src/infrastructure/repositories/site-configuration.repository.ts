@@ -45,6 +45,7 @@ export const createSiteConfigurationRepository = ({
       siteKeyEncrypted,
       siteCredentialEncrypted,
       sharedEncryptionKeyEncrypted,
+      webhookKeyEncrypted,
       ...rest
     } = dbRecord;
     return {
@@ -62,6 +63,7 @@ export const createSiteConfigurationRepository = ({
         sharedEncryptionKeyEncrypted,
         "sharedEncryptionKey"
       ),
+      webhookKey: decrypt(webhookKeyEncrypted, "webhookKey"),
     };
   }
   function mapToDbRecord(record: SiteConfiguration) {
@@ -73,6 +75,7 @@ export const createSiteConfigurationRepository = ({
       siteKey,
       siteCredential,
       sharedEncryptionKey,
+      webhookKey,
       ...rest
     } = record;
     return {
@@ -95,6 +98,9 @@ export const createSiteConfigurationRepository = ({
         sharedEncryptionKeyEncrypted:
           cryptoService.encrypt(sharedEncryptionKey),
       }),
+      ...(webhookKey && {
+        webhookKeyEncrypted: cryptoService.encrypt(webhookKey),
+      }),
     };
   }
 
@@ -107,6 +113,7 @@ export const createSiteConfigurationRepository = ({
       siteKey,
       siteCredential,
       sharedEncryptionKey,
+      webhookKey,
       ...rest
     } = record;
     const result: Record<string, unknown> = { ...rest };
@@ -133,6 +140,9 @@ export const createSiteConfigurationRepository = ({
     if (sharedEncryptionKey != null) {
       result.sharedEncryptionKeyEncrypted =
         cryptoService.encrypt(sharedEncryptionKey);
+    }
+    if (webhookKey != null) {
+      result.webhookKeyEncrypted = cryptoService.encrypt(webhookKey);
     }
 
     return result;

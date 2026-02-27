@@ -4,7 +4,6 @@ import type {
 } from "@/src/application/services/fhir.service.interface";
 import type { Resource } from "fhir/r4";
 
-import { Fhir } from "fhir";
 import { ApplicationContext } from "@/src/entities/models/application-context";
 
 type Dependencies = {
@@ -13,34 +12,21 @@ type Dependencies = {
 
 export const createFhirService = (deps: Dependencies): IFhirService => {
   const { cxt } = deps;
-  const fhir = new Fhir();
 
   async function validateResource(
     resource: Resource
   ): Promise<ValidationResponse> {
-    const response = fhir.validate(resource, {});
-    const issues = response.messages.map((m) => {
-      return {
-        code: "validation_error",
-        details: {
-          text: `${m.resourceId}:${m.location}: ${m.severity} ${m.message}`,
-        },
-        severity: (m.severity ?? "error") as
-          | "fatal"
-          | "error"
-          | "warning"
-          | "information",
-      };
-    });
+    const issues = collectStructuralValidationIssues(resource);
+    const valid = issues.every((issue) => issue.severity !== "error");
     const significantIssues = issues.filter(isSignificantWarning);
     const description =
-      (response.valid ? "Valid FHIR: " : "Invalid FHIR: ") +
-      issues.map((i) => i.details.text).join("; ");
+      (valid ? "Valid FHIR: " : "Invalid FHIR: ") +
+      (issues.map((i) => i.details.text).join("; ") || "No issues.");
     if (significantIssues.length > 0) {
       cxt.logger.warn(`Validation issues: ${description}`);
     }
     return {
-      valid: response.valid,
+      valid,
       issues: significantIssues,
       description: description,
     };
@@ -61,4 +47,35 @@ function isSignificantWarning(i: {
       i.severity === "fatal" ||
       i.severity === "error")
   );
+}
+
+function collectStructuralValidationIssues(resource: Resource) {
+  const issues: Array<{
+    code: string;
+    details: { text: string };
+    severity: "fatal" | "error" | "warning" | "information";
+  }> = [];
+  if (!resource || typeof resource !== "object") {
+    issues.push({
+      code: "validation_error",
+      details: { text: "resource:error: Resource payload is missing or invalid." },
+      severity: "error",
+    });
+    return issues;
+  }
+  if (!resource.resourceType || typeof resource.resourceType !== "string") {
+    issues.push({
+      code: "validation_error",
+      details: { text: "resourceType:error: Missing resourceType." },
+      severity: "error",
+    });
+  }
+  if ("id" in resource && resource.id != null && typeof resource.id !== "string") {
+    issues.push({
+      code: "validation_error",
+      details: { text: "id:warning: Resource id should be a string when present." },
+      severity: "warning",
+    });
+  }
+  return issues;
 }

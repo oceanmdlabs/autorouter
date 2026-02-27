@@ -113,8 +113,12 @@ export const createOceanClientService = ({
     credentials: OceanClientCredentials;
   }): Promise<Buffer<ArrayBufferLike>> {
     try {
+      const sanitizedLetterUrl = normalizeAndValidateLetterUrl({
+        letterUrl,
+        oceanServer: credentials.oceanServer,
+      });
       const accessToken = await retrieveAccessToken(credentials);
-      const apiResponse = await fetch(letterUrl, {
+      const apiResponse = await fetch(sanitizedLetterUrl, {
         headers: {
           "Content-Type": "application/fhir+json;charset=UTF-8",
           Authorization: `Bearer ${accessToken}`,
@@ -161,3 +165,28 @@ export const createOceanClientService = ({
     fetchLetterData,
   };
 };
+
+function normalizeAndValidateLetterUrl({
+  letterUrl,
+  oceanServer,
+}: {
+  letterUrl: string;
+  oceanServer: OceanClientCredentials["oceanServer"];
+}): string {
+  const expectedUrl = new URL(getOceanServerUrl(oceanServer));
+  const parsedLetterUrl = new URL(letterUrl, expectedUrl.origin);
+  if (parsedLetterUrl.hostname !== expectedUrl.hostname) {
+    throw new AuthorizationError(
+      `Invalid attachment URL host: ${parsedLetterUrl.hostname}`
+    );
+  }
+  if (
+    parsedLetterUrl.protocol !== expectedUrl.protocol &&
+    oceanServer !== "local"
+  ) {
+    throw new AuthorizationError(
+      `Invalid attachment URL protocol: ${parsedLetterUrl.protocol}`
+    );
+  }
+  return parsedLetterUrl.toString();
+}

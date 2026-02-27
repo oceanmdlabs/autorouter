@@ -1,6 +1,7 @@
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
 
 export default defineEventHandler(async (event) => {
+  await requireUserSession(event);
   const body = await readBody(event);
   const { oceanServer, oceanClientId, oceanClientSecret } = body;
   const cxt = await toApplicationContext(event);

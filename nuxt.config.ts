@@ -5,6 +5,26 @@ import { fileURLToPath } from "url";
 import tailwindcss from "@tailwindcss/vite";
 
 const currentDir = dirname(fileURLToPath(import.meta.url));
+const buildTime = process.env.BUILD_TIME ?? process.env.BUILD_DATE ?? new Date().toISOString();
+const appVersion = process.env.APP_VERSION ?? process.env.npm_package_version ?? "unknown";
+const commitSha =
+  process.env.COMMIT_SHA ??
+  process.env.GITHUB_SHA ??
+  process.env.VERCEL_GIT_COMMIT_SHA ??
+  process.env.COMMIT_REF ??
+  "unknown";
+const branchName =
+  process.env.BRANCH_NAME ??
+  process.env.GITHUB_REF_NAME ??
+  process.env.VERCEL_GIT_COMMIT_REF ??
+  "unknown";
+const deployEnvironment =
+  process.env.DEPLOY_ENVIRONMENT ??
+  process.env.NODE_ENV ??
+  process.env.CONTEXT ??
+  "unknown";
+const deployUrl = process.env.DEPLOY_URL ?? process.env.URL ?? "unknown";
+const region = process.env.AWS_REGION ?? process.env.VERCEL_REGION ?? "unknown";
 
 export default defineNuxtConfig({
   ssr: false,
@@ -24,6 +44,18 @@ export default defineNuxtConfig({
       google: {
         clientId: process.env.NUXT_OAUTH_GOOGLE_CLIENT_ID,
         clientSecret: process.env.NUXT_OAUTH_GOOGLE_CLIENT_SECRET,
+      },
+    },
+    public: {
+      deploymentInfo: {
+        appVersion,
+        buildTime,
+        commitSha,
+        branchName,
+        deployEnvironment,
+        deployUrl,
+        region,
+        nodeVersion: process.version,
       },
     },
   },

@@ -62,6 +62,8 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   siteKey: z.string().trim().max(255).optional().nullable(),
   siteCredential: z.string().trim().max(255).optional().nullable(),
   sharedEncryptionKey: z.string().trim().max(255).optional().nullable(),
+  webhookKey: z.string().trim().max(255).optional().nullable(),
+  webhookUnsignedChallengeUntil: z.date().nullable().optional(),
 });
 const newSchema = schema.merge(newBaseResourceSchema);
 const updateSchema = schema.partial().merge(updateBaseResourceSchema);

@@ -44,6 +44,12 @@ Copy and configure environment variables:
 cp .env.example .env
 ```
 
+Windows (PowerShell):
+
+```powershell
+Copy-Item .env.example .env
+```
+
 ## Development
 
 Start the local dev server:
@@ -61,6 +67,12 @@ npm run test
 
 ## Database
 
+The app supports two DB connection modes:
+
+- `DB_DRIVER=pg` (default): direct PostgreSQL connection via `pg`; requires `DB_URL`.
+  - Works with local Postgres and managed Postgres endpoints (for example AWS RDS PostgreSQL or Aurora PostgreSQL endpoint) when network access is available.
+- `DB_DRIVER=aws-data-api-pg`: Aurora Data API mode; requires `DB_NAME`, `DB_RESOURCE_ARN`, `DB_SECRET_ARN`, and `AWS_REGION`.
+
 Database schema lives in `drizzle/schema.ts`.
 
 Push schema changes (development only):
@@ -74,6 +86,8 @@ When `drizzle/schema.ts` changes, generate SQL migrations:
 ```bash
 npm run db:migrate:generate
 ```
+
+Note: `npm run push` uses `drizzle.config.ts` and currently requires `DB_URL` (direct SQL connection). For Aurora Data API environments, use the AWS migration flow documented in [infrastructure/cdk/README.md](infrastructure/cdk/README.md).
 
 ## Production
 

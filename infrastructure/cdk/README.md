@@ -33,6 +33,14 @@ This guide focuses on deploying to AWS with basic admin privileges.
 - Access to target AWS account (SSO recommended)
 - CDK bootstrap completed in target account/region
 
+### Windows PowerShell quick equivalents
+
+To avoid duplicating every command in this guide:
+- Use `Copy-Item` instead of `cp` for file copies.
+- Replace inline env assignment (for example `AWS_PROFILE=x AWS_REGION=y <command>`) with:
+  `$env:AWS_PROFILE="x"; $env:AWS_REGION="y"; <command>`
+- Replace `source file` with `. .\file`.
+
 ### App prerequisites (important)
 
 The login page supports Google and GitHub OAuth. You should configure **at least one provider**.

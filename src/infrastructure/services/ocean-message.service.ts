@@ -12,7 +12,10 @@ import type {
   ServiceRequest,
   Task,
 } from "fhir/r4";
-import { getSourceEndpoint } from "@/src/application/services/ocean-server.utils";
+import {
+  getDeployUrl,
+  getSourceEndpoint,
+} from "@/src/application/services/ocean-server.utils";
 import { InvalidArgumentsError, IOError } from "@/src/entities/errors/common";
 import { uuid } from "@/src/entities/models/uuid";
 
@@ -26,6 +29,8 @@ type EReferralEventV11 =
   | "notify-data-correction";
 
 const ORGANIZATION_ID = "autorouter";
+const AUTOROUTER_PRACTITIONER_ROLE_ID = "autorouter-sender";
+const AUTOROUTER_SENDER_NAME = "Autorouter";
 
 type CreateMessageHeaderParams = {
   eventCode: EReferralEventV11;
@@ -388,9 +393,11 @@ export function createSendCommunicationMessage(
 ): Bundle {
   const resources = prepareResourcesForResponse(serviceRequestBundle);
   const serviceRequest = getServiceRequest(resources);
+  const sender = createAutorouterSenderPractitionerRole();
   const communication: Communication = createCommunication(
     serviceRequest,
-    message
+    message,
+    sender
   );
   return createMessageBundle({
     resources: [
@@ -403,6 +410,7 @@ export function createSendCommunicationMessage(
           },
         ],
       }),
+      sender,
       communication,
       ...resources,
     ],
@@ -450,7 +458,8 @@ const OCEAN_REFERRAL_IDENTIFIER_SYSTEM = `${OCEAN_SERVER_URL}/svc/fhir/v1/Naming
 
 function createCommunication(
   serviceRequest: ServiceRequest,
-  message: string
+  message: string,
+  sender?: PractitionerRole
 ): Communication {
   const oceanReferralRef = getOceanReferenceFromServiceRequest(serviceRequest);
   if (!oceanReferralRef) {
@@ -479,11 +488,25 @@ function createCommunication(
         contentString: message,
       },
     ],
-    sender: {
-      identifier: {
-        value: "Autorouter",
+    sender: sender
+      ? {
+          reference: "PractitionerRole/" + sender.id,
+          identifier: sender.identifier?.[0],
+        }
+      : undefined,
+  };
+}
+
+function createAutorouterSenderPractitionerRole(): PractitionerRole {
+  return {
+    resourceType: "PractitionerRole",
+    id: AUTOROUTER_PRACTITIONER_ROLE_ID,
+    identifier: [
+      {
+        system: `${getDeployUrl()}/fhir/NamingSystem/autorouter-sender`,
+        value: AUTOROUTER_SENDER_NAME,
       },
-    },
+    ],
   };
 }
 

@@ -24,7 +24,9 @@ export const defaultEmailTemplate = `
         margin-bottom: 20px;
       }
       .header img {
-        max-width: 100px;
+        max-width: 280px;
+        width: 100%;
+        height: auto;
       }
       .content {
         line-height: 1.6;
@@ -54,7 +56,7 @@ export const defaultEmailTemplate = `
   <body>
     <div class="container">
       <div class="header">
-        <img src="{{logoUrl}}" alt="Ocean Autorouter Logo" />
+        <img src="{{logoUrl}}" alt="Ocean Labs Logo" />
       </div>
       <div class="content">{{{message}}}</div>
       {{#if referralLink}}

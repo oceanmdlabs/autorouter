@@ -2,7 +2,11 @@
 
 ## Overview
 
-Ocean Autorouter is a standalone Nuxt application that integrates with an Ocean site to automate eReferral and eConsult routing using AI and configurable rules.
+Ocean Autorouter is an Ocean Labs innovation project that brings intelligent automation to Ocean eReferral and eConsult workflows.
+
+Built as a standalone Nuxt application, it monitors referral events in real time, uses AI to analyze referral content (including form data, patient context, and attachments), and applies configurable rules to trigger secure routing actions in Ocean.
+
+The result is faster intake operations, reduced administrative burden, and stronger support for scalable virtual care pathways.
 
 ## Tech Stack
 

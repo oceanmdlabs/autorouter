@@ -66,7 +66,7 @@ export class Smtp2goEmailService implements EmailService {
   }): Promise<void> {
     const { to, cc, bcc, subject, message, referralLink } = params;
 
-    const logoUrl = `${getDeployUrl()}/autorouter-logo.png`;
+    const logoUrl = `${getDeployUrl()}/ocean-labs-logo.svg`;
     let htmlBody = defaultEmailTemplate
       .replace("{{logoUrl}}", logoUrl)
       .replace("{{{message}}}", message);

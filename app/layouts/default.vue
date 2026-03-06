@@ -44,7 +44,7 @@ function goToLogin() {
           <!-- Logo and Site Name -->
           <div class="flex items-center space-x-3 flex-1 min-w-0">
             <div class="flex-shrink-0">
-              <img src="/autorouter-logo.png" alt="AutoRouter Logo" class="h-8" />
+              <img src="/ocean-labs-logo.svg" alt="Ocean Labs Logo" class="h-7 w-auto" />
             </div>
             <div v-if="siteConfig?.siteConfig?.name" class="min-w-0 flex-1">
               <div class="text-lg font-semibold text-gray-900 truncate">{{ siteConfig.siteConfig.name }}</div>

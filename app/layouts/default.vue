@@ -21,15 +21,16 @@ const toggleMenu = () => {
 
 const memberships = computed(() => user.value?.memberships ?? [])
 const activeTenantId = computed(() => user.value?.activeTenantId ?? user.value?.tenantId ?? null)
+const hasActiveTenant = computed(() => Boolean(activeTenantId.value))
 const activeMembership = computed(() =>
   memberships.value.find((membership) => membership.tenantId === activeTenantId.value)
 )
 const canManageTenant = computed(() =>
   user.value?.roles?.admin === 'system' || activeMembership.value?.role === 'admin'
 )
+const selectedSiteName = computed(() => siteConfig.value?.siteConfig?.name ?? activeTenantId.value ?? null)
 const navItems = computed(() => {
   const items = [
-    { to: '/portal/access', label: 'Access' },
     { to: '/portal/site-configuration', label: 'Site' },
     { to: '/portal/routing-rules', label: 'Rules' },
     { to: '/portal/listings', label: 'Listings' },
@@ -94,27 +95,30 @@ function goToLogin() {
           </button>
 
           <div class="flex min-w-0 flex-1 items-center gap-3">
-            <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-slate-100 ring-1 ring-slate-200">
-              <img src="/ocean-labs-logo.svg" alt="Ocean Labs Logo" class="h-6 w-auto" />
-            </div>
+            <img src="/ocean-labs-logo.svg" alt="Ocean Labs Logo" class="h-6 w-auto flex-shrink-0" />
             <div class="min-w-0">
               <div class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Ocean Labs</div>
               <div class="flex min-w-0 items-baseline gap-2">
                 <div class="text-lg font-semibold text-slate-950">Autorouter</div>
-                <div v-if="siteConfig?.siteConfig?.name" class="hidden truncate text-sm text-slate-500 lg:block">
-                  {{ siteConfig.siteConfig.name }}
+                <div v-if="selectedSiteName" class="hidden truncate text-sm text-slate-500 lg:block">
+                  {{ selectedSiteName }}
                 </div>
               </div>
             </div>
           </div>
 
-          <nav class="hidden md:flex items-center rounded-full border border-slate-200 bg-slate-50/80 p-1">
+          <nav
+            class="hidden md:flex items-center rounded-full border border-slate-200 bg-slate-50/80 p-1"
+            :class="hasActiveTenant ? '' : 'pointer-events-none opacity-45 saturate-0'"
+          >
             <NuxtLink
               v-for="item in navItems"
               :key="item.to"
               :to="item.to"
               class="rounded-full px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-950"
-              :class="isRouteActive(item.to) ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : ''"
+              :class="hasActiveTenant && isRouteActive(item.to) ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : ''"
+              :tabindex="hasActiveTenant ? 0 : -1"
+              :aria-disabled="!hasActiveTenant"
             >
               {{ item.label }}
             </NuxtLink>
@@ -128,7 +132,7 @@ function goToLogin() {
               <div class="min-w-0 pr-1 text-left leading-tight">
                 <div class="max-w-[150px] truncate text-sm font-medium text-slate-950">{{ user?.name }}</div>
                 <div class="max-w-[150px] truncate text-xs text-slate-500">
-                  {{ activeTenantId ?? 'Account' }}
+                  {{ selectedSiteName ?? 'Choose access' }}
                 </div>
               </div>
               <svg class="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,7 +143,17 @@ function goToLogin() {
             <div class="absolute right-0 z-20 mt-3 w-80 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
               <div class="border-b border-slate-100 px-1 pb-3">
                 <div class="text-sm font-semibold text-slate-950">{{ user?.name }}</div>
-                <div class="text-xs text-slate-500">Ocean Autorouter account</div>
+                <div class="text-xs text-slate-500">{{ selectedSiteName ?? 'No site selected yet' }}</div>
+              </div>
+
+              <div class="border-b border-slate-100 px-1 py-3">
+                <NuxtLink
+                  to="/portal/access"
+                  class="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950"
+                >
+                  <span>Access</span>
+                  <span class="text-xs text-slate-400">{{ hasActiveTenant ? 'Manage' : 'Select' }}</span>
+                </NuxtLink>
               </div>
 
               <div v-if="memberships.length > 1" class="px-1 py-3">
@@ -171,7 +185,7 @@ function goToLogin() {
 
         <!-- Mobile navigation menu -->
         <div v-show="isMenuOpen" class="space-y-4 border-t border-slate-200 py-4 md:hidden">
-          <div class="grid grid-cols-2 gap-2">
+          <div v-if="hasActiveTenant" class="grid grid-cols-2 gap-2">
             <NuxtLink
               v-for="item in navItems"
               :key="item.to"
@@ -182,6 +196,9 @@ function goToLogin() {
               {{ item.label }}
             </NuxtLink>
           </div>
+          <div v-else class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500">
+            Choose tenant access to unlock navigation.
+          </div>
           <div class="rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center gap-3">
               <div class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold tracking-wide text-white">
@@ -189,8 +206,17 @@ function goToLogin() {
               </div>
               <div class="min-w-0">
                 <div class="truncate text-sm font-semibold text-slate-950">{{ user?.name }}</div>
-                <div class="truncate text-xs text-slate-500">{{ activeTenantId ?? 'Account' }}</div>
+                <div class="truncate text-xs text-slate-500">{{ selectedSiteName ?? 'Choose access' }}</div>
               </div>
+            </div>
+            <div class="pt-4">
+              <NuxtLink
+                to="/portal/access"
+                class="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"
+              >
+                <span>Access</span>
+                <span class="text-xs text-slate-400">{{ hasActiveTenant ? 'Manage' : 'Select' }}</span>
+              </NuxtLink>
             </div>
             <div v-if="memberships.length > 1" class="pt-4">
               <Label for="tenant-select-mobile" class="text-xs text-slate-500">Active tenant</Label>

@@ -14,6 +14,7 @@ const { data: siteConfig } = useAsyncData('site-config', async () => {
 });
 
 const isMenuOpen = ref(false)
+const route = useRoute()
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
 }
@@ -26,6 +27,38 @@ const activeMembership = computed(() =>
 const canManageTenant = computed(() =>
   user.value?.roles?.admin === 'system' || activeMembership.value?.role === 'admin'
 )
+const navItems = computed(() => {
+  const items = [
+    { to: '/portal/access', label: 'Access' },
+    { to: '/portal/site-configuration', label: 'Site' },
+    { to: '/portal/routing-rules', label: 'Rules' },
+    { to: '/portal/listings', label: 'Listings' },
+    { to: '/portal/testing', label: 'Testing' },
+    { to: '/portal/activity', label: 'Activity' },
+  ]
+
+  if (canManageTenant.value) {
+    items.push({ to: '/portal/members', label: 'Members' })
+  }
+
+  if (user.value?.roles?.admin === 'system') {
+    items.push({ to: '/admin', label: 'Admin' })
+  }
+
+  return items
+})
+const userInitials = computed(() => {
+  const name = user.value?.name?.trim()
+  if (!name) return 'AR'
+
+  return name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map(part => part[0]?.toUpperCase() ?? '')
+    .join('')
+})
+
+const isRouteActive = (to: string) => route.path.startsWith(to)
 
 const switchTenant = async (tenantId: string) => {
   await useRequestFetch()('/api/auth/update-tenant', {
@@ -48,11 +81,11 @@ function goToLogin() {
 
 <template>
   <div class="min-h-screen bg-gray-50">
-    <header class="bg-white shadow">
+    <header class="border-b border-gray-200 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/90">
       <div class="mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="flex h-16 justify-between items-center">
+        <div class="flex min-h-16 items-center gap-3 py-3">
           <!-- Mobile menu button -->
-          <button @click="toggleMenu" class="md:hidden p-2 rounded-md hover:bg-gray-100">
+          <button @click="toggleMenu" class="md:hidden rounded-md p-2 text-gray-600 hover:bg-gray-100">
             <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path v-if="!isMenuOpen" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M4 6h16M4 12h16M4 18h16" />
@@ -60,53 +93,110 @@ function goToLogin() {
             </svg>
           </button>
 
-          <!-- Logo, product, and site name -->
-          <div class="flex items-center space-x-3 flex-1 min-w-0">
-            <div class="flex-shrink-0">
-              <img src="/ocean-labs-logo.svg" alt="Ocean Labs Logo" class="h-7 w-auto" />
+          <div class="flex min-w-0 flex-1 items-center gap-3">
+            <div class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+              <img src="/ocean-labs-logo.svg" alt="Ocean Labs Logo" class="h-6 w-auto" />
             </div>
-            <div class="min-w-0 flex-1">
-              <div class="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">Autorouter</div>
-              <div v-if="siteConfig?.siteConfig?.name" class="text-lg font-semibold text-gray-900 truncate">
-                {{ siteConfig.siteConfig.name }}
+            <div class="min-w-0">
+              <div class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Ocean Labs</div>
+              <div class="flex min-w-0 items-baseline gap-2">
+                <div class="text-lg font-semibold text-slate-950">Autorouter</div>
+                <div v-if="siteConfig?.siteConfig?.name" class="hidden truncate text-sm text-slate-500 lg:block">
+                  {{ siteConfig.siteConfig.name }}
+                </div>
               </div>
             </div>
           </div>
 
-          <!-- Desktop navigation -->
-          <nav class="hidden md:flex items-center space-x-6 px-4">
-            <NavLink to="/portal/access">
-              Access
-            </NavLink>
-            <NavLink to="/portal/site-configuration">
-              Site Settings
-            </NavLink>
-            <NavLink to="/portal/routing-rules">
-              Routing Rules
-            </NavLink>
-            <NavLink to="/portal/listings">
-              Listings
-            </NavLink>
-            <NavLink to="/portal/testing">
-              Testing
-            </NavLink>
-            <NavLink to="/portal/activity">
-              Activity
-            </NavLink>
-            <NavLink v-if="canManageTenant" to="/portal/members">
-              Members
-            </NavLink>
-            <NavLink v-if="user?.roles?.admin === 'system'" to="/admin">
-              Admin
-            </NavLink>
+          <nav class="hidden md:flex items-center rounded-full border border-slate-200 bg-slate-50/80 p-1">
+            <NuxtLink
+              v-for="item in navItems"
+              :key="item.to"
+              :to="item.to"
+              class="rounded-full px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-950"
+              :class="isRouteActive(item.to) ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : ''"
+            >
+              {{ item.label }}
+            </NuxtLink>
           </nav>
 
-          <div class="flex items-center space-x-4 ml-4 flex-shrink-0">
-            <div v-if="memberships.length > 1" class="hidden lg:block min-w-[180px]">
-              <Label for="tenant-select" class="text-xs text-gray-500">Active tenant</Label>
+          <details class="relative ml-auto hidden md:block">
+            <summary class="flex cursor-pointer list-none items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-2 shadow-sm transition-colors hover:border-slate-300 [&::-webkit-details-marker]:hidden">
+              <div class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold tracking-wide text-white">
+                {{ userInitials }}
+              </div>
+              <div class="min-w-0 pr-1 text-left leading-tight">
+                <div class="max-w-[150px] truncate text-sm font-medium text-slate-950">{{ user?.name }}</div>
+                <div class="max-w-[150px] truncate text-xs text-slate-500">
+                  {{ activeTenantId ?? 'Account' }}
+                </div>
+              </div>
+              <svg class="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+
+            <div class="absolute right-0 z-20 mt-3 w-80 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+              <div class="border-b border-slate-100 px-1 pb-3">
+                <div class="text-sm font-semibold text-slate-950">{{ user?.name }}</div>
+                <div class="text-xs text-slate-500">Ocean Autorouter account</div>
+              </div>
+
+              <div v-if="memberships.length > 1" class="px-1 py-3">
+                <Label for="tenant-select" class="text-xs text-slate-500">Active tenant</Label>
+                <select
+                  id="tenant-select"
+                  class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
+                  :value="activeTenantId ?? ''"
+                  @change="switchTenant(($event.target as HTMLSelectElement).value)"
+                >
+                  <option v-for="membership in memberships" :key="membership.id" :value="membership.tenantId">
+                    {{ membership.tenantId }} ({{ membership.role }})
+                  </option>
+                </select>
+              </div>
+
+              <div class="flex justify-end px-1 pt-2">
+                <Button variant="outline" size="sm" @click="handleLogout">
+                  Logout
+                </Button>
+              </div>
+            </div>
+          </details>
+
+          <Button class="ml-auto md:hidden" variant="outline" size="sm" @click="handleLogout">
+            Logout
+          </Button>
+        </div>
+
+        <!-- Mobile navigation menu -->
+        <div v-show="isMenuOpen" class="space-y-4 border-t border-slate-200 py-4 md:hidden">
+          <div class="grid grid-cols-2 gap-2">
+            <NuxtLink
+              v-for="item in navItems"
+              :key="item.to"
+              :to="item.to"
+              class="rounded-2xl border border-slate-200 px-3 py-3 text-sm font-medium text-slate-700"
+              :class="isRouteActive(item.to) ? 'bg-slate-900 text-white border-slate-900' : 'bg-white'"
+            >
+              {{ item.label }}
+            </NuxtLink>
+          </div>
+          <div class="rounded-2xl border border-slate-200 bg-white p-4">
+            <div class="flex items-center gap-3">
+              <div class="flex h-10 w-10 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold tracking-wide text-white">
+                {{ userInitials }}
+              </div>
+              <div class="min-w-0">
+                <div class="truncate text-sm font-semibold text-slate-950">{{ user?.name }}</div>
+                <div class="truncate text-xs text-slate-500">{{ activeTenantId ?? 'Account' }}</div>
+              </div>
+            </div>
+            <div v-if="memberships.length > 1" class="pt-4">
+              <Label for="tenant-select-mobile" class="text-xs text-slate-500">Active tenant</Label>
               <select
-                id="tenant-select"
-                class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                id="tenant-select-mobile"
+                class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
                 :value="activeTenantId ?? ''"
                 @change="switchTenant(($event.target as HTMLSelectElement).value)"
               >
@@ -115,63 +205,11 @@ function goToLogin() {
                 </option>
               </select>
             </div>
-            <div class="hidden sm:flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
-              <div class="min-w-0 text-sm leading-tight">
-                <div class="text-xs text-muted-foreground">Signed in as</div>
-                <div class="max-w-[180px] truncate font-medium text-foreground">{{ user?.name }}</div>
-              </div>
-              <Button variant="outline" size="sm" @click="handleLogout">
+            <div class="pt-4">
+              <Button variant="outline" size="sm" class="w-full" @click="handleLogout">
                 Logout
               </Button>
             </div>
-            <Button class="sm:hidden" variant="outline" size="sm" @click="handleLogout">
-              Logout
-            </Button>
-          </div>
-        </div>
-
-        <!-- Mobile navigation menu -->
-        <div v-show="isMenuOpen" class="md:hidden py-2 space-y-1">
-          <NavLink to="/portal/access" class="block px-3 py-2 rounded-md hover:bg-gray-100">
-            Access
-          </NavLink>
-          <NavLink to="/portal/site-configuration" class="block px-3 py-2 rounded-md hover:bg-gray-100">
-            Site Settings
-          </NavLink>
-          <NavLink to="/portal/routing-rules" class="block px-3 py-2 rounded-md hover:bg-gray-100">
-            Routing Rules
-          </NavLink>
-          <NavLink to="/portal/listings" class="block px-3 py-2 rounded-md hover:bg-gray-100">
-            Listings
-          </NavLink>
-          <NavLink to="/portal/testing" class="block px-3 py-2 rounded-md hover:bg-gray-100">
-            Testing
-          </NavLink>
-          <NavLink to="/portal/activity" class="block px-3 py-2 rounded-md hover:bg-gray-100">
-            Activity
-          </NavLink>
-          <NavLink v-if="canManageTenant" to="/portal/members" class="block px-3 py-2 rounded-md hover:bg-gray-100">
-            Members
-          </NavLink>
-          <NavLink v-if="user?.roles?.admin === 'system'" to="/admin"
-            class="block px-3 py-2 rounded-md hover:bg-gray-100">
-            Admin
-          </NavLink>
-          <div v-if="memberships.length > 1" class="px-3 py-2">
-            <Label for="tenant-select-mobile" class="text-xs text-gray-500">Active tenant</Label>
-            <select
-              id="tenant-select-mobile"
-              class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
-              :value="activeTenantId ?? ''"
-              @change="switchTenant(($event.target as HTMLSelectElement).value)"
-            >
-              <option v-for="membership in memberships" :key="membership.id" :value="membership.tenantId">
-                {{ membership.tenantId }} ({{ membership.role }})
-              </option>
-            </select>
-          </div>
-          <div class="sm:hidden px-3 py-2 text-sm text-muted-foreground">
-            Signed in as <span class="font-medium text-foreground">{{ user?.name }}</span>
           </div>
         </div>
       </div>

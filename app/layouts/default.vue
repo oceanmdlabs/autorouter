@@ -60,13 +60,16 @@ function goToLogin() {
             </svg>
           </button>
 
-          <!-- Logo and Site Name -->
+          <!-- Logo, product, and site name -->
           <div class="flex items-center space-x-3 flex-1 min-w-0">
             <div class="flex-shrink-0">
               <img src="/ocean-labs-logo.svg" alt="Ocean Labs Logo" class="h-7 w-auto" />
             </div>
-            <div v-if="siteConfig?.siteConfig?.name" class="min-w-0 flex-1">
-              <div class="text-lg font-semibold text-gray-900 truncate">{{ siteConfig.siteConfig.name }}</div>
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-semibold uppercase tracking-[0.2em] text-gray-500">Autorouter</div>
+              <div v-if="siteConfig?.siteConfig?.name" class="text-lg font-semibold text-gray-900 truncate">
+                {{ siteConfig.siteConfig.name }}
+              </div>
             </div>
           </div>
 
@@ -112,10 +115,16 @@ function goToLogin() {
                 </option>
               </select>
             </div>
-            <div class="hidden sm:block text-sm text-muted-foreground max-w-[180px]">
-              Signed in as <span class="font-medium text-foreground truncate">{{ user?.name }}</span>
+            <div class="hidden sm:flex items-center gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+              <div class="min-w-0 text-sm leading-tight">
+                <div class="text-xs text-muted-foreground">Signed in as</div>
+                <div class="max-w-[180px] truncate font-medium text-foreground">{{ user?.name }}</div>
+              </div>
+              <Button variant="outline" size="sm" @click="handleLogout">
+                Logout
+              </Button>
             </div>
-            <Button variant="outline" size="sm" @click="handleLogout">
+            <Button class="sm:hidden" variant="outline" size="sm" @click="handleLogout">
               Logout
             </Button>
           </div>

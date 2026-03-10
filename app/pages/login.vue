@@ -18,7 +18,7 @@ const setLastProvider = (provider: string) => {
     <div class="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow">
       <div class="text-center">
         <img src="/ocean-labs-logo.svg" alt="Ocean Labs Logo" class="h-12 w-auto mx-auto mb-4" />
-        <h2 class="mt-6 text-3xl font-extrabold text-gray-900">Sign in to your account</h2>
+        <h2 class="mt-6 text-3xl font-extrabold text-gray-900">Autorouter</h2>
       </div>
       <div class="mt-8 space-y-4">
         <a href="/auth/google" @click="setLastProvider('google')"

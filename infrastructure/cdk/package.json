@@ -12,6 +12,7 @@
     "cdk:deploy:app": "NITRO_PRESET=aws_lambda npm --prefix ../.. run build && cdk deploy",
     "cdk:deploy:app:env": "./scripts/deploy-app-with-env.sh",
     "cdk:deploy:app:env:migrate": "./scripts/deploy-app-and-migrate.sh",
+    "db:sql": "npm --prefix ../.. exec -- tsx ./scripts/execute-sql-aws.ts",
     "db:migrate:apply": "npm --prefix ../.. exec tsx ./scripts/apply-migrations-aws.ts",
     "cdk:destroy": "cdk destroy"
   },

@@ -178,6 +178,20 @@ Apply migrations to deployed AWS environment:
 npm --prefix infrastructure/cdk run db:migrate:apply
 ```
 
+Run ad hoc SQL against the deployed AWS environment:
+
+```bash
+npm run db:sql:aws -- --sql "select now();"
+```
+
+```bash
+npm run db:sql:aws -- --sql "select id, hash, created_at from drizzle.__drizzle_migrations order by created_at desc;" --json
+```
+
+```bash
+npm run db:sql:aws -- --file infrastructure/cdk/scripts/query.sql
+```
+
 Notes:
 - `db:migrate:apply` currently requires Aurora Data API (`dbUseDataApi=true`).
 - If using private RDS Postgres without Data API, run migrations from inside VPC (for example a migration Lambda/CodeBuild job in VPC).

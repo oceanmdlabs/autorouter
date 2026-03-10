@@ -36,7 +36,7 @@ export const createDbService = (deps: Dependencies): IDbService => {
   ): T & BaseResource & TenantConfined {
     const resourceWithMetadata = initMetadata(insert as Partial<BaseResource>);
     (resourceWithMetadata as Partial<TenantConfined>).tenantId =
-      cxt.getUser()?.tenantId;
+      cxt.getTenantId() ?? undefined;
     return resourceWithMetadata as T & BaseResource & TenantConfined;
   }
 

@@ -11,10 +11,13 @@ export async function toApplicationContext(
   let h3User = session.user;
   if (!h3User && auth) {
     h3User = {
+      id: auth.clientId,
       clientId: auth.clientId,
       name: "OAuth2_client_" + auth.clientId,
+      activeTenantId: auth.tenantId,
       tenantId: auth.tenantId,
       roles: { admin: "" },
+      memberships: [],
     };
   }
   return getContext(h3User);
@@ -29,20 +32,19 @@ function getContext(user?: User | null) {
   const logger = new DefaultLogger();
   const context = new ApplicationContext(logger);
   if (user) {
-    const userId = (
-      user?.clientId ??
-      user?.googleId ??
-      user?.gitHubId ??
-      ""
-    ).toString();
+    const userId = (user?.id ?? user?.clientId ?? "").toString();
     context.setSession({
       user:
         userId && user
           ? {
               id: userId,
               name: user.name ?? userId,
+              provider: user.provider,
+              subject: user.subject,
               roles: user.roles ?? { admin: "" },
-              tenantId: user.tenantId ?? "unknown",
+              activeTenantId: user.activeTenantId ?? user.tenantId ?? null,
+              tenantId: user.activeTenantId ?? user.tenantId ?? null,
+              memberships: user.memberships ?? [],
             }
           : null,
     });

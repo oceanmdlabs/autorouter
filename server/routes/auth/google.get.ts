@@ -1,4 +1,4 @@
-import { getRoles } from "./roles";
+import { buildSessionUserFromIdentity } from "@/server/utils/session-user";
 
 export default defineOAuthGoogleEventHandler({
   config: {
@@ -6,12 +6,11 @@ export default defineOAuthGoogleEventHandler({
   } satisfies OAuthGoogleConfig,
   async onSuccess(event, { user }) {
     await setUserSession(event, {
-      user: {
-        name: user.name + " (Google)",
-        googleId: user.sub,
-        tenantId: user.tenantId ?? user.sub,
-        roles: await getRoles("google", user),
-      },
+      user: await buildSessionUserFromIdentity({
+        provider: "google",
+        subject: user.sub,
+        displayName: `${user.name} (Google)`,
+      }),
     });
     return sendRedirect(event, "/portal");
   },

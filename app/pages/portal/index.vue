@@ -1,5 +1,7 @@
 <script setup lang="ts">
-navigateTo("/portal/routing-rules");
+const { user } = useUserSession()
+const activeTenantId = user.value?.activeTenantId ?? user.value?.tenantId
+navigateTo(activeTenantId ? "/portal/routing-rules" : "/portal/access");
 </script>
 <template>
   <div>

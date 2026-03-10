@@ -203,7 +203,9 @@ export default defineEventHandler(async (event) => {
         id: "api-client-" + siteConfig.clientId,
         name: "Ocean Open API WebhookClient",
         roles: { admin: "" },
+        activeTenantId: siteConfig.tenantId,
         tenantId: siteConfig.tenantId,
+        memberships: [],
       },
     });
     await processPatientEngagementEventUseCase(peEventContext, cxt);

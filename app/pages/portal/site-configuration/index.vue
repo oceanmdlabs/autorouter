@@ -895,7 +895,7 @@ function copyToClipboard(text: string) {
 
 				<div class="space-y-2">
 					<Label for="name" class="text-xs text-gray-500">Your Autorouter Tenant ID</Label>
-					<p class="text-xs text-gray-400 font-mono">{{ user?.tenantId }}</p>
+					<p class="text-xs text-gray-400 font-mono">{{ user?.activeTenantId ?? user?.tenantId }}</p>
 				</div>
 			</form>
 		</div>

@@ -1,12 +1,10 @@
 import { hydrateSessionUser } from "@/server/utils/session-user";
-import {
-  assertActiveMembership,
-  isKnownTenant,
-} from "@/server/utils/tenant-access";
+import { redeemTenantInvite } from "@/server/utils/tenant-access";
 
 export default defineEventHandler(async (event) => {
   const session = await requireUserSession(event);
   const user = session.user;
+
   if (!user?.id) {
     throw createError({
       statusCode: 401,
@@ -15,44 +13,34 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event);
-  const tenantId = body.tenantId;
-  if (!tenantId) {
+  if (!body.code) {
     throw createError({
       statusCode: 400,
-      statusMessage: "Tenant ID is required",
+      statusMessage: "Invite code is required",
     });
   }
 
-  if (user.roles.admin === "system") {
-    const knownTenant = await isKnownTenant(tenantId);
-    if (!knownTenant) {
-      throw createError({
-        statusCode: 404,
-        statusMessage: "Tenant not found",
-      });
-    }
-  } else {
-    await assertActiveMembership({
-      tenantId,
-      userId: user.id,
-    });
-  }
+  const invite = await redeemTenantInvite({
+    code: body.code,
+    userId: user.id,
+  });
 
   await replaceUserSession(event, {
     ...session,
     user: {
       ...user,
-      activeTenantId: tenantId,
-      tenantId,
+      activeTenantId: invite.tenantId,
+      tenantId: invite.tenantId,
     },
   });
 
   return {
     success: true,
+    tenantId: invite.tenantId,
     user: await hydrateSessionUser({
       ...user,
-      activeTenantId: tenantId,
-      tenantId,
+      activeTenantId: invite.tenantId,
+      tenantId: invite.tenantId,
     }),
   };
 });

@@ -18,6 +18,25 @@ const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
 }
 
+const memberships = computed(() => user.value?.memberships ?? [])
+const activeTenantId = computed(() => user.value?.activeTenantId ?? user.value?.tenantId ?? null)
+const activeMembership = computed(() =>
+  memberships.value.find((membership) => membership.tenantId === activeTenantId.value)
+)
+const canManageTenant = computed(() =>
+  user.value?.roles?.admin === 'system' || activeMembership.value?.role === 'admin'
+)
+
+const switchTenant = async (tenantId: string) => {
+  await useRequestFetch()('/api/auth/update-tenant', {
+    method: 'POST',
+    body: { tenantId }
+  })
+  await refreshCookie('nuxt-session')
+  await useUserSession().fetch()
+  await navigateTo('/portal')
+}
+
 const handleLogout = async () => {
   await clear()
   goToLogin();
@@ -53,6 +72,9 @@ function goToLogin() {
 
           <!-- Desktop navigation -->
           <nav class="hidden md:flex items-center space-x-6 px-4">
+            <NavLink to="/portal/access">
+              Access
+            </NavLink>
             <NavLink to="/portal/site-configuration">
               Site Settings
             </NavLink>
@@ -68,12 +90,28 @@ function goToLogin() {
             <NavLink to="/portal/activity">
               Activity
             </NavLink>
+            <NavLink v-if="canManageTenant" to="/portal/members">
+              Members
+            </NavLink>
             <NavLink v-if="user?.roles?.admin === 'system'" to="/admin">
               Admin
             </NavLink>
           </nav>
 
           <div class="flex items-center space-x-4 ml-4 flex-shrink-0">
+            <div v-if="memberships.length > 1" class="hidden lg:block min-w-[180px]">
+              <Label for="tenant-select" class="text-xs text-gray-500">Active tenant</Label>
+              <select
+                id="tenant-select"
+                class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+                :value="activeTenantId ?? ''"
+                @change="switchTenant(($event.target as HTMLSelectElement).value)"
+              >
+                <option v-for="membership in memberships" :key="membership.id" :value="membership.tenantId">
+                  {{ membership.tenantId }} ({{ membership.role }})
+                </option>
+              </select>
+            </div>
             <div class="hidden sm:block text-sm text-muted-foreground max-w-[180px]">
               Signed in as <span class="font-medium text-foreground truncate">{{ user?.name }}</span>
             </div>
@@ -85,6 +123,9 @@ function goToLogin() {
 
         <!-- Mobile navigation menu -->
         <div v-show="isMenuOpen" class="md:hidden py-2 space-y-1">
+          <NavLink to="/portal/access" class="block px-3 py-2 rounded-md hover:bg-gray-100">
+            Access
+          </NavLink>
           <NavLink to="/portal/site-configuration" class="block px-3 py-2 rounded-md hover:bg-gray-100">
             Site Settings
           </NavLink>
@@ -100,10 +141,26 @@ function goToLogin() {
           <NavLink to="/portal/activity" class="block px-3 py-2 rounded-md hover:bg-gray-100">
             Activity
           </NavLink>
+          <NavLink v-if="canManageTenant" to="/portal/members" class="block px-3 py-2 rounded-md hover:bg-gray-100">
+            Members
+          </NavLink>
           <NavLink v-if="user?.roles?.admin === 'system'" to="/admin"
             class="block px-3 py-2 rounded-md hover:bg-gray-100">
             Admin
           </NavLink>
+          <div v-if="memberships.length > 1" class="px-3 py-2">
+            <Label for="tenant-select-mobile" class="text-xs text-gray-500">Active tenant</Label>
+            <select
+              id="tenant-select-mobile"
+              class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              :value="activeTenantId ?? ''"
+              @change="switchTenant(($event.target as HTMLSelectElement).value)"
+            >
+              <option v-for="membership in memberships" :key="membership.id" :value="membership.tenantId">
+                {{ membership.tenantId }} ({{ membership.role }})
+              </option>
+            </select>
+          </div>
           <div class="sm:hidden px-3 py-2 text-sm text-muted-foreground">
             Signed in as <span class="font-medium text-foreground">{{ user?.name }}</span>
           </div>

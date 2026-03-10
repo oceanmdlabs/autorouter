@@ -75,11 +75,12 @@ export class ApplicationContext implements ApplicationContext {
   }
 
   getTenantId(): string | null {
-    return this.session.user?.tenantId ?? null;
+    return this.session.user?.activeTenantId ?? this.session.user?.tenantId ?? null;
   }
 
   getNonEmptyTenantId(): string {
-    const tenantId = this.session.user?.tenantId;
+    const tenantId =
+      this.session.user?.activeTenantId ?? this.session.user?.tenantId;
     if (!tenantId) {
       throw new UnauthenticatedError(
         "This call requires an active tenant in the session."
@@ -100,7 +101,9 @@ export class ApplicationContext implements ApplicationContext {
     if (!this.session.user) {
       throw new UnauthenticatedError("User not authenticated");
     }
-    if (tenantId && this.session.user.tenantId !== tenantId) {
+    const activeTenantId =
+      this.session.user.activeTenantId ?? this.session.user.tenantId;
+    if (tenantId && activeTenantId !== tenantId) {
       throw new UnauthorizedError("User not authorized for tenant");
     }
   }

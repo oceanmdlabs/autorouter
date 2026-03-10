@@ -134,6 +134,104 @@ export const identityProviderEnum = pgEnum("identity_provider", [
   "github",
 ]);
 
+export const tenantMembershipRoleEnum = pgEnum("tenant_membership_role", [
+  "admin",
+  "member",
+]);
+
+export const tenantMembershipStatusEnum = pgEnum("tenant_membership_status", [
+  "active",
+  "revoked",
+]);
+
+export const tenantInviteStatusEnum = pgEnum("tenant_invite_status", [
+  "pending",
+  "redeemed",
+  "revoked",
+  "expired",
+]);
+
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    provider: identityProviderEnum("provider").notNull(),
+    subject: text("subject").notNull(),
+    displayName: text("display_name").notNull(),
+    lastLoginAt: timestamp("last_login_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdBy: text("created_by").notNull().default("system"),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+    updatedBy: text("updated_by").notNull().default("system"),
+  },
+  (table) => ({
+    providerSubjectUnique: uniqueIndex("uidx_users_provider_subject").on(
+      table.provider,
+      table.subject
+    ),
+  })
+);
+
+export const tenantMemberships = pgTable(
+  "tenant_memberships",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: text("tenant_id").notNull(),
+    userId: uuid("user_id").notNull(),
+    role: tenantMembershipRoleEnum("role").notNull().default("member"),
+    status: tenantMembershipStatusEnum("status").notNull().default("active"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdBy: text("created_by").notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+    updatedBy: text("updated_by").notNull(),
+    revokedAt: timestamp("revoked_at"),
+    revokedBy: text("revoked_by"),
+  },
+  (table) => ({
+    tenantIdx: index("idx_tenant_memberships_tenant_id").on(table.tenantId),
+    userIdx: index("idx_tenant_memberships_user_id").on(table.userId),
+    tenantUserUnique: uniqueIndex("uidx_tenant_memberships_tenant_user").on(
+      table.tenantId,
+      table.userId
+    ),
+  })
+);
+
+export const tenantInvites = pgTable(
+  "tenant_invites",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    tenantId: text("tenant_id").notNull(),
+    code: text("code").notNull(),
+    role: tenantMembershipRoleEnum("role").notNull().default("member"),
+    status: tenantInviteStatusEnum("status").notNull().default("pending"),
+    invitedByUserId: uuid("invited_by_user_id").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    createdBy: text("created_by").notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+    updatedBy: text("updated_by").notNull(),
+    expiresAt: timestamp("expires_at").notNull(),
+    redeemedAt: timestamp("redeemed_at"),
+    redeemedByUserId: uuid("redeemed_by_user_id"),
+    revokedAt: timestamp("revoked_at"),
+    revokedByUserId: uuid("revoked_by_user_id"),
+  },
+  (table) => ({
+    tenantIdx: index("idx_tenant_invites_tenant_id").on(table.tenantId),
+    codeUnique: uniqueIndex("uidx_tenant_invites_code").on(table.code),
+    statusIdx: index("idx_tenant_invites_status").on(table.status),
+  })
+);
+
 export const systemAdminAllowlist = pgTable(
   "system_admin_allowlist",
   {

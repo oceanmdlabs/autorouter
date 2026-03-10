@@ -1,4 +1,4 @@
-import { getRoles } from "./roles";
+import { buildSessionUserFromIdentity } from "@/server/utils/session-user";
 export default defineOAuthGitHubEventHandler({
   config: {
     emailRequired: true,
@@ -7,12 +7,11 @@ export default defineOAuthGitHubEventHandler({
   } satisfies OAuthGitHubConfig,
   async onSuccess(event, { user }) {
     await setUserSession(event, {
-      user: {
-        name: user.login + " (GitHub)",
-        gitHubId: user.id.toString(),
-        tenantId: "github" + user.id.toString(),
-        roles: await getRoles("github", { sub: user.id.toString() }),
-      },
+      user: await buildSessionUserFromIdentity({
+        provider: "github",
+        subject: user.id.toString(),
+        displayName: `${user.login} (GitHub)`,
+      }),
     });
     return sendRedirect(event, "/portal");
   },

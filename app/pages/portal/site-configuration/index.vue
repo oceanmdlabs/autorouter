@@ -298,7 +298,7 @@ function copyToClipboard(text: string) {
 				<div class="text-center py-12 bg-gray-50 rounded-lg">
 					<h3 class="text-lg font-medium text-gray-900 mb-2">Welcome to Ocean Autorouter!</h3>
 					<p class="text-sm text-gray-600 mb-6 max-w-md mx-auto">
-						Get started by creating your site configuration. This will connect your Autorouter tenant to
+						Get started by creating your site configuration. This will connect your Autorouter site to
 						your Ocean site.
 					</p>
 					<Button @click="handleCreateConfig">Create Configuration</Button>
@@ -894,7 +894,7 @@ function copyToClipboard(text: string) {
 				</div>
 
 				<div class="space-y-2">
-					<Label for="name" class="text-xs text-gray-500">Your Autorouter Tenant ID</Label>
+					<Label for="name" class="text-xs text-gray-500">Your Autorouter Site ID</Label>
 					<p class="text-xs text-gray-400 font-mono">{{ user?.activeTenantId ?? user?.tenantId }}</p>
 				</div>
 			</form>

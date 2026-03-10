@@ -22,7 +22,7 @@ const switchTenant = async (tenantId: string) => {
 
 const redeemInvite = async (code = inviteCode.value) => {
   if (!code) {
-    error.value = 'Enter an invite code to join a tenant.'
+    error.value = 'Enter an invite code to join a site.'
     return
   }
 
@@ -37,7 +37,7 @@ const redeemInvite = async (code = inviteCode.value) => {
     })
     localStorage.removeItem('pendingInviteCode')
     await fetch()
-    status.value = 'Invite redeemed. Your active tenant has been updated.'
+    status.value = 'Invite redeemed. Your active site has been updated.'
     await router.push('/portal/routing-rules')
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : 'Unable to redeem invite.'
@@ -61,10 +61,10 @@ onMounted(async () => {
 <template>
   <div class="mx-auto max-w-4xl p-6 space-y-6">
     <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-      <p class="text-sm uppercase tracking-[0.2em] text-slate-500">Tenant Access</p>
-      <h1 class="mt-2 text-3xl font-semibold text-slate-900">Manage your memberships</h1>
+      <p class="text-sm uppercase tracking-[0.2em] text-slate-500">Sites</p>
+      <h1 class="mt-2 text-3xl font-semibold text-slate-900">Manage your site access</h1>
       <p class="mt-2 text-sm text-slate-600">
-        Choose an active tenant, or redeem an invite to join a new one.
+        Choose an active site, or redeem an invite to join a new one.
       </p>
       <p v-if="status" class="mt-4 rounded-md bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
         {{ status }}
@@ -77,14 +77,14 @@ onMounted(async () => {
     <div class="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
       <Card>
         <CardHeader>
-          <CardTitle>Your tenants</CardTitle>
+          <CardTitle>Your sites</CardTitle>
           <CardDescription>
-            Active tenant: <span class="font-medium text-slate-900">{{ activeTenantId ?? 'none selected' }}</span>
+            Active site: <span class="font-medium text-slate-900">{{ activeTenantId ?? 'none selected' }}</span>
           </CardDescription>
         </CardHeader>
         <CardContent class="space-y-3">
           <div v-if="memberships.length === 0" class="rounded-xl border border-dashed border-slate-300 p-6 text-sm text-slate-600">
-            No tenant memberships were found for this account. Redeem an invite code below, or ask a tenant admin to create one for you.
+            No site access was found for this account. Redeem an invite code below, or ask a site admin to create one for you.
           </div>
           <div
             v-for="membership in memberships"
@@ -110,7 +110,7 @@ onMounted(async () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Redeem invite</CardTitle>
+            <CardTitle>Redeem invite</CardTitle>
           <CardDescription>Paste an invite code or use a redeemable link.</CardDescription>
         </CardHeader>
         <CardContent class="space-y-4">

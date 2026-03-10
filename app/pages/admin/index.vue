@@ -22,7 +22,7 @@
 				<div class="flex justify-between items-center">
 					<div>
 						<h2 class="text-lg font-semibold">{{ config.name }}</h2>
-						<p class="text-gray-600">Tenant ID: {{ config.tenantId }}</p>
+						<p class="text-gray-600">Site ID: {{ config.tenantId }}</p>
 					</div>
 					<button @click="selectConfiguration(config)"
 						class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded">
@@ -93,7 +93,7 @@ const selectConfiguration = async (config: SiteConfigurationReference) => {
 		router.push('/portal/site-configuration')
 	} catch (e) {
 		status.value = 'error'
-		error.value = e instanceof Error ? e.message : 'Failed to switch tenant'
+		error.value = e instanceof Error ? e.message : 'Failed to switch site'
 	}
 }
 </script>

@@ -148,16 +148,16 @@ function goToLogin() {
 
               <div class="border-b border-slate-100 px-1 py-3">
                 <NuxtLink
-                  to="/portal/access"
+                  to="/portal/sites"
                   class="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950"
                 >
-                  <span>Access</span>
+                  <span>Sites</span>
                   <span class="text-xs text-slate-400">{{ hasActiveTenant ? 'Manage' : 'Select' }}</span>
                 </NuxtLink>
               </div>
 
               <div v-if="memberships.length > 1" class="px-1 py-3">
-                <Label for="tenant-select" class="text-xs text-slate-500">Active tenant</Label>
+                <Label for="tenant-select" class="text-xs text-slate-500">Active site</Label>
                 <select
                   id="tenant-select"
                   class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"
@@ -197,7 +197,7 @@ function goToLogin() {
             </NuxtLink>
           </div>
           <div v-else class="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-500">
-            Choose tenant access to unlock navigation.
+            Choose site access to unlock navigation.
           </div>
           <div class="rounded-2xl border border-slate-200 bg-white p-4">
             <div class="flex items-center gap-3">
@@ -211,15 +211,15 @@ function goToLogin() {
             </div>
             <div class="pt-4">
               <NuxtLink
-                to="/portal/access"
+                to="/portal/sites"
                 class="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"
               >
-                <span>Access</span>
+                <span>Sites</span>
                 <span class="text-xs text-slate-400">{{ hasActiveTenant ? 'Manage' : 'Select' }}</span>
               </NuxtLink>
             </div>
             <div v-if="memberships.length > 1" class="pt-4">
-              <Label for="tenant-select-mobile" class="text-xs text-slate-500">Active tenant</Label>
+              <Label for="tenant-select-mobile" class="text-xs text-slate-500">Active site</Label>
               <select
                 id="tenant-select-mobile"
                 class="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm"

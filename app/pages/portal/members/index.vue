@@ -108,17 +108,17 @@ const revokeInvite = async (inviteId: string) => {
   <div class="mx-auto max-w-6xl p-6 space-y-6">
     <div class="flex items-start justify-between gap-4">
       <div>
-        <p class="text-sm uppercase tracking-[0.2em] text-slate-500">Tenant Admin</p>
+        <p class="text-sm uppercase tracking-[0.2em] text-slate-500">Site Admin</p>
         <h1 class="mt-2 text-3xl font-semibold text-slate-900">Members and invites</h1>
         <p class="mt-2 text-sm text-slate-600">
-          Manage access for <span class="font-medium text-slate-900">{{ user?.activeTenantId ?? user?.tenantId ?? 'no active tenant' }}</span>.
+          Manage access for <span class="font-medium text-slate-900">{{ user?.activeTenantId ?? user?.tenantId ?? 'no active site' }}</span>.
         </p>
       </div>
       <Button variant="outline" @click="refreshAll">Refresh</Button>
     </div>
 
     <div v-if="!canManageTenant" class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-      Tenant admin access is required to manage members or invites.
+      Site admin access is required to manage members or invites.
     </div>
     <div v-if="error" class="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
       {{ error }}
@@ -128,7 +128,7 @@ const revokeInvite = async (inviteId: string) => {
       <Card>
         <CardHeader>
           <CardTitle>Members</CardTitle>
-          <CardDescription>Active and revoked memberships for the current tenant.</CardDescription>
+          <CardDescription>Active and revoked memberships for the current site.</CardDescription>
         </CardHeader>
         <CardContent>
           <div class="overflow-x-auto">

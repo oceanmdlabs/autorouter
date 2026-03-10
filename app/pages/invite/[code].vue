@@ -13,7 +13,7 @@ onMounted(() => {
   }
 
   if (loggedIn.value) {
-    navigateTo(`/portal/access?code=${encodeURIComponent(code)}`)
+    navigateTo(`/portal/sites?code=${encodeURIComponent(code)}`)
     return
   }
 

@@ -11,9 +11,9 @@ export default defineNuxtRouteMiddleware((to) => {
   if (
     loggedIn.value &&
     to.path.startsWith('/portal') &&
-    to.path !== '/portal/access' &&
+    to.path !== '/portal/sites' &&
     !activeTenantId
   ) {
-    return navigateTo('/portal/access')
+    return navigateTo('/portal/sites')
   }
 });

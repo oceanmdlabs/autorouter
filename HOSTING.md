@@ -52,6 +52,15 @@ For AWS deployments, use the CDK guide in this repository:
 
 This is the primary and current AWS deployment path for the Autorouter.
 
+Important first-run step:
+- After the first successful deployment, sign in once with the Google or GitHub account that should become the first system admin.
+- That first login creates the user record and determines the admin allowlist identifier:
+  - Google: OAuth `sub`
+  - GitHub: numeric OAuth `user.id` stored as text
+- The easiest way to inspect that value is while signed in: visit `/api/_auth/session` and read `user.provider` and `user.subject`.
+- Then add that `provider` + `subject` pair to `system_admin_allowlist` and log out / log back in.
+- The AWS CDK deploy scripts print these post-deploy instructions automatically, with a database lookup fallback if needed.
+
 
 ### Google Cloud Platform Deployment
 

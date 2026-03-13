@@ -163,6 +163,8 @@ Build + deploy + apply SQL migrations:
 npm run cdk:deploy:app:env:migrate -- --profile "$AWS_PROFILE" --require-approval never
 ```
 
+The deploy wrapper prints post-deploy admin bootstrap instructions at the end of a successful deploy. Do not skip that step on a new environment.
+
 ## Keep deploy secrets in `.env.deploy` (simplest path)
 
 For simplicity, you can keep all deploy values directly in `infrastructure/cdk/.env.deploy` and run deploy commands with that file loaded by the wrapper scripts.
@@ -195,9 +197,40 @@ npm run db:sql:aws -- --file infrastructure/cdk/scripts/query.sql
 Notes:
 - `db:migrate:apply` currently requires Aurora Data API (`dbUseDataApi=true`).
 - If using private RDS Postgres without Data API, run migrations from inside VPC (for example a migration Lambda/CodeBuild job in VPC).
-- Migration generation for schema changes is documented in the root [`README.md`](../../README.md).
+- Migration generation and schema safety policy are documented in [`DATABASE_MIGRATION_POLICY.md`](../../DATABASE_MIGRATION_POLICY.md).
 
-## Optional post-deployment: grant app-level system admin
+## Required post-deployment on a new environment: grant the first app-level system admin
+
+On a fresh deployment, nobody is a system admin until you explicitly allowlist one OAuth identity.
+
+Do this in order:
+1. Deploy the app.
+2. Sign in once with the Google or GitHub account that should become the first system admin.
+3. Look up that account in the `users` table to get its `provider` and `subject`.
+4. Insert that `provider` + `subject` into `system_admin_allowlist`.
+5. Log out and log back in so the new admin role is picked up in session.
+
+Identity mapping used by the app:
+- Google `subject` = OAuth `sub`
+- GitHub `subject` = numeric OAuth `user.id`, stored as text
+
+The easiest way to get those values after first login is to stay signed in and open:
+
+```text
+https://<your-app-url>/api/_auth/session
+```
+
+Read:
+- `user.provider`
+- `user.subject`
+
+If you prefer a database lookup, or if you are troubleshooting a session issue on Aurora Data API, you can also query:
+
+```bash
+npm run db:sql -- --sql "select provider, subject, display_name, last_login_at from users order by last_login_at desc nulls last, created_at desc limit 10;"
+```
+
+Pick the row for the account you just used to sign in.
 
 System admin is resolved at OAuth login time and stored in the session (`roles.admin = "system"`). It is not looked up on every request.
 

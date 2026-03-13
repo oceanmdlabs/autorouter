@@ -2,11 +2,15 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { setTimeout as sleep } from "node:timers/promises";
 
 import dotenv from "dotenv";
-import { RDSDataClient } from "@aws-sdk/client-rds-data";
+import { ExecuteStatementCommand, RDSDataClient } from "@aws-sdk/client-rds-data";
 import { drizzle } from "drizzle-orm/aws-data-api/pg";
 import { migrate } from "drizzle-orm/aws-data-api/pg/migrator";
+
+const MAX_RESUME_ATTEMPTS = 8;
+const INITIAL_RESUME_DELAY_MS = 5_000;
 
 function runAwsJson(args: string[], env: NodeJS.ProcessEnv): unknown {
   const output = execFileSync("aws", [...args, "--output", "json"], {
@@ -44,6 +48,58 @@ function getLambdaEnv(env: NodeJS.ProcessEnv): Record<string, string> {
   };
 
   return cfg.Environment?.Variables ?? {};
+}
+
+function getErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return String(error);
+}
+
+function isAuroraResumeError(error: unknown): boolean {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes("resuming after being auto-paused") ||
+    message.includes("db instance is resuming") ||
+    message.includes("databaseresumingexception")
+  );
+}
+
+async function waitForAuroraResume(params: {
+  client: RDSDataClient;
+  database: string;
+  resourceArn: string;
+  secretArn: string;
+}) {
+  let delayMs = INITIAL_RESUME_DELAY_MS;
+
+  for (let attempt = 1; attempt <= MAX_RESUME_ATTEMPTS; attempt += 1) {
+    try {
+      await params.client.send(
+        new ExecuteStatementCommand({
+          database: params.database,
+          resourceArn: params.resourceArn,
+          secretArn: params.secretArn,
+          sql: "select 1",
+        })
+      );
+      return;
+    } catch (error) {
+      if (!isAuroraResumeError(error) || attempt === MAX_RESUME_ATTEMPTS) {
+        throw error;
+      }
+
+      console.info(
+        `Aurora is still resuming from auto-pause. Waiting ${Math.round(
+          delayMs / 1000
+        )}s before retry ${attempt + 1}/${MAX_RESUME_ATTEMPTS}.`
+      );
+      await sleep(delayMs);
+      delayMs *= 2;
+    }
+  }
 }
 
 async function main() {
@@ -85,6 +141,7 @@ async function main() {
   }
 
   const client = new RDSDataClient({ region: awsRegion });
+  await waitForAuroraResume({ client, database, resourceArn, secretArn });
   const db = drizzle(client, {
     database,
     resourceArn,
@@ -96,6 +153,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(error instanceof Error ? error.message : String(error));
+  console.error(getErrorMessage(error));
   process.exit(1);
 });

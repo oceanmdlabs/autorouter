@@ -112,3 +112,47 @@ app_secret_env="$(node -e '
 
 cd "$CDK_DIR"
 APP_ENV="$app_env" APP_SECRET_ENV="$app_secret_env" npm run cdk:deploy:app -- "$@"
+
+stack_name="${CDK_STACK_NAME:-dev}-autorouter"
+deploy_url="${PUBLIC_URL:-}"
+
+if command -v aws >/dev/null 2>&1; then
+  stack_url="$(aws cloudformation describe-stacks \
+    --stack-name "$stack_name" \
+    --query 'Stacks[0].Outputs[?OutputKey==`url`].OutputValue' \
+    --output text 2>/dev/null || true)"
+
+  if [[ -n "$stack_url" && "$stack_url" != "None" ]]; then
+    deploy_url="$stack_url"
+  fi
+fi
+
+echo
+echo "Deployment complete."
+if [[ -n "$deploy_url" ]]; then
+  echo "App URL: $deploy_url"
+fi
+echo
+echo "First system admin bootstrap (required on a new environment):"
+echo "1. Sign in once with the Google or GitHub account that should become the first system admin."
+echo "2. That first login creates the user row and determines the admin identifier:"
+echo "   - Google subject = OAuth sub"
+echo "   - GitHub subject = numeric OAuth user.id stored as text"
+echo "3. While still signed in, open /api/_auth/session and note user.provider + user.subject."
+if [[ -n "$deploy_url" ]]; then
+  echo "   Session URL: ${deploy_url%/}/api/_auth/session"
+else
+  echo "   Session URL: https://<your-app-url>/api/_auth/session"
+fi
+echo
+echo "   Database lookup fallback:"
+echo '   npm run db:sql -- --sql "select provider, subject, display_name, last_login_at from users order by last_login_at desc nulls last, created_at desc limit 10;"'
+echo
+echo "4. Insert the matching provider + subject into system_admin_allowlist."
+echo
+echo '   Aurora Data API environments:'
+echo '   npm run db:sql -- --sql "insert into system_admin_allowlist (provider, subject, notes, active) values ('\''google'\'', '\''REPLACE_WITH_SUBJECT'\'', '\''initial system admin'\'', true);"'
+echo
+echo "5. Log out and sign back in. System admin is assigned at login time."
+echo
+echo "For more detail, see infrastructure/cdk/README.md."

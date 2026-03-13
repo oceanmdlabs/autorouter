@@ -109,6 +109,7 @@ __azurite_db*__.json
 .DS_Store
 
 .claude/settings.local.json
+.codex/environments/environment.toml
 
 # Pulumi (local caches and stack config may contain secrets)
 infrastructure/pulumi/**/node_modules/

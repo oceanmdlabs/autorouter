@@ -20,6 +20,9 @@ This is the **Ocean Autorouter** - a Nuxt/Vue.js application that uses AI to int
 
 3. **Commit Workflow**:
    - Develop on feature branches created from `origin/main`
+   - Before finishing a task, run `git status --short` and group your changes into logical commits instead of one catch-all commit
+   - Stage only the files for the logical unit you are committing, write a specific message, and repeat until the task's intended changes are committed
+   - Do not leave task-related tracked files uncommitted when you are done unless the user explicitly asks for a partial handoff
    - Push feature branches to `origin`
    - Create PRs targeting `main` in GitHub
 
@@ -68,16 +71,24 @@ Use the "Nuxt: Server" debug target in VS Code/Cursor (see `.vscode/launch.json`
 
 ## Database Changes
 
-Schema is in `drizzle/schema.ts`. To push schema changes:
-```bash
-npm run push
-```
+Schema is in `drizzle/schema.ts`. Follow [`DATABASE_MIGRATION_POLICY.md`](DATABASE_MIGRATION_POLICY.md) for every SQL schema change.
 
-Note: This uses Drizzle Push which is fast but not safe for production.
+Required agent behavior:
+- Treat `drizzle/schema.ts` plus committed files in `drizzle/migrations/` as the only schema source of truth.
+- Never run `drizzle-kit push` or `npm run push` against shared, staging, or production databases.
+- Before generating a migration, point `DB_URL` at a dedicated local Postgres instance and run:
+  ```bash
+  npm run db:migrate:apply:local
+  npm run db:migrate:generate
+  ```
+- Do not generate migrations from a local database that is out of sync with the repo. The guarded scripts will refuse this.
+- Schema PRs must include `drizzle/schema.ts`, the generated SQL migration, snapshot metadata, and notes for any backfill/manual SQL.
+- If production drift is suspected, verify `drizzle.__drizzle_migrations` in the deployed environment before applying anything new.
 
 ## Key Files to Reference
 
 - [README.md](README.md) - Project overview and setup
 - [HOSTING.md](HOSTING.md) - Deployment information
+- [DATABASE_MIGRATION_POLICY.md](DATABASE_MIGRATION_POLICY.md) - Required SQL schema change workflow
 - `drizzle/schema.ts` - Database schema
 - `src/entities/models/` - Business models

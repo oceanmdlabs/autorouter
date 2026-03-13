@@ -79,19 +79,27 @@ The app supports two DB connection modes:
 
 Database schema lives in `drizzle/schema.ts`.
 
-Push schema changes (development only):
+Apply committed migrations to a dedicated local database before generating new ones:
 
 ```bash
-npm run push
+npm run db:migrate:apply:local
 ```
 
-When `drizzle/schema.ts` changes, generate SQL migrations:
+When `drizzle/schema.ts` changes, generate SQL migrations from that local database state:
 
 ```bash
 npm run db:migrate:generate
 ```
 
-Note: `npm run push` uses `drizzle.config.ts` and currently requires `DB_URL` (direct SQL connection). For Aurora Data API environments, use the AWS migration flow documented in [infrastructure/cdk/README.md](infrastructure/cdk/README.md).
+Optional local-only escape hatch:
+
+```bash
+ALLOW_DRIZZLE_PUSH=1 npm run db:push:local
+```
+
+`db:migrate:generate` and `db:push:local` both refuse to run unless `DB_URL` points to a local Postgres instance whose applied migration hashes match the repo's committed migrations.
+
+Read [DATABASE_MIGRATION_POLICY.md](DATABASE_MIGRATION_POLICY.md) before making SQL schema changes. For Aurora Data API environments, use the AWS migration flow documented in [infrastructure/cdk/README.md](infrastructure/cdk/README.md).
 
 ## Production
 

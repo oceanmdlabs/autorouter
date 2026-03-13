@@ -16,7 +16,6 @@ import type {
 } from "@/src/entities/models/site-configuration";
 import { uuid } from "@/src/entities/models/uuid";
 const errors = ref<Record<string, string>>({});
-const isSubmitting = ref(false);
 const formValues = ref<NewSiteConfiguration | null>(null);
 const isNewConfig = ref(false);
 const showEmptyState = ref(false);
@@ -36,6 +35,34 @@ const showEmailApiKey = ref(false);
 const showSiteKey = ref(false);
 const showSiteCredential = ref(false);
 const showSharedEncryptionKey = ref(false);
+
+const panelFields = {
+  connection: [
+    "name",
+    "clientId",
+    "clientSecret",
+    "oceanServer",
+    "oceanSiteNum",
+    "oceanClientId",
+    "oceanClientSecret",
+  ],
+  inbound: ["clientSecret"],
+  sms: ["twilioAccountSid", "twilioAuthToken", "twilioPhoneNumber"],
+  ai: ["aiProvider", "aiApiKey", "aiModel"],
+  email: ["emailProvider", "emailFromAddress", "emailApiKey", "emailFromName"],
+  openApi: ["siteKey", "siteCredential", "sharedEncryptionKey"],
+} as const;
+
+type SettingsPanel = keyof typeof panelFields;
+
+const savingPanels = ref<Record<SettingsPanel, boolean>>({
+  connection: false,
+  inbound: false,
+  sms: false,
+  ai: false,
+  email: false,
+  openApi: false,
+});
 
 // Test email and SMS variables
 const isTestingEmail = ref(false);
@@ -67,33 +94,6 @@ const apiEndpoint = computed(() => {
 });
 const cdsHookEndpoint = computed(() => {
   return `${host}/api/cds`;
-});
-const hasChanges = computed(() => {
-  const loadedSite = loadedData.value?.siteConfig;
-  if (!loadedSite) return true;
-  if (!formValues.value) return false;
-  return (
-    loadedSite.name !== formValues.value.name ||
-    loadedSite.clientId !== formValues.value.clientId ||
-    loadedSite.clientSecret !== formValues.value.clientSecret ||
-    loadedSite.oceanServer !== formValues.value.oceanServer ||
-    loadedSite.oceanSiteNum !== formValues.value.oceanSiteNum ||
-    loadedSite.oceanClientId !== formValues.value.oceanClientId ||
-    loadedSite.oceanClientSecret !== formValues.value.oceanClientSecret ||
-    loadedSite.twilioAccountSid !== formValues.value.twilioAccountSid ||
-    loadedSite.twilioAuthToken !== formValues.value.twilioAuthToken ||
-    loadedSite.twilioPhoneNumber !== formValues.value.twilioPhoneNumber ||
-    loadedSite.aiProvider !== formValues.value.aiProvider ||
-    loadedSite.aiApiKey !== formValues.value.aiApiKey ||
-    loadedSite.aiModel !== formValues.value.aiModel ||
-    loadedSite.emailProvider !== formValues.value.emailProvider ||
-    loadedSite.emailFromAddress !== formValues.value.emailFromAddress ||
-    loadedSite.emailApiKey !== formValues.value.emailApiKey ||
-    loadedSite.emailFromName !== formValues.value.emailFromName ||
-    loadedSite.siteKey !== formValues.value.siteKey ||
-    loadedSite.siteCredential !== formValues.value.siteCredential ||
-    loadedSite.sharedEncryptionKey !== formValues.value.sharedEncryptionKey
-  );
 });
 const { data: loadedData, status } = useAsyncData("site", async () => {
   return await useRequestFetch()<{
@@ -165,39 +165,80 @@ const isRecentSuccessfulInboundConnection = computed(() => {
   );
 });
 
-async function handleSubmit() {
-  isSubmitting.value = true;
-  errors.value = {};
+function clearPanelErrors(panel: SettingsPanel) {
+  for (const field of panelFields[panel]) {
+    delete errors.value[field];
+  }
+}
+
+function mapValidationErrors(error: any) {
+  if (
+    error.data?.data?.name === "ZodError" &&
+    Array.isArray(error.data.data.issues)
+  ) {
+    error.data.data.issues.forEach(
+      (issue: { path: string[]; message: string }) => {
+        const fieldName = issue.path[issue.path.length - 1];
+        if (fieldName) {
+          errors.value[fieldName] = issue.message;
+        }
+      },
+    );
+    return true;
+  }
+  return false;
+}
+
+function panelHasChanges(panel: SettingsPanel) {
+  if (!formValues.value) return false;
+  const loadedSite = loadedData.value?.siteConfig;
+  if (!loadedSite) return panel === "connection";
+
+  return panelFields[panel].some((field) => {
+    return (
+      loadedSite[field as keyof SiteConfiguration] !== formValues.value?.[field]
+    );
+  });
+}
+
+function panelPayload(panel: SettingsPanel) {
+  if (!formValues.value) return null;
+  if (isNewConfig.value) {
+    return formValues.value;
+  }
+
+  const payload: Record<string, unknown> = { id: formValues.value.id };
+  for (const field of panelFields[panel]) {
+    payload[field] = formValues.value[field];
+  }
+  return payload;
+}
+
+async function savePanel(panel: SettingsPanel) {
+  const payload = panelPayload(panel);
+  if (!payload) return;
+
+  savingPanels.value[panel] = true;
+  clearPanelErrors(panel);
+  delete errors.value.general;
+
   try {
     loadedData.value = {
       siteConfig: await $fetch<SiteConfiguration>("/api/site-configuration", {
         method: "POST",
-        body: formValues.value,
+        body: payload,
       }),
     };
     isNewConfig.value = false;
+    toast.success("Settings saved");
   } catch (error: any) {
     console.error("Failed to save site configuration:", error);
-    if (
-      error.data?.data?.name === "ZodError" &&
-      Array.isArray(error.data.data.issues)
-    ) {
-      // Map Zod validation errors to form fields
-      error.data.data.issues.forEach(
-        (issue: { path: string[]; message: string }) => {
-          const fieldName = issue.path[issue.path.length - 1];
-          if (fieldName) {
-            errors.value[fieldName] = issue.message;
-          }
-        },
-      );
-    }
-    // Add a catch-all error if there are no field-specific errors
-    if (Object.keys(errors.value).length === 0) {
+    const hasValidationErrors = mapValidationErrors(error);
+    if (!hasValidationErrors) {
       errors.value.general = "Failed to save site configuration";
     }
   } finally {
-    isSubmitting.value = false;
+    savingPanels.value[panel] = false;
   }
 }
 
@@ -355,11 +396,7 @@ function copyToClipboard(text: string) {
         </Alert>
       </div>
 
-      <form
-        v-else-if="formValues"
-        class="space-y-8"
-        @submit.prevent="handleSubmit"
-      >
+      <form v-else-if="formValues" class="space-y-8" @submit.prevent>
         <div>
           <h1 class="text-2xl font-semibold text-gray-900">Settings</h1>
           <p
@@ -501,6 +538,7 @@ function copyToClipboard(text: string) {
                 <div v-if="formValues" class="space-y-4">
                   <div class="flex items-center justify-between">
                     <Button
+                      type="button"
                       variant="outline"
                       @click="handleTestConnection"
                       :disabled="
@@ -534,6 +572,23 @@ function copyToClipboard(text: string) {
                       {{ testConnectionResult.error }}
                     </p>
                   </Alert>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                  <Button
+                    type="button"
+                    @click="savePanel('connection')"
+                    :disabled="
+                      savingPanels.connection ||
+                      (!isNewConfig && !panelHasChanges('connection'))
+                    "
+                  >
+                    {{
+                      savingPanels.connection
+                        ? "Saving..."
+                        : "Save Connection Settings"
+                    }}
+                  </Button>
                 </div>
               </div>
             </AccordionContent>
@@ -778,6 +833,20 @@ function copyToClipboard(text: string) {
                     >
                   </div>
                 </div>
+
+                <div class="flex justify-end pt-2">
+                  <Button
+                    type="button"
+                    @click="savePanel('inbound')"
+                    :disabled="
+                      savingPanels.inbound || !panelHasChanges('inbound')
+                    "
+                  >
+                    {{
+                      savingPanels.inbound ? "Saving..." : "Save OAuth Settings"
+                    }}
+                  </Button>
+                </div>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -888,6 +957,7 @@ function copyToClipboard(text: string) {
                   </div>
                   <div class="flex items-center justify-between">
                     <Button
+                      type="button"
                       variant="outline"
                       @click="handleTestSms"
                       :disabled="
@@ -921,6 +991,16 @@ function copyToClipboard(text: string) {
                       {{ testSmsResult.error }}
                     </p>
                   </Alert>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                  <Button
+                    type="button"
+                    @click="savePanel('sms')"
+                    :disabled="savingPanels.sms || !panelHasChanges('sms')"
+                  >
+                    {{ savingPanels.sms ? "Saving..." : "Save SMS Settings" }}
+                  </Button>
                 </div>
               </div>
             </AccordionContent>
@@ -1002,6 +1082,16 @@ function copyToClipboard(text: string) {
                 <p v-if="errors.aiModel" class="text-sm text-destructive">
                   {{ errors.aiModel }}
                 </p>
+              </div>
+
+              <div class="flex justify-end pt-2">
+                <Button
+                  type="button"
+                  @click="savePanel('ai')"
+                  :disabled="savingPanels.ai || !panelHasChanges('ai')"
+                >
+                  {{ savingPanels.ai ? "Saving..." : "Save AI Settings" }}
+                </Button>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -1140,6 +1230,7 @@ function copyToClipboard(text: string) {
                   </div>
                   <div class="flex items-center justify-between">
                     <Button
+                      type="button"
                       variant="outline"
                       @click="handleTestEmail"
                       :disabled="
@@ -1176,6 +1267,18 @@ function copyToClipboard(text: string) {
                     </p>
                   </Alert>
                 </div>
+
+                <div class="flex justify-end pt-2">
+                  <Button
+                    type="button"
+                    @click="savePanel('email')"
+                    :disabled="savingPanels.email || !panelHasChanges('email')"
+                  >
+                    {{
+                      savingPanels.email ? "Saving..." : "Save Email Settings"
+                    }}
+                  </Button>
+                </div>
               </div>
             </AccordionContent>
           </AccordionItem>
@@ -1185,7 +1288,7 @@ function copyToClipboard(text: string) {
             value="ocean-open-api"
             class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
           >
-            <AccordionTrigger class="py-5 hover:no-underline">
+            <AccordionTrigger type="button" class="py-5 hover:no-underline">
               <div class="space-y-1 text-left">
                 <h2 class="text-base font-semibold text-gray-900">
                   Ocean Open API Credentials
@@ -1294,6 +1397,22 @@ function copyToClipboard(text: string) {
                   Ocean's Open API for patient engagement features.
                 </p>
               </div>
+
+              <div class="flex justify-end pt-2">
+                <Button
+                  type="button"
+                  @click="savePanel('openApi')"
+                  :disabled="
+                    savingPanels.openApi || !panelHasChanges('openApi')
+                  "
+                >
+                  {{
+                    savingPanels.openApi
+                      ? "Saving..."
+                      : "Save Open API Settings"
+                  }}
+                </Button>
+              </div>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
@@ -1318,12 +1437,6 @@ function copyToClipboard(text: string) {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
-        </div>
-
-        <div class="flex justify-end">
-          <Button v-if="hasChanges" type="submit" :disabled="isSubmitting">
-            {{ isSubmitting ? "Saving..." : "Save Changes" }}
-          </Button>
         </div>
 
         <div class="space-y-2">

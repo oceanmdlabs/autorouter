@@ -10,7 +10,41 @@
 			</div>
 		</div>
 
-		<h1 class="text-2xl font-bold mb-4">Site Configurations</h1>
+		<div class="bg-white border border-slate-200 rounded-lg p-4 mb-6">
+			<div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+				<div>
+					<h1 class="text-2xl font-bold">Site Configurations</h1>
+					<p class="text-sm text-slate-600">Create a new site, then finish its setup in the site configuration page.</p>
+				</div>
+				<form class="grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end" @submit.prevent="createSite">
+					<div>
+						<label class="mb-1 block text-sm font-medium text-slate-700">Site Name</label>
+						<input
+							v-model="newSite.name"
+							type="text"
+							placeholder="Downtown Clinic"
+							class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+						/>
+					</div>
+					<div>
+						<label class="mb-1 block text-sm font-medium text-slate-700">Tenant ID</label>
+						<input
+							v-model="newSite.tenantId"
+							type="text"
+							placeholder="downtown-clinic"
+							class="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+						/>
+					</div>
+					<button
+						type="submit"
+						:disabled="isCreating"
+						class="self-end bg-slate-900 hover:bg-slate-800 disabled:opacity-60 text-white px-4 py-2 rounded-md text-sm font-medium"
+					>
+						{{ isCreating ? 'Creating…' : 'Create Site' }}
+					</button>
+				</form>
+			</div>
+		</div>
 
 		<div v-if="error" class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
 			{{ error }}
@@ -37,8 +71,14 @@
 <script setup lang="ts">
 import type { SiteConfigurationReference } from '@/src/entities/models/site-configuration';
 const router = useRouter()
+const { fetch: refreshSession } = useUserSession()
 const status = ref<'pending' | 'error' | 'success'>('pending')
 const error = ref<string | null>(null)
+const isCreating = ref(false)
+const newSite = ref({
+	name: '',
+	tenantId: ''
+})
 const deploymentInfo = useRuntimeConfig().public.deploymentInfo as {
 	appVersion?: string
 	buildTime?: string
@@ -83,6 +123,20 @@ const { data: siteConfigurations } = useAsyncData('site-configurations', async (
 	}
 });
 
+const normalizeTenantId = (value: string) =>
+	value
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9-]+/g, '-')
+		.replace(/^-+|-+$/g, '')
+		.replace(/-{2,}/g, '-')
+
+watch(() => newSite.value.name, (value) => {
+	if (!newSite.value.tenantId.trim()) {
+		newSite.value.tenantId = normalizeTenantId(value)
+	}
+})
+
 const selectConfiguration = async (config: SiteConfigurationReference) => {
 	try {
 		status.value = 'pending'
@@ -94,6 +148,38 @@ const selectConfiguration = async (config: SiteConfigurationReference) => {
 	} catch (e) {
 		status.value = 'error'
 		error.value = e instanceof Error ? e.message : 'Failed to switch site'
+	}
+}
+
+const createSite = async () => {
+	try {
+		status.value = 'pending'
+		isCreating.value = true
+		error.value = null
+
+		const tenantId = normalizeTenantId(newSite.value.tenantId)
+		if (!newSite.value.name.trim() || !tenantId) {
+			error.value = 'Site name and tenant ID are required'
+			status.value = 'error'
+			return
+		}
+
+		await useRequestFetch()('/api/site-configuration/all', {
+			method: 'POST',
+			body: {
+				name: newSite.value.name.trim(),
+				tenantId
+			}
+		})
+
+		await refreshCookie('nuxt-session')
+		await refreshSession()
+		await router.push('/portal/site-configuration')
+	} catch (e) {
+		status.value = 'error'
+		error.value = e instanceof Error ? e.message : 'Failed to create site'
+	} finally {
+		isCreating.value = false
 	}
 }
 </script>

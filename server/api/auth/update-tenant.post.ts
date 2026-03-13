@@ -3,6 +3,7 @@ import {
   assertActiveMembership,
   isKnownTenant,
 } from "@/server/utils/tenant-access";
+import { hasSystemAdminAccess } from "@/server/utils/system-admin-access";
 
 export default defineEventHandler(async (event) => {
   const session = await requireUserSession(event);
@@ -23,7 +24,7 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  if (user.roles.admin === "system") {
+  if (await hasSystemAdminAccess(user)) {
     const knownTenant = await isKnownTenant(tenantId);
     if (!knownTenant) {
       throw createError({

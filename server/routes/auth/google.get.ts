@@ -1,9 +1,6 @@
 import { buildSessionUserFromIdentity } from "@/server/utils/session-user";
 
 export default defineOAuthGoogleEventHandler({
-  config: {
-    redirectURL: (process.env.URL ?? "http://localhost:4000") + "/auth/google",
-  } satisfies OAuthGoogleConfig,
   async onSuccess(event, { user }) {
     await setUserSession(event, {
       user: await buildSessionUserFromIdentity({

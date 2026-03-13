@@ -1,6 +1,6 @@
 import type { ApplicationContext } from "@/src/entities/models/application-context";
-import { eq } from "drizzle-orm";
-import { siteConfig } from "@/drizzle/schema";
+import { eq, sql } from "drizzle-orm";
+import { aiProviderEnum, oceanServerEnum, siteConfig } from "@/drizzle/schema";
 import type {
   SiteConfiguration,
   UpdateSiteConfiguration,
@@ -11,6 +11,14 @@ import type { ISiteConfigurationRepository } from "@/src/application/repositorie
 type Dependencies = {
   cxt: ApplicationContext;
 };
+
+function oceanServerValue(server: (typeof oceanServerEnum.enumValues)[number]) {
+  return sql`${server}::ocean_server`;
+}
+
+function aiProviderValue(provider: (typeof aiProviderEnum.enumValues)[number] | null) {
+  return provider === null ? null : sql`${provider}::ai_provider`;
+}
 
 export const createSiteConfigurationRepository = ({
   cxt,
@@ -80,6 +88,9 @@ export const createSiteConfigurationRepository = ({
     } = record;
     return {
       ...rest,
+      oceanServer: oceanServerValue(rest.oceanServer),
+      aiProvider:
+        rest.aiProvider === undefined ? undefined : aiProviderValue(rest.aiProvider),
       clientSecretEncrypted: cryptoService.encrypt(clientSecret),
       oceanClientSecretEncrypted: cryptoService.encrypt(oceanClientSecret),
       ...(aiApiKey && {
@@ -117,6 +128,13 @@ export const createSiteConfigurationRepository = ({
       ...rest
     } = record;
     const result: Record<string, unknown> = { ...rest };
+
+    if (rest.oceanServer != null) {
+      result.oceanServer = oceanServerValue(rest.oceanServer);
+    }
+    if (rest.aiProvider !== undefined) {
+      result.aiProvider = aiProviderValue(rest.aiProvider);
+    }
 
     if (clientSecret != null) {
       result.clientSecretEncrypted = cryptoService.encrypt(clientSecret);

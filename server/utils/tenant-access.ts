@@ -1,9 +1,14 @@
 import {
+  aiProviderEnum,
   identityProviderEnum,
+  oceanServerEnum,
   siteConfig,
   systemAdminAllowlist,
   tenantInvites,
+  tenantInviteStatusEnum,
   tenantMemberships,
+  tenantMembershipRoleEnum,
+  tenantMembershipStatusEnum,
   users,
 } from "@/drizzle/schema";
 import type {
@@ -12,7 +17,7 @@ import type {
 } from "@/src/entities/models/session";
 import { uuid } from "@/src/entities/models/uuid";
 import { createDbClient } from "@/src/infrastructure/services/db/create-db-client";
-import { and, asc, desc, eq, gt } from "drizzle-orm";
+import { and, asc, desc, eq, gt, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 
 export type IdentityProvider = (typeof identityProviderEnum.enumValues)[number];
@@ -57,6 +62,71 @@ export function generateInviteCode() {
   return randomBytes(18).toString("base64url");
 }
 
+type EnumColumn =
+  | typeof users.provider
+  | typeof systemAdminAllowlist.provider
+  | typeof tenantMemberships.role
+  | typeof tenantMemberships.status
+  | typeof tenantInvites.role
+  | typeof tenantInvites.status
+  | typeof siteConfig.oceanServer
+  | typeof siteConfig.aiProvider;
+
+function castEnumValue<TValue extends string>(
+  value: TValue,
+  enumName:
+    | "identity_provider"
+    | "tenant_membership_role"
+    | "tenant_membership_status"
+    | "tenant_invite_status"
+    | "ocean_server"
+    | "ai_provider"
+) {
+  return sql`${value}::${sql.raw(enumName)}`;
+}
+
+function eqEnum<TValue extends string>(
+  column: EnumColumn,
+  value: TValue,
+  enumName:
+    | "identity_provider"
+    | "tenant_membership_role"
+    | "tenant_membership_status"
+    | "tenant_invite_status"
+    | "ocean_server"
+    | "ai_provider"
+) {
+  return sql`${column} = ${castEnumValue(value, enumName)}`;
+}
+
+function identityProviderValue(provider: IdentityProvider) {
+  return castEnumValue(provider, "identity_provider");
+}
+
+function membershipRoleValue(role: (typeof tenantMembershipRoleEnum.enumValues)[number]) {
+  return castEnumValue(role, "tenant_membership_role");
+}
+
+function membershipStatusValue(
+  status: (typeof tenantMembershipStatusEnum.enumValues)[number]
+) {
+  return castEnumValue(status, "tenant_membership_status");
+}
+
+function inviteStatusValue(status: (typeof tenantInviteStatusEnum.enumValues)[number]) {
+  return castEnumValue(status, "tenant_invite_status");
+}
+
+function oceanServerValue(server: (typeof oceanServerEnum.enumValues)[number]) {
+  return castEnumValue(server, "ocean_server");
+}
+
+function aiProviderValue(
+  provider: (typeof aiProviderEnum.enumValues)[number] | null
+) {
+  return provider === null ? null : castEnumValue(provider, "ai_provider");
+}
+
 export async function isSystemAdmin(
   provider: IdentityProvider,
   subject: string
@@ -64,7 +134,7 @@ export async function isSystemAdmin(
   const db = createDbClient();
   const record = await db.query.systemAdminAllowlist.findFirst({
     where: and(
-      eq(systemAdminAllowlist.provider, provider),
+      eqEnum(systemAdminAllowlist.provider, provider, "identity_provider"),
       eq(systemAdminAllowlist.subject, subject),
       eq(systemAdminAllowlist.active, true)
     ),
@@ -76,7 +146,7 @@ export async function upsertOAuthUser(identity: UserIdentity) {
   const db = createDbClient();
   const existing = await db.query.users.findFirst({
     where: and(
-      eq(users.provider, identity.provider),
+      eqEnum(users.provider, identity.provider, "identity_provider"),
       eq(users.subject, identity.subject)
     ),
   });
@@ -100,7 +170,7 @@ export async function upsertOAuthUser(identity: UserIdentity) {
 
   const user = {
     id: uuid(),
-    provider: identity.provider,
+    provider: identityProviderValue(identity.provider),
     subject: identity.subject,
     displayName: identity.displayName,
     lastLoginAt: new Date(),
@@ -157,8 +227,8 @@ export async function ensureLegacyMembership(identity: UserIdentity, userId: str
     id: uuid(),
     tenantId,
     userId,
-    role: "admin",
-    status: "active",
+    role: membershipRoleValue("admin"),
+    status: membershipStatusValue("active"),
     createdBy: userId,
     updatedBy: userId,
   });
@@ -248,8 +318,13 @@ export async function createTenantInvite(args: {
     updatedBy: args.invitedByUserId,
     expiresAt: args.expiresAt,
   };
+  const dbInvite = {
+    ...invite,
+    role: membershipRoleValue(args.role),
+    status: inviteStatusValue("pending"),
+  };
 
-  await db.insert(tenantInvites).values(invite);
+  await db.insert(tenantInvites).values(dbInvite);
   return invite;
 }
 
@@ -262,7 +337,7 @@ export async function revokeTenantInvite(args: {
   await db
     .update(tenantInvites)
     .set({
-      status: "revoked",
+      status: inviteStatusValue("revoked"),
       revokedAt: new Date(),
       revokedByUserId: args.revokedByUserId,
       updatedBy: args.revokedByUserId,
@@ -309,7 +384,7 @@ export async function redeemTenantInvite(args: {
     await db
       .update(tenantInvites)
       .set({
-        status: "expired",
+        status: inviteStatusValue("expired"),
         updatedBy: args.userId,
       })
       .where(eq(tenantInvites.id, invite.id));
@@ -331,8 +406,8 @@ export async function redeemTenantInvite(args: {
     await db
       .update(tenantMemberships)
       .set({
-        role: invite.role,
-        status: "active",
+        role: membershipRoleValue(invite.role),
+        status: membershipStatusValue("active"),
         revokedAt: null,
         revokedBy: null,
         updatedBy: args.userId,
@@ -343,8 +418,8 @@ export async function redeemTenantInvite(args: {
       id: uuid(),
       tenantId: invite.tenantId,
       userId: args.userId,
-      role: invite.role,
-      status: "active",
+      role: membershipRoleValue(invite.role),
+      status: membershipStatusValue("active"),
       createdBy: args.userId,
       updatedBy: args.userId,
     });
@@ -353,7 +428,7 @@ export async function redeemTenantInvite(args: {
   await db
     .update(tenantInvites)
     .set({
-      status: "redeemed",
+      status: inviteStatusValue("redeemed"),
       redeemedAt: new Date(),
       redeemedByUserId: args.userId,
       updatedBy: args.userId,
@@ -373,7 +448,7 @@ export async function updateMembershipRole(args: {
   await db
     .update(tenantMemberships)
     .set({
-      role: args.role,
+      role: membershipRoleValue(args.role),
       updatedBy: args.updatedByUserId,
     })
     .where(
@@ -393,7 +468,7 @@ export async function revokeMembership(args: {
   await db
     .update(tenantMemberships)
     .set({
-      status: "revoked",
+      status: membershipStatusValue("revoked"),
       revokedAt: new Date(),
       revokedBy: args.revokedByUserId,
       updatedBy: args.revokedByUserId,
@@ -415,7 +490,7 @@ export async function assertActiveMembership(args: {
     where: and(
       eq(tenantMemberships.tenantId, args.tenantId),
       eq(tenantMemberships.userId, args.userId),
-      eq(tenantMemberships.status, "active")
+      eqEnum(tenantMemberships.status, "active", "tenant_membership_status")
     ),
   });
 
@@ -450,6 +525,77 @@ export async function isKnownTenant(tenantId: string) {
     columns: { id: true },
   });
   return Boolean(tenant);
+}
+
+export async function createTenantSiteConfiguration(args: {
+  tenantId: string;
+  name: string;
+  userId: string;
+}) {
+  const db = createDbClient();
+  const existingTenant = await db.query.siteConfig.findFirst({
+    where: eq(siteConfig.tenantId, args.tenantId),
+    columns: { id: true },
+  });
+
+  if (existingTenant) {
+    throw createError({
+      statusCode: 409,
+      statusMessage: "Tenant already exists",
+    });
+  }
+
+  const now = new Date();
+
+  await db.insert(siteConfig).values({
+    id: uuid(),
+    tenantId: args.tenantId,
+    name: args.name,
+    clientId: uuid(),
+    clientSecretEncrypted: "",
+    oceanServer: oceanServerValue("ocean"),
+    oceanSiteNum: "",
+    oceanClientId: "",
+    oceanClientSecretEncrypted: "",
+    createdAt: now,
+    createdBy: args.userId,
+    updatedAt: now,
+    updatedBy: args.userId,
+  });
+
+  const existingMembership = await db.query.tenantMemberships.findFirst({
+    where: and(
+      eq(tenantMemberships.tenantId, args.tenantId),
+      eq(tenantMemberships.userId, args.userId)
+    ),
+    columns: { id: true },
+  });
+
+  if (existingMembership) {
+    await db
+      .update(tenantMemberships)
+      .set({
+        role: membershipRoleValue("admin"),
+        status: membershipStatusValue("active"),
+        updatedAt: now,
+        updatedBy: args.userId,
+        revokedAt: null,
+        revokedBy: null,
+      })
+      .where(eq(tenantMemberships.id, existingMembership.id));
+  } else {
+    await db.insert(tenantMemberships).values({
+      id: uuid(),
+      tenantId: args.tenantId,
+      userId: args.userId,
+      role: membershipRoleValue("admin"),
+      status: membershipStatusValue("active"),
+      createdAt: now,
+      createdBy: args.userId,
+      updatedAt: now,
+      updatedBy: args.userId,
+    });
+  }
 }
 
 export async function findInviteForCode(code: string) {

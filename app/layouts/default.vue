@@ -22,13 +22,15 @@ const toggleMenu = () => {
 const memberships = computed(() => user.value?.memberships ?? [])
 const activeTenantId = computed(() => user.value?.activeTenantId ?? user.value?.tenantId ?? null)
 const hasActiveTenant = computed(() => Boolean(activeTenantId.value))
+const isSystemAdmin = computed(() => user.value?.roles?.admin === 'system')
 const activeMembership = computed(() =>
   memberships.value.find((membership) => membership.tenantId === activeTenantId.value)
 )
 const canManageTenant = computed(() =>
-  user.value?.roles?.admin === 'system' || activeMembership.value?.role === 'admin'
+  isSystemAdmin.value || activeMembership.value?.role === 'admin'
 )
 const selectedSiteName = computed(() => siteConfig.value?.siteConfig?.name ?? activeTenantId.value ?? null)
+const isNavItemEnabled = (to: string) => hasActiveTenant.value || (isSystemAdmin.value && to === '/admin')
 const navItems = computed(() => {
   const items = [
     { to: '/portal/site-configuration', label: 'Site' },
@@ -42,7 +44,7 @@ const navItems = computed(() => {
     items.push({ to: '/portal/members', label: 'Members' })
   }
 
-  if (user.value?.roles?.admin === 'system') {
+  if (isSystemAdmin.value) {
     items.push({ to: '/admin', label: 'Admin' })
   }
 
@@ -94,13 +96,13 @@ function goToLogin() {
             </svg>
           </button>
 
-          <div class="flex min-w-0 flex-1 items-center gap-3">
+          <div class="flex min-w-0 flex-1 items-center gap-3 md:flex-none">
             <img src="/ocean-labs-logo.svg" alt="Ocean Labs Logo" class="h-6 w-auto flex-shrink-0" />
             <div class="min-w-0">
-              <div class="text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500">Ocean Labs</div>
+              <div class="hidden text-[11px] font-semibold uppercase tracking-[0.28em] text-slate-500 xl:block">Ocean Labs</div>
               <div class="flex min-w-0 items-baseline gap-2">
-                <div class="text-lg font-semibold text-slate-950">Autorouter</div>
-                <div v-if="selectedSiteName" class="hidden truncate text-sm text-slate-500 lg:block">
+                <div class="truncate text-base font-semibold text-slate-950 lg:text-lg">Autorouter</div>
+                <div v-if="selectedSiteName" class="hidden max-w-[12rem] truncate text-sm text-slate-500 2xl:block">
                   {{ selectedSiteName }}
                 </div>
               </div>
@@ -109,16 +111,19 @@ function goToLogin() {
 
           <nav
             class="hidden md:flex items-center rounded-full border border-slate-200 bg-slate-50/80 p-1"
-            :class="hasActiveTenant ? '' : 'pointer-events-none opacity-45 saturate-0'"
+            :class="hasActiveTenant || isSystemAdmin ? '' : 'pointer-events-none opacity-45 saturate-0'"
           >
             <NuxtLink
               v-for="item in navItems"
               :key="item.to"
               :to="item.to"
               class="rounded-full px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-950"
-              :class="hasActiveTenant && isRouteActive(item.to) ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : ''"
-              :tabindex="hasActiveTenant ? 0 : -1"
-              :aria-disabled="!hasActiveTenant"
+              :class="[
+                isNavItemEnabled(item.to) && isRouteActive(item.to) ? 'bg-white text-slate-950 shadow-sm ring-1 ring-slate-200' : '',
+                isNavItemEnabled(item.to) ? '' : 'pointer-events-none opacity-45 saturate-0'
+              ]"
+              :tabindex="isNavItemEnabled(item.to) ? 0 : -1"
+              :aria-disabled="!isNavItemEnabled(item.to)"
             >
               {{ item.label }}
             </NuxtLink>
@@ -132,7 +137,7 @@ function goToLogin() {
               <div class="min-w-0 pr-1 text-left leading-tight">
                 <div class="max-w-[150px] truncate text-sm font-medium text-slate-950">{{ user?.name }}</div>
                 <div class="max-w-[150px] truncate text-xs text-slate-500">
-                  {{ selectedSiteName ?? 'Choose access' }}
+                  {{ selectedSiteName ?? 'Choose site' }}
                 </div>
               </div>
               <svg class="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -206,7 +211,7 @@ function goToLogin() {
               </div>
               <div class="min-w-0">
                 <div class="truncate text-sm font-semibold text-slate-950">{{ user?.name }}</div>
-                <div class="truncate text-xs text-slate-500">{{ selectedSiteName ?? 'Choose access' }}</div>
+                <div class="truncate text-xs text-slate-500">{{ selectedSiteName ?? 'Choose site' }}</div>
               </div>
             </div>
             <div class="pt-4">

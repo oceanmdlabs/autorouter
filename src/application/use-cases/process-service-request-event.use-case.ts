@@ -82,6 +82,17 @@ export async function processServiceRequestEventUseCase(
       .join("\n");
   }
 
+  if (event.archivalMessage) {
+    details = [details, `Archival: ${event.archivalMessage}`]
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (event.archivalError) {
+    error = [error, `Archival: ${event.archivalError}`]
+      .filter(Boolean)
+      .join("\n");
+  }
+
   await cxt.getActivityLogEntriesRepository().create({
     ...event,
     details,

@@ -2,8 +2,10 @@ import type { IActivityLogEntriesRepository } from "@/src/application/repositori
 import type { IHealthcareServicesRepository } from "@/src/application/repositories/healthcare-services.repository.interface";
 import type { IRoutingRulesRepository } from "@/src/application/repositories/routing-rules.repository.interface";
 import type { ISiteConfigurationRepository } from "@/src/application/repositories/site-configuration.repository.interface";
+import type { IErequestsRepository } from "@/src/application/repositories/erequests.repository.interface";
 import type { ITestServiceRequestsRepository } from "@/src/application/repositories/test-service-requests.repository.interface";
 import type { IAiService } from "@/src/application/services/ai.service.interface";
+import type { IBlobStorageService } from "@/src/application/services/blob-storage.service.interface";
 import type { ICryptoService } from "@/src/application/services/crypto.service.interface";
 import type { IDbService } from "@/src/application/services/db.service.interface";
 import type { IOceanClientService } from "@/src/application/services/ocean-client.service.interface";
@@ -12,7 +14,9 @@ import { createHealthcareServicesRepository } from "@/src/infrastructure/reposit
 import { createRoutingRulesRepository } from "@/src/infrastructure/repositories/routing-rules.repository";
 import { createSiteConfigurationRepository } from "@/src/infrastructure/repositories/site-configuration.repository";
 import { createTestServiceRequestsRepository } from "@/src/infrastructure/repositories/test-service-requests.repository";
+import { createErequestsRepository } from "@/src/infrastructure/repositories/erequests.repository";
 import { createAiService } from "@/src/infrastructure/services/ai.service";
+import { createBlobStorageService } from "@/src/infrastructure/services/blob-storage.service";
 import { createCryptoService } from "@/src/infrastructure/services/crypto.service";
 import { createDbService } from "@/src/infrastructure/services/db.service";
 import { createRoutingToolActionService } from "@/src/infrastructure/services/routing-tool-action.service";
@@ -32,7 +36,9 @@ export class ApplicationContext implements ApplicationContext {
   private testServiceRequestsRepository?: ITestServiceRequestsRepository;
   private siteConfigurationRepository?: ISiteConfigurationRepository;
   private activityLogEntriesRepository?: IActivityLogEntriesRepository;
+  private erequestsRepository?: IErequestsRepository;
   private aiService?: IAiService;
+  private blobStorageService?: IBlobStorageService;
   private routingToolActionService?: IRoutingToolActionService;
   private oceanClientService?: IOceanClientService;
 
@@ -167,6 +173,20 @@ export class ApplicationContext implements ApplicationContext {
       });
     }
     return this.activityLogEntriesRepository;
+  }
+
+  getErequestsRepository(): IErequestsRepository {
+    if (!this.erequestsRepository) {
+      this.erequestsRepository = createErequestsRepository({ cxt: this });
+    }
+    return this.erequestsRepository;
+  }
+
+  getBlobStorageService(): IBlobStorageService {
+    if (!this.blobStorageService) {
+      this.blobStorageService = createBlobStorageService({ cxt: this });
+    }
+    return this.blobStorageService;
   }
 
   getOceanClientService(): IOceanClientService {

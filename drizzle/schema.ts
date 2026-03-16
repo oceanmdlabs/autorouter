@@ -8,6 +8,7 @@ import {
   boolean,
   index,
   uniqueIndex,
+  integer,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 type FhirBundle = { resourceType: "Bundle" };
@@ -128,6 +129,29 @@ export const aiProviderEnum = pgEnum("ai_provider", [
   "google",
   "cohere",
 ]);
+
+export const erequestStorageProviderEnum = pgEnum(
+  "erequest_storage_provider",
+  ["filesystem", "s3"]
+);
+
+export const erequestStorageStatusEnum = pgEnum("erequest_storage_status", [
+  "pending",
+  "stored",
+  "partial_failure",
+  "failed",
+]);
+
+export const erequestBlobKindEnum = pgEnum("erequest_blob_kind", [
+  "primary_pdf",
+  "attachment",
+  "other",
+]);
+
+export const erequestBlobDownloadStatusEnum = pgEnum(
+  "erequest_blob_download_status",
+  ["pending", "stored", "failed"]
+);
 
 export const identityProviderEnum = pgEnum("identity_provider", [
   "google",
@@ -288,8 +312,142 @@ export const siteConfig = pgTable(
     sharedEncryptionKeyEncrypted: text("shared_encryption_key_encrypted"),
     webhookKeyEncrypted: text("webhook_key_encrypted"),
     webhookUnsignedChallengeUntil: timestamp("webhook_unsigned_challenge_until"),
+    erequestArchivalEnabled: boolean("erequest_archival_enabled")
+      .notNull()
+      .default(false),
+    erequestStorageProvider:
+      erequestStorageProviderEnum("erequest_storage_provider")
+        .notNull()
+        .default("filesystem"),
+    erequestStoreAttachments: boolean("erequest_store_attachments")
+      .notNull()
+      .default(true),
+    erequestStoreRawBundle: boolean("erequest_store_raw_bundle")
+      .notNull()
+      .default(true),
+    erequestStorageBucket: text("erequest_storage_bucket"),
+    erequestStorageRegion: text("erequest_storage_region"),
+    erequestStoragePrefix: text("erequest_storage_prefix"),
+    erequestEnabledConfirmedAt: timestamp("erequest_enabled_confirmed_at"),
+    erequestDisabledConfirmedAt: timestamp("erequest_disabled_confirmed_at"),
   },
   (table) => ({
     tenantIdx: index("idx_site_config_tenant_id").on(table.tenantId),
+  })
+);
+
+export const erequests = pgTable(
+  "erequests",
+  {
+    ...BaseResourceSchema,
+    ...TenantConfinedSchema,
+    sourceMessageId: text("source_message_id"),
+    messageChecksum: text("message_checksum").notNull(),
+    referralRef: text("referral_ref"),
+    triggeringEvent: triggeringEventEnum("triggering_event").notNull(),
+    receivedAt: timestamp("received_at").notNull().defaultNow(),
+    patientHealthNumber: text("patient_health_number"),
+    patientMedicalRecordNumber: text("patient_medical_record_number"),
+    patientName: text("patient_name"),
+    patientFamilyName: text("patient_family_name"),
+    patientGivenNames: text("patient_given_names"),
+    patientDateOfBirth: timestamp("patient_date_of_birth"),
+    referringProvider: text("referring_provider"),
+    receivingProvider: text("receiving_provider"),
+    requestedListingRef: text("requested_listing_ref"),
+    requestedListingTitle: text("requested_listing_title"),
+    healthServiceTypes: text("health_service_types").array().notNull().default([]),
+    requestedServiceDescription: text("requested_service_description"),
+    rawBundle: jsonb("raw_bundle").$type<FhirBundle | null>(),
+    primaryBlobId: uuid("primary_blob_id"),
+    storageStatus: erequestStorageStatusEnum("storage_status")
+      .notNull()
+      .default("pending"),
+    ingestionError: text("ingestion_error"),
+  },
+  (table) => ({
+    tenantReceivedIdx: index("idx_erequests_tenant_received_at").on(
+      table.tenantId,
+      table.receivedAt
+    ),
+    tenantReferralIdx: index("idx_erequests_tenant_referral_ref").on(
+      table.tenantId,
+      table.referralRef
+    ),
+    tenantHcnIdx: index("idx_erequests_tenant_health_number").on(
+      table.tenantId,
+      table.patientHealthNumber
+    ),
+    tenantMrnIdx: index("idx_erequests_tenant_mrn").on(
+      table.tenantId,
+      table.patientMedicalRecordNumber
+    ),
+    tenantReferringProviderIdx: index("idx_erequests_tenant_referring_provider").on(
+      table.tenantId,
+      table.referringProvider
+    ),
+    tenantReceivingProviderIdx: index("idx_erequests_tenant_receiving_provider").on(
+      table.tenantId,
+      table.receivingProvider
+    ),
+    tenantRequestedListingIdx: index("idx_erequests_tenant_requested_listing_ref").on(
+      table.tenantId,
+      table.requestedListingRef
+    ),
+    tenantChecksumUnique: uniqueIndex("uidx_erequests_tenant_message_checksum").on(
+      table.tenantId,
+      table.messageChecksum
+    ),
+    healthServiceTypesGinIdx: sql`CREATE INDEX IF NOT EXISTS idx_erequests_health_service_types ON erequests USING GIN (health_service_types)`,
+    searchGinIdx: sql`CREATE INDEX IF NOT EXISTS idx_erequests_text_search ON erequests USING GIN (
+      to_tsvector(
+        'english',
+        coalesce(patient_name, '') || ' ' ||
+        coalesce(patient_health_number, '') || ' ' ||
+        coalesce(patient_medical_record_number, '') || ' ' ||
+        coalesce(referring_provider, '') || ' ' ||
+        coalesce(receiving_provider, '') || ' ' ||
+        coalesce(referral_ref, '') || ' ' ||
+        coalesce(requested_listing_title, '') || ' ' ||
+        coalesce(requested_service_description, '')
+      )
+    )`,
+  })
+);
+
+export const erequestBlobs = pgTable(
+  "erequest_blobs",
+  {
+    ...BaseResourceSchema,
+    ...TenantConfinedSchema,
+    erequestId: uuid("erequest_id").notNull(),
+    kind: erequestBlobKindEnum("kind").notNull(),
+    filename: text("filename").notNull(),
+    contentType: text("content_type"),
+    byteSize: integer("byte_size").notNull(),
+    checksumSha256: text("checksum_sha256").notNull(),
+    storageProvider: erequestStorageProviderEnum("storage_provider").notNull(),
+    storageBucket: text("storage_bucket"),
+    storageKey: text("storage_key").notNull(),
+    sourceUrl: text("source_url"),
+    downloadStatus: erequestBlobDownloadStatusEnum("download_status")
+      .notNull()
+      .default("pending"),
+    downloadError: text("download_error"),
+  },
+  (table) => ({
+    tenantErequestIdx: index("idx_erequest_blobs_tenant_erequest_id").on(
+      table.tenantId,
+      table.erequestId
+    ),
+    tenantKindIdx: index("idx_erequest_blobs_tenant_kind").on(
+      table.tenantId,
+      table.kind
+    ),
+    tenantStorageUnique: uniqueIndex("uidx_erequest_blobs_tenant_provider_key").on(
+      table.tenantId,
+      table.storageProvider,
+      table.storageKey
+    ),
   })
 );

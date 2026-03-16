@@ -6,19 +6,6 @@ if (!user.value) {
   goToLogin();
 }
 
-// Fetch site configuration to get site name
-const { data: siteConfig } = useAsyncData('site-config', async () => {
-  return await useRequestFetch()<{
-    siteConfig: SiteConfiguration | null;
-  }>('/api/site-configuration');
-});
-
-const isMenuOpen = ref(false)
-const route = useRoute()
-const toggleMenu = () => {
-  isMenuOpen.value = !isMenuOpen.value
-}
-
 const memberships = computed(() => user.value?.memberships ?? [])
 const activeTenantId = computed(() => user.value?.activeTenantId ?? user.value?.tenantId ?? null)
 const hasActiveTenant = computed(() => Boolean(activeTenantId.value))
@@ -29,13 +16,49 @@ const activeMembership = computed(() =>
 const canManageTenant = computed(() =>
   isSystemAdmin.value || activeMembership.value?.role === 'admin'
 )
+
+// Fetch site configuration to get site name
+const { data: siteConfig } = useAsyncData('site-config', async () => {
+  if (!activeTenantId.value) {
+    return {
+      siteConfig: null,
+    };
+  }
+  return await useRequestFetch()<{
+    siteConfig: SiteConfiguration | null;
+  }>('/api/site-configuration');
+});
+
+const isMenuOpen = ref(false)
+const route = useRoute()
+const toggleMenu = () => {
+  isMenuOpen.value = !isMenuOpen.value
+}
 const selectedSiteName = computed(() => siteConfig.value?.siteConfig?.name ?? activeTenantId.value ?? null)
+const hasAccessibleSites = computed(() => memberships.value.length > 0)
+const siteStatusMessage = computed(() => {
+  if (selectedSiteName.value) {
+    return selectedSiteName.value
+  }
+
+  return hasAccessibleSites.value
+    ? 'No site selected yet'
+    : 'No sites are accessible with this account.'
+})
+const siteActionLabel = computed(() => {
+  if (hasActiveTenant.value) {
+    return 'Manage'
+  }
+
+  return hasAccessibleSites.value ? 'Select' : 'None'
+})
 const isNavItemEnabled = (to: string) => hasActiveTenant.value || (isSystemAdmin.value && to === '/admin')
 const navItems = computed(() => {
   const items = [
     { to: '/portal/site-configuration', label: 'Site' },
     { to: '/portal/routing-rules', label: 'Rules' },
     { to: '/portal/listings', label: 'Listings' },
+    { to: '/portal/erequests', label: 'Erequests' },
     { to: '/portal/testing', label: 'Testing' },
     { to: '/portal/activity', label: 'Activity' },
   ]
@@ -137,7 +160,7 @@ function goToLogin() {
               <div class="min-w-0 pr-1 text-left leading-tight">
                 <div class="max-w-[150px] truncate text-sm font-medium text-slate-950">{{ user?.name }}</div>
                 <div class="max-w-[150px] truncate text-xs text-slate-500">
-                  {{ selectedSiteName ?? 'Choose site' }}
+                  {{ siteStatusMessage }}
                 </div>
               </div>
               <svg class="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -148,7 +171,7 @@ function goToLogin() {
             <div class="absolute right-0 z-20 mt-3 w-80 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
               <div class="border-b border-slate-100 px-1 pb-3">
                 <div class="text-sm font-semibold text-slate-950">{{ user?.name }}</div>
-                <div class="text-xs text-slate-500">{{ selectedSiteName ?? 'No site selected yet' }}</div>
+                <div class="text-xs text-slate-500">{{ siteStatusMessage }}</div>
               </div>
 
               <div class="border-b border-slate-100 px-1 py-3">
@@ -157,7 +180,7 @@ function goToLogin() {
                   class="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950"
                 >
                   <span>Sites</span>
-                  <span class="text-xs text-slate-400">{{ hasActiveTenant ? 'Manage' : 'Select' }}</span>
+                  <span class="text-xs text-slate-400">{{ siteActionLabel }}</span>
                 </NuxtLink>
               </div>
 
@@ -211,7 +234,7 @@ function goToLogin() {
               </div>
               <div class="min-w-0">
                 <div class="truncate text-sm font-semibold text-slate-950">{{ user?.name }}</div>
-                <div class="truncate text-xs text-slate-500">{{ selectedSiteName ?? 'Choose site' }}</div>
+                <div class="truncate text-xs text-slate-500">{{ siteStatusMessage }}</div>
               </div>
             </div>
             <div class="pt-4">
@@ -220,7 +243,7 @@ function goToLogin() {
                 class="flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700"
               >
                 <span>Sites</span>
-                <span class="text-xs text-slate-400">{{ hasActiveTenant ? 'Manage' : 'Select' }}</span>
+                <span class="text-xs text-slate-400">{{ siteActionLabel }}</span>
               </NuxtLink>
             </div>
             <div v-if="memberships.length > 1" class="pt-4">

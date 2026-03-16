@@ -7,6 +7,11 @@ export default defineEventHandler(
     siteConfig: SiteConfiguration | null;
   }> => {
     const cxt = await toApplicationContext(event);
+    if (!cxt.getTenantId()) {
+      return {
+        siteConfig: null,
+      };
+    }
     let siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
     return {
       siteConfig: siteConfig,

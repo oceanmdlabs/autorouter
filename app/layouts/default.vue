@@ -61,7 +61,6 @@ const siteActionLabel = computed(() => {
 const isNavItemEnabled = (to: string) => hasActiveTenant.value || (isSystemAdmin.value && to === '/admin')
 const navItems = computed(() => {
   const items = [
-    { to: '/portal/site-configuration', label: 'Site' },
     { to: '/portal/routing-rules', label: 'Rules' },
     { to: '/portal/listings', label: 'Listings' },
     { to: '/portal/erequests', label: 'eRequests' },
@@ -70,6 +69,7 @@ const navItems = computed(() => {
   ]
 
   if (canManageTenant.value) {
+    items.unshift({ to: '/portal/site-configuration', label: 'Site' })
     items.push({ to: '/portal/members', label: 'Members' })
   }
 

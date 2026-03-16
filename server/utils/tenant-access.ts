@@ -17,7 +17,7 @@ import type {
 } from "@/src/entities/models/session";
 import { uuid } from "@/src/entities/models/uuid";
 import { createDbClient } from "@/src/infrastructure/services/db/create-db-client";
-import { and, asc, desc, eq, gt, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gt, ilike, isNotNull, or, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
 
 export type IdentityProvider = (typeof identityProviderEnum.enumValues)[number];
@@ -49,6 +49,36 @@ export interface TenantInviteSummary {
   redeemedAt: Date | null;
 }
 
+export interface ActiveSystemUserMembershipSummary {
+  id: string;
+  tenantId: string;
+  role: TenantMembershipRole;
+  status: "active" | "revoked";
+  createdAt: Date;
+}
+
+export interface ActiveSystemUserSummary {
+  id: string;
+  name: string;
+  provider: IdentityProvider;
+  subject: string;
+  lastLoginAt: Date;
+  memberships: ActiveSystemUserMembershipSummary[];
+}
+
+interface ActiveSystemUserRow {
+  userId: string;
+  displayName: string;
+  provider: IdentityProvider;
+  subject: string;
+  lastLoginAt: Date;
+  membershipId: string | null;
+  membershipTenantId: string | null;
+  membershipRole: TenantMembershipRole | null;
+  membershipStatus: "active" | "revoked" | null;
+  membershipCreatedAt: Date | null;
+}
+
 export function deriveLegacyTenantId(identity: {
   provider: IdentityProvider;
   subject: string;
@@ -60,6 +90,47 @@ export function deriveLegacyTenantId(identity: {
 
 export function generateInviteCode() {
   return randomBytes(18).toString("base64url");
+}
+
+export function mapActiveSystemUserRows(
+  rows: ActiveSystemUserRow[]
+): ActiveSystemUserSummary[] {
+  const usersById = new Map<string, ActiveSystemUserSummary>();
+
+  for (const row of rows) {
+    const existing =
+      usersById.get(row.userId) ??
+      ({
+        id: row.userId,
+        name: row.displayName,
+        provider: row.provider,
+        subject: row.subject,
+        lastLoginAt: row.lastLoginAt,
+        memberships: [],
+      } satisfies ActiveSystemUserSummary);
+
+    if (!usersById.has(row.userId)) {
+      usersById.set(row.userId, existing);
+    }
+
+    if (
+      row.membershipId &&
+      row.membershipTenantId &&
+      row.membershipRole &&
+      row.membershipStatus &&
+      row.membershipCreatedAt
+    ) {
+      existing.memberships.push({
+        id: row.membershipId,
+        tenantId: row.membershipTenantId,
+        role: row.membershipRole,
+        status: row.membershipStatus,
+        createdAt: row.membershipCreatedAt,
+      });
+    }
+  }
+
+  return Array.from(usersById.values());
 }
 
 type EnumColumn =
@@ -189,6 +260,55 @@ export async function getUserById(userId: string) {
   return await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
+}
+
+export async function listActiveSystemUsers(args?: {
+  search?: string | null;
+}): Promise<ActiveSystemUserSummary[]> {
+  const db = createDbClient();
+  const search = args?.search?.trim();
+  const filters = [isNotNull(users.lastLoginAt)];
+
+  if (search) {
+    const searchPattern = `%${search}%`;
+    filters.push(
+      or(
+        ilike(users.displayName, searchPattern),
+        ilike(users.subject, searchPattern),
+        sql`CAST(${users.provider} AS text) ILIKE ${searchPattern}`,
+        ilike(tenantMemberships.tenantId, searchPattern)
+      )!
+    );
+  }
+
+  const rows = await db
+    .select({
+      userId: users.id,
+      displayName: users.displayName,
+      provider: users.provider,
+      subject: users.subject,
+      lastLoginAt: users.lastLoginAt,
+      membershipId: tenantMemberships.id,
+      membershipTenantId: tenantMemberships.tenantId,
+      membershipRole: tenantMemberships.role,
+      membershipStatus: tenantMemberships.status,
+      membershipCreatedAt: tenantMemberships.createdAt,
+    })
+    .from(users)
+    .leftJoin(tenantMemberships, eq(tenantMemberships.userId, users.id))
+    .where(and(...filters))
+    .orderBy(
+      asc(users.displayName),
+      asc(users.subject),
+      asc(tenantMemberships.tenantId),
+      asc(tenantMemberships.createdAt)
+    );
+
+  return mapActiveSystemUserRows(
+    rows.filter(
+      (row): row is ActiveSystemUserRow => row.lastLoginAt instanceof Date
+    )
+  );
 }
 
 export async function getMembershipsForUser(
@@ -596,6 +716,85 @@ export async function createTenantSiteConfiguration(args: {
       updatedBy: args.userId,
     });
   }
+}
+
+export async function assignUserToTenant(args: {
+  tenantId: string;
+  userId: string;
+  role: TenantMembershipRole;
+  assignedByUserId: string;
+}) {
+  const db = createDbClient();
+  const tenant = await db.query.siteConfig.findFirst({
+    where: eq(siteConfig.tenantId, args.tenantId),
+    columns: { id: true },
+  });
+
+  if (!tenant) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: "Site not found",
+    });
+  }
+
+  const user = await db.query.users.findFirst({
+    where: eq(users.id, args.userId),
+    columns: { id: true },
+  });
+
+  if (!user) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: "User not found",
+    });
+  }
+
+  const existingMembership = await db.query.tenantMemberships.findFirst({
+    where: and(
+      eq(tenantMemberships.tenantId, args.tenantId),
+      eq(tenantMemberships.userId, args.userId)
+    ),
+  });
+
+  if (existingMembership) {
+    await db
+      .update(tenantMemberships)
+      .set({
+        role: membershipRoleValue(args.role),
+        status: membershipStatusValue("active"),
+        updatedBy: args.assignedByUserId,
+        revokedAt: null,
+        revokedBy: null,
+      })
+      .where(eq(tenantMemberships.id, existingMembership.id));
+
+    return {
+      id: existingMembership.id,
+      tenantId: args.tenantId,
+      userId: args.userId,
+      role: args.role,
+      status: "active" as const,
+    };
+  }
+
+  const membershipId = uuid();
+  await db.insert(tenantMemberships).values({
+    id: membershipId,
+    tenantId: args.tenantId,
+    userId: args.userId,
+    role: membershipRoleValue(args.role),
+    status: membershipStatusValue("active"),
+    createdBy: args.assignedByUserId,
+    updatedBy: args.assignedByUserId,
+  });
+
+  return {
+    id: membershipId,
+    tenantId: args.tenantId,
+    userId: args.userId,
+    role: args.role,
+    status: "active" as const,
+  };
 }
 
 export async function findInviteForCode(code: string) {

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { onClickOutside, useEventListener } from '@vueuse/core'
 import type { SiteConfiguration } from '@/src/entities/models/site-configuration';
 
 const { user, clear } = useUserSession();
@@ -30,9 +31,14 @@ const { data: siteConfig } = useAsyncData('site-config', async () => {
 });
 
 const isMenuOpen = ref(false)
+const isUserMenuOpen = ref(false)
+const userMenuRef = ref<HTMLElement | null>(null)
 const route = useRoute()
 const toggleMenu = () => {
   isMenuOpen.value = !isMenuOpen.value
+}
+const toggleUserMenu = () => {
+  isUserMenuOpen.value = !isUserMenuOpen.value
 }
 const selectedSiteName = computed(() => siteConfig.value?.siteConfig?.name ?? activeTenantId.value ?? null)
 const hasAccessibleSites = computed(() => memberships.value.length > 0)
@@ -58,7 +64,7 @@ const navItems = computed(() => {
     { to: '/portal/site-configuration', label: 'Site' },
     { to: '/portal/routing-rules', label: 'Rules' },
     { to: '/portal/listings', label: 'Listings' },
-    { to: '/portal/erequests', label: 'Erequests' },
+    { to: '/portal/erequests', label: 'eRequests' },
     { to: '/portal/testing', label: 'Testing' },
     { to: '/portal/activity', label: 'Activity' },
   ]
@@ -103,6 +109,16 @@ const handleLogout = async () => {
 function goToLogin() {
   navigateTo('/login')
 }
+
+onClickOutside(userMenuRef, () => {
+  isUserMenuOpen.value = false
+})
+
+useEventListener('keydown', (event: KeyboardEvent) => {
+  if (event.key === 'Escape') {
+    isUserMenuOpen.value = false
+  }
+})
 </script>
 
 <template>
@@ -152,8 +168,14 @@ function goToLogin() {
             </NuxtLink>
           </nav>
 
-          <details class="relative ml-auto hidden md:block">
-            <summary class="flex cursor-pointer list-none items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-2 shadow-sm transition-colors hover:border-slate-300 [&::-webkit-details-marker]:hidden">
+          <div ref="userMenuRef" class="relative ml-auto hidden md:block">
+            <button
+              type="button"
+              class="flex cursor-pointer items-center gap-3 rounded-full border border-slate-200 bg-white px-2 py-2 shadow-sm transition-colors hover:border-slate-300"
+              :aria-expanded="isUserMenuOpen"
+              aria-haspopup="menu"
+              @click="toggleUserMenu"
+            >
               <div class="flex h-9 w-9 items-center justify-center rounded-full bg-slate-900 text-xs font-semibold tracking-wide text-white">
                 {{ userInitials }}
               </div>
@@ -166,9 +188,13 @@ function goToLogin() {
               <svg class="h-4 w-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
               </svg>
-            </summary>
+            </button>
 
-            <div class="absolute right-0 z-20 mt-3 w-80 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl">
+            <div
+              v-if="isUserMenuOpen"
+              class="absolute right-0 z-20 mt-3 w-80 rounded-2xl border border-slate-200 bg-white p-3 shadow-xl"
+              role="menu"
+            >
               <div class="border-b border-slate-100 px-1 pb-3">
                 <div class="text-sm font-semibold text-slate-950">{{ user?.name }}</div>
                 <div class="text-xs text-slate-500">{{ siteStatusMessage }}</div>
@@ -178,6 +204,7 @@ function goToLogin() {
                 <NuxtLink
                   to="/portal/sites"
                   class="flex items-center justify-between rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-950"
+                  @click="isUserMenuOpen = false"
                 >
                   <span>Sites</span>
                   <span class="text-xs text-slate-400">{{ siteActionLabel }}</span>
@@ -199,12 +226,12 @@ function goToLogin() {
               </div>
 
               <div class="flex justify-end px-1 pt-2">
-                <Button variant="outline" size="sm" @click="handleLogout">
+                <Button variant="outline" size="sm" @click="isUserMenuOpen = false; handleLogout()">
                   Logout
                 </Button>
               </div>
             </div>
-          </details>
+          </div>
 
           <Button class="ml-auto md:hidden" variant="outline" size="sm" @click="handleLogout">
             Logout

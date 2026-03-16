@@ -1,5 +1,5 @@
 import type { Readable } from "node:stream";
-import type { ErequestStorageProvider } from "@/src/entities/models/site-configuration";
+import type { ErequestStorageProvider } from "@/src/entities/models/erequest";
 
 export type PutBlobInput = {
   key: string;
@@ -22,9 +22,7 @@ export interface IBlobStorageService {
     contentType?: string;
     storageBucket?: string;
   }>;
-  getObjectStream(input: {
-    key: string;
-  }): Promise<{
+  getObjectStream(input: { key: string }): Promise<{
     stream: Readable;
     contentType?: string;
     byteSize?: number;

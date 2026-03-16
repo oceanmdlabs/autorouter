@@ -30,14 +30,16 @@ type DocumentToArchive = {
 
 export async function archiveErequestUseCase(
   eventContext: ServiceRequestEventContext,
-  cxt: ApplicationContext
+  cxt: ApplicationContext,
 ): Promise<ArchiveErequestOutput> {
   const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
   if (!siteConfig?.erequestArchivalEnabled) {
     return { archived: false, duplicate: false };
   }
 
-  const messageChecksum = sha256(JSON.stringify(eventContext.serviceRequestBundle));
+  const messageChecksum = sha256(
+    JSON.stringify(eventContext.serviceRequestBundle),
+  );
   const existing = await cxt
     .getErequestsRepository()
     .findByMessageChecksum(messageChecksum);
@@ -51,24 +53,18 @@ export async function archiveErequestUseCase(
   }
 
   const erequest = await cxt.getErequestsRepository().create({
-    ...extractErequestMetadata(
-      eventContext.serviceRequestBundle,
-      eventContext,
-      siteConfig.erequestStoreRawBundle
-    ),
+    ...extractErequestMetadata(eventContext.serviceRequestBundle, eventContext),
     messageChecksum,
     storageStatus: "pending",
   });
 
-  const documents = collectDocuments(
-    eventContext.serviceRequestBundle,
-    siteConfig.erequestStoreAttachments
-  );
+  const documents = collectDocuments(eventContext.serviceRequestBundle);
   if (documents.length === 0) {
     await cxt.getErequestsRepository().update({
       id: erequest.id,
       storageStatus: "partial_failure",
-      ingestionError: "No downloadable documents were present in the inbound bundle.",
+      ingestionError:
+        "No downloadable documents were present in the inbound bundle.",
     });
     return {
       archived: true,
@@ -83,10 +79,14 @@ export async function archiveErequestUseCase(
   const failures: string[] = [];
 
   try {
-    credentials = await cxt.getOceanClientService().fetchOceanClientCredentials();
+    credentials = await cxt
+      .getOceanClientService()
+      .fetchOceanClientCredentials();
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to load Ocean credentials";
+      error instanceof Error
+        ? error.message
+        : "Failed to load Ocean credentials";
     await cxt.getErequestsRepository().update({
       id: erequest.id,
       storageStatus: "failed",
@@ -135,7 +135,7 @@ export async function archiveErequestUseCase(
         contentType: document.contentType,
         byteSize: object.byteSize,
         checksumSha256: sha256(data),
-        storageProvider: siteConfig.erequestStorageProvider,
+        storageProvider: "s3",
         storageBucket: object.storageBucket,
         storageKey: object.storageKey,
         sourceUrl: document.sourceUrl,
@@ -148,7 +148,7 @@ export async function archiveErequestUseCase(
       failures.push(
         `${document.filename}: ${
           error instanceof Error ? error.message : "Unknown archival error"
-        }`
+        }`,
       );
     }
   }
@@ -171,8 +171,8 @@ export async function archiveErequestUseCase(
     erequestId: erequest.id,
     message:
       failures.length === 0
-        ? `Archived erequest ${erequest.id}.`
-        : `Archived erequest ${erequest.id} with ${failures.length} document failure(s).`,
+        ? `Archived eRequest ${erequest.id}.`
+        : `Archived eRequest ${erequest.id} with ${failures.length} document failure(s).`,
     error: failures.length ? failures.join("\n") : undefined,
   };
 }
@@ -180,19 +180,19 @@ export async function archiveErequestUseCase(
 function extractErequestMetadata(
   bundle: Bundle,
   eventContext: ServiceRequestEventContext,
-  storeRawBundle: boolean
 ) {
   const resources =
-    (bundle.entry?.map((entry) => entry.resource).filter(Boolean) as Resource[]) ??
-    [];
+    (bundle.entry
+      ?.map((entry) => entry.resource)
+      .filter(Boolean) as Resource[]) ?? [];
   const serviceRequest = resources.find(
     (resource): resource is ServiceRequest =>
-      resource.resourceType === "ServiceRequest"
+      resource.resourceType === "ServiceRequest",
   );
   const patient = resolvePatient(resources, serviceRequest);
   const messageHeader = resources.find(
     (resource): resource is MessageHeader =>
-      resource.resourceType === "MessageHeader"
+      resource.resourceType === "MessageHeader",
   );
 
   return {
@@ -203,7 +203,7 @@ function extractErequestMetadata(
     patientHealthNumber:
       findIdentifierValue(
         patient?.identifier,
-        /health-number|health card|health card number|hin/i
+        /health-number|health card|health card number|hin/i,
       ) ?? null,
     patientMedicalRecordNumber:
       findIdentifierValue(patient?.identifier, /medical record|mrn|chart/i) ??
@@ -212,7 +212,9 @@ function extractErequestMetadata(
     patientFamilyName: patient?.name?.[0]?.family ?? null,
     patientGivenNames: patient?.name?.[0]?.given?.join(" ") ?? null,
     patientDateOfBirth: patient?.birthDate ? new Date(patient.birthDate) : null,
-    referringProvider: eventContext.requestingProvider ?? resolveSenderPractitioner(resources, messageHeader),
+    referringProvider:
+      eventContext.requestingProvider ??
+      resolveSenderPractitioner(resources, messageHeader),
     receivingProvider: resolveReceivingProvider(resources, messageHeader),
     requestedListingRef: eventContext.requestedListingRef ?? null,
     requestedListingTitle: eventContext.requestedListingTitle ?? null,
@@ -221,18 +223,19 @@ function extractErequestMetadata(
         ?.flatMap((category) => category.coding ?? [])
         .map((coding) => coding.display || coding.code)
         .filter((value): value is string => Boolean(value)) ?? [],
-    requestedServiceDescription: eventContext.requestedServiceDescription ?? null,
-    rawBundle: storeRawBundle ? bundle : null,
+    requestedServiceDescription:
+      eventContext.requestedServiceDescription ?? null,
+    rawBundle: bundle,
   };
 }
 
-function collectDocuments(bundle: Bundle, includeAttachments: boolean) {
+function collectDocuments(bundle: Bundle) {
   const documents =
     bundle.entry
       ?.map((entry) => entry.resource)
       .filter(
         (resource): resource is DocumentReference =>
-          resource?.resourceType === "DocumentReference"
+          resource?.resourceType === "DocumentReference",
       ) ?? [];
 
   return documents.flatMap((document, index) => {
@@ -241,9 +244,6 @@ function collectDocuments(bundle: Bundle, includeAttachments: boolean) {
       return [];
     }
     const kind = index === 0 ? "primary_pdf" : "attachment";
-    if (kind === "attachment" && !includeAttachments) {
-      return [];
-    }
     return [
       {
         kind,
@@ -267,19 +267,25 @@ function getDocumentFilename(document: DocumentReference, index: number) {
     : title;
 }
 
-function resolvePatient(resources: Resource[], serviceRequest?: ServiceRequest) {
-  const patientReference = serviceRequest?.subject?.reference?.replace(/^#/, "");
+function resolvePatient(
+  resources: Resource[],
+  serviceRequest?: ServiceRequest,
+) {
+  const patientReference = serviceRequest?.subject?.reference?.replace(
+    /^#/,
+    "",
+  );
   return resources.find(
     (resource): resource is Patient =>
       resource.resourceType === "Patient" &&
       (resource.id === patientReference ||
-        `Patient/${resource.id}` === serviceRequest?.subject?.reference)
+        `Patient/${resource.id}` === serviceRequest?.subject?.reference),
   );
 }
 
 function resolveSenderPractitioner(
   resources: Resource[],
-  messageHeader?: MessageHeader
+  messageHeader?: MessageHeader,
 ) {
   const senderReference = messageHeader?.sender?.reference;
   if (!senderReference) {
@@ -289,28 +295,29 @@ function resolveSenderPractitioner(
     (resource): resource is PractitionerRole =>
       resource.resourceType === "PractitionerRole" &&
       (`PractitionerRole/${resource.id}` === senderReference ||
-        resource.id === senderReference)
+        resource.id === senderReference),
   );
   const practitionerReference = senderRole?.practitioner?.reference;
   const practitioner = resources.find(
     (resource): resource is Practitioner =>
       resource.resourceType === "Practitioner" &&
       (`Practitioner/${resource.id}` === practitionerReference ||
-        resource.id === practitionerReference)
+        resource.id === practitionerReference),
   );
   return practitioner ? formatPractitionerName(practitioner) : null;
 }
 
 function resolveReceivingProvider(
   resources: Resource[],
-  messageHeader?: MessageHeader
+  messageHeader?: MessageHeader,
 ) {
-  const receiverReference = messageHeader?.destination?.[0]?.receiver?.reference;
+  const receiverReference =
+    messageHeader?.destination?.[0]?.receiver?.reference;
   const receiverRole = resources.find(
     (resource): resource is PractitionerRole =>
       resource.resourceType === "PractitionerRole" &&
       (`PractitionerRole/${resource.id}` === receiverReference ||
-        resource.id === receiverReference)
+        resource.id === receiverReference),
   );
   if (messageHeader?.destination?.[0]?.name) {
     return messageHeader.destination[0].name;
@@ -323,19 +330,23 @@ function resolveReceivingProvider(
     (resource): resource is Practitioner =>
       resource.resourceType === "Practitioner" &&
       (`Practitioner/${resource.id}` === practitionerReference ||
-        resource.id === practitionerReference)
+        resource.id === practitionerReference),
   );
   return practitioner ? formatPractitionerName(practitioner) : null;
 }
 
 function findIdentifierValue(
   identifiers: Patient["identifier"] | undefined,
-  pattern: RegExp
+  pattern: RegExp,
 ) {
   return identifiers?.find((identifier) =>
-    [identifier.system, identifier.type?.text, ...(identifier.type?.coding?.map(codingSummary) ?? [])]
+    [
+      identifier.system,
+      identifier.type?.text,
+      ...(identifier.type?.coding?.map(codingSummary) ?? []),
+    ]
       .filter(Boolean)
-      .some((value) => pattern.test(value!))
+      .some((value) => pattern.test(value!)),
   )?.value;
 }
 
@@ -345,7 +356,9 @@ function codingSummary(coding: Coding) {
 
 function formatPatientName(patient?: Patient) {
   const name = patient?.name?.[0];
-  return name ? [...(name.given ?? []), name.family].filter(Boolean).join(" ") : null;
+  return name
+    ? [...(name.given ?? []), name.family].filter(Boolean).join(" ")
+    : null;
 }
 
 function formatPractitionerName(practitioner: Practitioner) {

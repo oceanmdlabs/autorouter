@@ -77,16 +77,16 @@ const archivalEnabled = computed(
   <div class="container mx-auto px-4 py-6 sm:px-6 lg:px-8">
     <div class="space-y-6">
       <div>
-        <h1 class="text-2xl font-semibold text-gray-900">Erequests</h1>
+        <h1 class="text-2xl font-semibold text-gray-900">eRequests</h1>
         <p class="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">
-          Browse retained inbound erequests and download the archived documents.
+          Browse retained inbound eRequests and download the archived documents.
         </p>
       </div>
 
       <Card v-if="!archivalEnabled">
         <CardContent class="space-y-3 py-6">
           <p class="text-sm text-gray-700">
-            Erequest archival is currently disabled for this tenant.
+            eRequest archival is currently disabled for this tenant.
           </p>
           <NuxtLink to="/portal/site-configuration" class="text-sm font-medium text-blue-600 hover:underline">
             Open site settings
@@ -126,7 +126,7 @@ const archivalEnabled = computed(
               <TableBody>
                 <TableRow v-if="status === 'success' && !(data?.items?.length)">
                   <TableCell :colspan="5" class="text-center text-muted-foreground">
-                    No retained erequests found.
+                    No retained eRequests found.
                   </TableCell>
                 </TableRow>
                 <TableRow v-for="erequest in data?.items ?? []" :key="erequest.id" class="cursor-pointer" @click="navigateTo(`/portal/erequests/${erequest.id}`)">

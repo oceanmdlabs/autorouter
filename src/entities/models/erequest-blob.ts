@@ -5,10 +5,10 @@ import {
   tenantConfinedSchema,
   updateBaseResourceSchema,
 } from "./base";
-import { siteConfigurationSchema } from "./site-configuration";
 
 const erequestBlobKindEnum = z.enum(["primary_pdf", "attachment", "other"]);
 const erequestBlobDownloadStatusEnum = z.enum(["pending", "stored", "failed"]);
+const erequestStorageProviderEnum = z.enum(["filesystem", "s3"]);
 
 const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   erequestId: z.string().uuid(),
@@ -17,7 +17,7 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   contentType: z.string().nullable().optional(),
   byteSize: z.number().int().nonnegative(),
   checksumSha256: z.string().min(1),
-  storageProvider: siteConfigurationSchema.shape.erequestStorageProvider,
+  storageProvider: erequestStorageProviderEnum,
   storageBucket: z.string().nullable().optional(),
   storageKey: z.string().min(1),
   sourceUrl: z.string().nullable().optional(),
@@ -36,9 +36,9 @@ export const newErequestBlobSchema = schema
   })
   .merge(newBaseResourceSchema)
   .merge(tenantConfinedSchema.partial());
-export const updateErequestBlobSchema = schema.partial().merge(
-  updateBaseResourceSchema
-);
+export const updateErequestBlobSchema = schema
+  .partial()
+  .merge(updateBaseResourceSchema);
 
 export type ErequestBlob = z.infer<typeof erequestBlobSchema>;
 export type NewErequestBlob = z.infer<typeof newErequestBlobSchema>;

@@ -12,6 +12,7 @@
     "db:sql:aws": "npm --prefix infrastructure/cdk run db:sql --",
     "postinstall": "node src/scripts/setup-git-hooks.mjs && nuxt prepare",
     "db:migrate:apply:local": "tsx src/scripts/apply-local-migrations.ts",
+    "db:migrate:apply:aws": "npm --prefix infrastructure/cdk run db:migrate:apply",
     "db:migrate:generate": "tsx src/scripts/run-guarded-drizzle.ts generate",
     "push": "tsx src/scripts/run-guarded-drizzle.ts push",
     "prepush:typecheck": "npx nuxi typecheck",

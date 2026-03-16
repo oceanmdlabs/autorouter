@@ -26,10 +26,14 @@ const activeTenantId = computed(
   () => user.value?.activeTenantId ?? user.value?.tenantId ?? null,
 );
 const activeMembership = computed(() =>
-  memberships.value.find((membership) => membership.tenantId === activeTenantId.value),
+  memberships.value.find(
+    (membership) => membership.tenantId === activeTenantId.value,
+  ),
 );
 const canManageTenant = computed(
-  () => user.value?.roles?.admin === "system" || activeMembership.value?.role === "admin",
+  () =>
+    user.value?.roles?.admin === "system" ||
+    activeMembership.value?.role === "admin",
 );
 const hadPreviousConfig = ref(false);
 const isTestingConnection = ref(false);
@@ -63,12 +67,6 @@ const panelFields = {
   openApi: ["siteKey", "siteCredential", "sharedEncryptionKey"],
   erequests: [
     "erequestArchivalEnabled",
-    "erequestStorageProvider",
-    "erequestStoreAttachments",
-    "erequestStoreRawBundle",
-    "erequestStorageBucket",
-    "erequestStorageRegion",
-    "erequestStoragePrefix",
     "erequestEnabledConfirmedAt",
     "erequestDisabledConfirmedAt",
   ],
@@ -139,12 +137,6 @@ watch(
         oceanClientId: "",
         oceanClientSecret: "",
         erequestArchivalEnabled: false,
-        erequestStorageProvider: "filesystem",
-        erequestStoreAttachments: true,
-        erequestStoreRawBundle: true,
-        erequestStorageBucket: "",
-        erequestStorageRegion: "",
-        erequestStoragePrefix: "",
       };
       isNewConfig.value = true;
       showEmptyState.value = true;
@@ -176,12 +168,6 @@ watch(
         siteCredential: site.siteCredential ?? "",
         sharedEncryptionKey: site.sharedEncryptionKey ?? "",
         erequestArchivalEnabled: site.erequestArchivalEnabled ?? false,
-        erequestStorageProvider: site.erequestStorageProvider ?? "filesystem",
-        erequestStoreAttachments: site.erequestStoreAttachments ?? true,
-        erequestStoreRawBundle: site.erequestStoreRawBundle ?? true,
-        erequestStorageBucket: site.erequestStorageBucket ?? "",
-        erequestStorageRegion: site.erequestStorageRegion ?? "",
-        erequestStoragePrefix: site.erequestStoragePrefix ?? "",
         erequestEnabledConfirmedAt: site.erequestEnabledConfirmedAt ?? null,
         erequestDisabledConfirmedAt: site.erequestDisabledConfirmedAt ?? null,
       };
@@ -262,6 +248,12 @@ function panelPayload(panel: SettingsPanel) {
 }
 
 async function savePanel(panel: SettingsPanel) {
+  if (!canManageTenant.value) {
+    errors.value.general =
+      "Only tenant admins can update site configuration settings.";
+    return;
+  }
+
   const payload = panelPayload(panel);
   if (!payload) return;
 
@@ -280,6 +272,11 @@ async function savePanel(panel: SettingsPanel) {
     toast.success("Settings saved");
   } catch (error: any) {
     console.error("Failed to save site configuration:", error);
+    if (error?.status === 403 || error?.data?.statusCode === 403) {
+      errors.value.general =
+        "Only tenant admins can update site configuration settings.";
+      return;
+    }
     const hasValidationErrors = mapValidationErrors(error);
     if (!hasValidationErrors) {
       errors.value.general = "Failed to save site configuration";
@@ -626,6 +623,7 @@ function copyToClipboard(text: string) {
                     type="button"
                     @click="savePanel('connection')"
                     :disabled="
+                      !canManageTenant ||
                       savingPanels.connection ||
                       (!isNewConfig && !panelHasChanges('connection'))
                     "
@@ -886,7 +884,9 @@ function copyToClipboard(text: string) {
                     type="button"
                     @click="savePanel('inbound')"
                     :disabled="
-                      savingPanels.inbound || !panelHasChanges('inbound')
+                      !canManageTenant ||
+                      savingPanels.inbound ||
+                      !panelHasChanges('inbound')
                     "
                   >
                     {{
@@ -1044,7 +1044,11 @@ function copyToClipboard(text: string) {
                   <Button
                     type="button"
                     @click="savePanel('sms')"
-                    :disabled="savingPanels.sms || !panelHasChanges('sms')"
+                    :disabled="
+                      !canManageTenant ||
+                      savingPanels.sms ||
+                      !panelHasChanges('sms')
+                    "
                   >
                     {{ savingPanels.sms ? "Saving..." : "Save SMS Settings" }}
                   </Button>
@@ -1135,7 +1139,11 @@ function copyToClipboard(text: string) {
                 <Button
                   type="button"
                   @click="savePanel('ai')"
-                  :disabled="savingPanels.ai || !panelHasChanges('ai')"
+                  :disabled="
+                    !canManageTenant ||
+                    savingPanels.ai ||
+                    !panelHasChanges('ai')
+                  "
                 >
                   {{ savingPanels.ai ? "Saving..." : "Save AI Settings" }}
                 </Button>
@@ -1319,7 +1327,11 @@ function copyToClipboard(text: string) {
                   <Button
                     type="button"
                     @click="savePanel('email')"
-                    :disabled="savingPanels.email || !panelHasChanges('email')"
+                    :disabled="
+                      !canManageTenant ||
+                      savingPanels.email ||
+                      !panelHasChanges('email')
+                    "
                   >
                     {{
                       savingPanels.email ? "Saving..." : "Save Email Settings"
@@ -1450,7 +1462,9 @@ function copyToClipboard(text: string) {
                   type="button"
                   @click="savePanel('openApi')"
                   :disabled="
-                    savingPanels.openApi || !panelHasChanges('openApi')
+                    !canManageTenant ||
+                    savingPanels.openApi ||
+                    !panelHasChanges('openApi')
                   "
                 >
                   {{
@@ -1471,25 +1485,34 @@ function copyToClipboard(text: string) {
             <AccordionTrigger type="button" class="py-5 hover:no-underline">
               <div class="space-y-1 text-left">
                 <h2 class="text-base font-semibold text-gray-900">
-                  Erequest Archival
+                  eRequest Archival
                 </h2>
                 <p class="text-sm font-normal text-gray-600">
-                  Retain inbound erequests and archived documents for later access
+                  Retain inbound eRequests and archived documents for later
+                  access
                 </p>
               </div>
             </AccordionTrigger>
             <AccordionContent class="pb-6">
               <div class="space-y-6">
-                <div class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-                  Enabling this stores inbound erequest metadata and documents that may include PHI.
-                  Your tenant is responsible for retention, storage access, and lifecycle management.
+                <div
+                  class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
+                >
+                  Enabling this stores inbound eRequest metadata and documents
+                  that may include PHI. Your tenant is responsible for
+                  retention, storage access, and lifecycle management.
                 </div>
 
-                <div class="flex items-center justify-between rounded-lg border bg-gray-50 p-4">
+                <div
+                  class="flex items-center justify-between rounded-lg border bg-gray-50 p-4"
+                >
                   <div class="space-y-1 pr-4">
-                    <Label for="erequestArchivalEnabled">Enable erequest archival</Label>
+                    <Label for="erequestArchivalEnabled"
+                      >Enable eRequest archival</Label
+                    >
                     <p class="text-sm text-gray-600">
-                      Turning this off stops retention of future inbound erequests but does not delete previously retained records.
+                      Turning this off stops retention of future inbound
+                      eRequests but does not delete previously retained records.
                     </p>
                   </div>
                   <Switch
@@ -1497,51 +1520,6 @@ function copyToClipboard(text: string) {
                     v-model="formValues.erequestArchivalEnabled"
                     :disabled="!canManageTenant"
                   />
-                </div>
-
-                <div class="grid gap-4 md:grid-cols-2">
-                  <div class="space-y-2">
-                    <Label for="erequestStorageProvider">Storage Provider</Label>
-                    <Select id="erequestStorageProvider" v-model="formValues.erequestStorageProvider">
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select provider" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="filesystem">Filesystem</SelectItem>
-                        <SelectItem value="s3">AWS S3</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div class="space-y-2">
-                    <Label for="erequestStoragePrefix">Storage Prefix</Label>
-                    <Input id="erequestStoragePrefix" v-model="formValues.erequestStoragePrefix" />
-                  </div>
-                  <div class="space-y-2" v-if="formValues.erequestStorageProvider === 's3'">
-                    <Label for="erequestStorageBucket">S3 Bucket</Label>
-                    <Input id="erequestStorageBucket" v-model="formValues.erequestStorageBucket" />
-                  </div>
-                  <div class="space-y-2" v-if="formValues.erequestStorageProvider === 's3'">
-                    <Label for="erequestStorageRegion">S3 Region</Label>
-                    <Input id="erequestStorageRegion" v-model="formValues.erequestStorageRegion" />
-                  </div>
-                </div>
-
-                <div class="grid gap-4 md:grid-cols-2">
-                  <div class="flex items-center justify-between rounded-lg border p-4">
-                    <div class="space-y-1 pr-4">
-                      <Label for="erequestStoreAttachments">Store attachments</Label>
-                      <p class="text-sm text-gray-600">Retain non-primary documents referenced by the inbound bundle.</p>
-                    </div>
-                    <Switch id="erequestStoreAttachments" v-model="formValues.erequestStoreAttachments" />
-                  </div>
-
-                  <div class="flex items-center justify-between rounded-lg border p-4">
-                    <div class="space-y-1 pr-4">
-                      <Label for="erequestStoreRawBundle">Store raw bundle</Label>
-                      <p class="text-sm text-gray-600">Keep the original FHIR payload for troubleshooting and reprocessing.</p>
-                    </div>
-                    <Switch id="erequestStoreRawBundle" v-model="formValues.erequestStoreRawBundle" />
-                  </div>
                 </div>
 
                 <div class="flex justify-end pt-2">
@@ -1557,7 +1535,7 @@ function copyToClipboard(text: string) {
                     {{
                       savingPanels.erequests
                         ? "Saving..."
-                        : "Save Erequest Settings"
+                        : "Save eRequest Settings"
                     }}
                   </Button>
                 </div>

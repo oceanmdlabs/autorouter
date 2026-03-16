@@ -12,16 +12,11 @@ export type OceanServer = z.infer<typeof OceanServerEnum>;
 const AiProviderEnum = z.enum(["openai", "google", "cohere"]);
 export type AiProvider = z.infer<typeof AiProviderEnum>;
 
-const ErequestStorageProviderEnum = z.enum(["filesystem", "s3"]);
-export type ErequestStorageProvider = z.infer<
-  typeof ErequestStorageProviderEnum
->;
-
 const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   name: z
     .string()
     .nonempty(
-      "Your site name is required. You can use the name of your Ocean site."
+      "Your site name is required. You can use the name of your Ocean site.",
     )
     .max(255),
   clientId: z.string().trim().nonempty().min(10).max(255),
@@ -70,12 +65,6 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   webhookKey: z.string().trim().max(255).optional().nullable(),
   webhookUnsignedChallengeUntil: z.coerce.date().nullable().optional(),
   erequestArchivalEnabled: z.boolean().default(false),
-  erequestStorageProvider: ErequestStorageProviderEnum.default("filesystem"),
-  erequestStoreAttachments: z.boolean().default(true),
-  erequestStoreRawBundle: z.boolean().default(true),
-  erequestStorageBucket: z.string().trim().max(255).optional().nullable(),
-  erequestStorageRegion: z.string().trim().max(255).optional().nullable(),
-  erequestStoragePrefix: z.string().trim().max(255).optional().nullable(),
   erequestEnabledConfirmedAt: z.coerce.date().nullable().optional(),
   erequestDisabledConfirmedAt: z.coerce.date().nullable().optional(),
 });
@@ -104,7 +93,7 @@ export interface ISiteConfigurationRepository {
   create(config: NewSiteConfiguration): Promise<SiteConfiguration>;
   update(
     id: string,
-    config: UpdateSiteConfiguration
+    config: UpdateSiteConfiguration,
   ): Promise<SiteConfiguration>;
   delete(id: string): Promise<void>;
 }

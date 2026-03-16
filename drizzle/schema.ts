@@ -315,19 +315,6 @@ export const siteConfig = pgTable(
     erequestArchivalEnabled: boolean("erequest_archival_enabled")
       .notNull()
       .default(false),
-    erequestStorageProvider:
-      erequestStorageProviderEnum("erequest_storage_provider")
-        .notNull()
-        .default("filesystem"),
-    erequestStoreAttachments: boolean("erequest_store_attachments")
-      .notNull()
-      .default(true),
-    erequestStoreRawBundle: boolean("erequest_store_raw_bundle")
-      .notNull()
-      .default(true),
-    erequestStorageBucket: text("erequest_storage_bucket"),
-    erequestStorageRegion: text("erequest_storage_region"),
-    erequestStoragePrefix: text("erequest_storage_prefix"),
     erequestEnabledConfirmedAt: timestamp("erequest_enabled_confirmed_at"),
     erequestDisabledConfirmedAt: timestamp("erequest_disabled_confirmed_at"),
   },

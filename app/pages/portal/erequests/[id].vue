@@ -17,10 +17,10 @@ const { data } = useAsyncData(`erequest-${route.params.id}`, () =>
     <div class="space-y-6" v-if="data">
       <div class="space-y-2">
         <NuxtLink to="/portal/erequests" class="text-sm font-medium text-blue-600 hover:underline">
-          Back to erequests
+          Back to eRequests
         </NuxtLink>
         <h1 class="text-2xl font-semibold text-gray-900">
-          {{ data.patientName || data.referralRef || "Erequest" }}
+          {{ data.patientName || data.referralRef || "eRequest" }}
         </h1>
         <p class="text-sm text-gray-600">
           Received {{ formatTimestampWithMinutePrecision(data.receivedAt) }}
@@ -82,7 +82,7 @@ const { data } = useAsyncData(`erequest-${route.params.id}`, () =>
               </div>
             </div>
           </div>
-          <div v-else class="text-sm text-slate-500">No archived documents were stored for this erequest.</div>
+          <div v-else class="text-sm text-slate-500">No archived documents were stored for this eRequest.</div>
         </CardContent>
       </Card>
 

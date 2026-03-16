@@ -7,7 +7,7 @@ export default defineEventHandler(async (event) => {
   if (!record) {
     throw createError({
       statusCode: 404,
-      statusMessage: "Erequest not found",
+      statusMessage: "eRequest not found",
     });
   }
 

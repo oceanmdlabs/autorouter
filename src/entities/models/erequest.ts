@@ -5,7 +5,6 @@ import {
   tenantConfinedSchema,
   updateBaseResourceSchema,
 } from "./base";
-import { siteConfigurationSchema } from "./site-configuration";
 
 const erequestStorageStatusEnum = z.enum([
   "pending",
@@ -49,18 +48,16 @@ export const newErequestSchema = schema
   })
   .merge(newBaseResourceSchema)
   .merge(tenantConfinedSchema.partial());
-export const updateErequestSchema = schema.partial().merge(
-  updateBaseResourceSchema
-);
+export const updateErequestSchema = schema
+  .partial()
+  .merge(updateBaseResourceSchema);
 
 export type Erequest = z.infer<typeof erequestSchema>;
 export type NewErequest = z.infer<typeof newErequestSchema>;
 export type UpdateErequest = z.infer<typeof updateErequestSchema>;
 
 export type ErequestStorageStatus = z.infer<typeof erequestStorageStatusEnum>;
-export type ErequestStorageProvider = NonNullable<
-  z.infer<typeof siteConfigurationSchema>["erequestStorageProvider"]
->;
+export type ErequestStorageProvider = "filesystem" | "s3";
 
 export type ErequestSearchOptions = {
   page?: number;

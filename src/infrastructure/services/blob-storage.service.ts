@@ -1,17 +1,17 @@
 import type { IBlobStorageService } from "@/src/application/services/blob-storage.service.interface";
 import type { ApplicationContext } from "@/src/entities/models/application-context";
-import { createFilesystemBlobStorageService } from "./blob-storage/filesystem-blob-storage.service";
 import { createS3BlobStorageService } from "./blob-storage/s3-blob-storage.service";
 
 type Dependencies = {
   cxt: ApplicationContext;
 };
 
+const DEFAULT_EREQUEST_S3_BUCKET = "ocean-autorouter-erequests";
+const DEFAULT_EREQUEST_S3_PREFIX = "erequests";
+
 export function createBlobStorageService({
   cxt,
 }: Dependencies): IBlobStorageService {
-  const siteConfig = cxt.getSiteConfigurationRepository();
-
   let cached: IBlobStorageService | null = null;
 
   const getService = async () => {
@@ -19,31 +19,17 @@ export function createBlobStorageService({
       return cached;
     }
 
-    const config = await siteConfig.getForTenant();
-    const provider = config?.erequestStorageProvider ?? "filesystem";
-    if (provider === "s3") {
-      const bucket =
-        config?.erequestStorageBucket ?? process.env.EREQUEST_S3_BUCKET;
-      if (!bucket) {
-        throw new Error("Erequest archival is configured for S3 but no bucket is set.");
-      }
-      cached = createS3BlobStorageService({
-        bucket,
-        region:
-          config?.erequestStorageRegion ?? process.env.EREQUEST_S3_REGION,
-        prefix:
-          config?.erequestStoragePrefix ?? process.env.EREQUEST_S3_PREFIX,
-      });
-      return cached;
-    }
-
-    cached = createFilesystemBlobStorageService();
+    cached = createS3BlobStorageService({
+      bucket: process.env.EREQUEST_S3_BUCKET ?? DEFAULT_EREQUEST_S3_BUCKET,
+      region: process.env.AWS_REGION,
+      prefix: process.env.EREQUEST_S3_PREFIX ?? DEFAULT_EREQUEST_S3_PREFIX,
+    });
     return cached;
   };
 
   return {
     getProvider() {
-      return cached?.getProvider() ?? "filesystem";
+      return cached?.getProvider() ?? "s3";
     },
     async putObject(input) {
       return (await getService()).putObject(input);
@@ -58,7 +44,13 @@ export function createBlobStorageService({
       return (await getService()).deleteObject(input);
     },
     buildStorageKey(input) {
-      const provider = cached ?? createFilesystemBlobStorageService();
+      const provider =
+        cached ??
+        createS3BlobStorageService({
+          bucket: "__placeholder__",
+          region: process.env.AWS_REGION,
+          prefix: process.env.EREQUEST_S3_PREFIX ?? DEFAULT_EREQUEST_S3_PREFIX,
+        });
       return provider.buildStorageKey(input);
     },
   };

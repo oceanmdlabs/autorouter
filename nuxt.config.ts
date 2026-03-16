@@ -64,7 +64,6 @@ export default defineNuxtConfig({
     "nuxt-auth-utils",
     "@nuxt/icon",
     "@nuxt/devtools",
-    "shadcn-nuxt",
     "@nuxtjs/color-mode",
     "nuxt-lucide-icons",
   ],
@@ -77,11 +76,6 @@ export default defineNuxtConfig({
     // https://nuxt.com/docs/getting-started/transitions#page-transitions
     pageTransition: { name: "page", mode: "out-in" },
     layoutTransition: { name: "layout", mode: "out-in" },
-  },
-
-  shadcn: {
-    prefix: "./components",
-    componentDir: "./components/ui",
   },
 
   nitro: {

@@ -1,0 +1,3 @@
+#!/bin/sh
+
+node src/scripts/run-pre-push-checks.mjs

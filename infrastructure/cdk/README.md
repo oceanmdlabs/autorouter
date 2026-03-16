@@ -227,7 +227,7 @@ Read:
 If you prefer a database lookup, or if you are troubleshooting a session issue on Aurora Data API, you can also query:
 
 ```bash
-npm run db:sql -- --sql "select provider, subject, display_name, last_login_at from users order by last_login_at desc nulls last, created_at desc limit 10;"
+npm run db:sql:aws -- --sql "select provider, subject, display_name, last_login_at from users order by last_login_at desc nulls last, created_at desc limit 10;"
 ```
 
 Pick the row for the account you just used to sign in.

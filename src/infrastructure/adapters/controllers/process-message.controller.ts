@@ -11,6 +11,7 @@ import type {
 } from "fhir/r4";
 import { z } from "zod";
 import type { OceanClientCredentials } from "@/src/application/services/ocean-client.service.interface";
+import { archiveErequestUseCase } from "@/src/application/use-cases/archive-erequest.use-case";
 import { processServiceRequestEventUseCase } from "@/src/application/use-cases/process-service-request-event.use-case";
 import type { Attachment } from "@/src/entities/models/attachment";
 import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
@@ -60,6 +61,10 @@ export async function processMessageController(
       status: 200,
     };
   }
+
+  const archivalResult = await archiveErequestUseCase(eventContext, cxt);
+  eventContext.archivalMessage = archivalResult.message;
+  eventContext.archivalError = archivalResult.error;
 
   await loadAttachmentsIfIndicated(eventContext, cxt, bundle);
 
@@ -188,6 +193,7 @@ async function extractServiceRequestContextFromMessageBundle(
       triggeringEvent: triggeringEvent,
       referralRef: referralRef,
       requestingProvider: senderPractitionerName,
+      requestedListingTitle: destination,
       requestedListingRef,
       requestedServiceDescription,
     };

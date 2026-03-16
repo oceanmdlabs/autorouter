@@ -146,12 +146,12 @@ else
 fi
 echo
 echo "   Database lookup fallback:"
-echo '   npm run db:sql -- --sql "select provider, subject, display_name, last_login_at from users order by last_login_at desc nulls last, created_at desc limit 10;"'
+echo '   npm run db:sql:aws -- --sql "select provider, subject, display_name, last_login_at from users order by last_login_at desc nulls last, created_at desc limit 10;"'
 echo
 echo "4. Insert the matching provider + subject into system_admin_allowlist."
 echo
 echo '   Aurora Data API environments:'
-echo '   npm run db:sql -- --sql "insert into system_admin_allowlist (provider, subject, notes, active) values ('\''google'\'', '\''REPLACE_WITH_SUBJECT'\'', '\''initial system admin'\'', true);"'
+echo '   npm run db:sql:aws -- --sql "insert into system_admin_allowlist (provider, subject, notes, active) values ('\''google'\'', '\''REPLACE_WITH_SUBJECT'\'', '\''initial system admin'\'', true);"'
 echo
 echo "5. Log out and sign back in. System admin is assigned at login time."
 echo

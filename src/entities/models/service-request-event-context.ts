@@ -12,6 +12,8 @@ export type ServiceRequestEventContext = {
   requestedServiceDescription?: string;
   attachments?: Attachment[];
   details?: string;
+  archivalMessage?: string;
+  archivalError?: string;
 };
 
 export function getServiceRequestEventContextDescription(

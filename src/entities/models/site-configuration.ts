@@ -12,6 +12,11 @@ export type OceanServer = z.infer<typeof OceanServerEnum>;
 const AiProviderEnum = z.enum(["openai", "google", "cohere"]);
 export type AiProvider = z.infer<typeof AiProviderEnum>;
 
+const ErequestStorageProviderEnum = z.enum(["filesystem", "s3"]);
+export type ErequestStorageProvider = z.infer<
+  typeof ErequestStorageProviderEnum
+>;
+
 const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   name: z
     .string()
@@ -43,7 +48,7 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
       .max(255),
     z.string().length(0),
   ]),
-  lastSuccessfulConnection: z.date().nullable().optional(),
+  lastSuccessfulConnection: z.coerce.date().nullable().optional(),
   twilioAccountSid: z.string().trim().max(255).optional().nullable(),
   twilioAuthToken: z.string().trim().max(255).optional().nullable(),
   twilioPhoneNumber: z.string().trim().max(255).optional().nullable(),
@@ -63,7 +68,16 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   siteCredential: z.string().trim().max(255).optional().nullable(),
   sharedEncryptionKey: z.string().trim().max(255).optional().nullable(),
   webhookKey: z.string().trim().max(255).optional().nullable(),
-  webhookUnsignedChallengeUntil: z.date().nullable().optional(),
+  webhookUnsignedChallengeUntil: z.coerce.date().nullable().optional(),
+  erequestArchivalEnabled: z.boolean().default(false),
+  erequestStorageProvider: ErequestStorageProviderEnum.default("filesystem"),
+  erequestStoreAttachments: z.boolean().default(true),
+  erequestStoreRawBundle: z.boolean().default(true),
+  erequestStorageBucket: z.string().trim().max(255).optional().nullable(),
+  erequestStorageRegion: z.string().trim().max(255).optional().nullable(),
+  erequestStoragePrefix: z.string().trim().max(255).optional().nullable(),
+  erequestEnabledConfirmedAt: z.coerce.date().nullable().optional(),
+  erequestDisabledConfirmedAt: z.coerce.date().nullable().optional(),
 });
 const newSchema = schema.merge(newBaseResourceSchema);
 const updateSchema = schema.partial().merge(updateBaseResourceSchema);

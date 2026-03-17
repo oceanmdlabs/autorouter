@@ -16,6 +16,7 @@ import type {
   TenantMembershipSummary,
 } from "@/src/entities/models/session";
 import { uuid } from "@/src/entities/models/uuid";
+import { createCryptoService } from "@/src/infrastructure/services/crypto.service";
 import { createDbClient } from "@/src/infrastructure/services/db/create-db-client";
 import { and, asc, desc, eq, gt, ilike, isNotNull, or, sql } from "drizzle-orm";
 import { randomBytes } from "node:crypto";
@@ -666,13 +667,15 @@ export async function createTenantSiteConfiguration(args: {
   }
 
   const now = new Date();
+  const cryptoService = createCryptoService({});
+  const clientSecret = uuid();
 
   await db.insert(siteConfig).values({
     id: uuid(),
     tenantId: args.tenantId,
     name: args.name,
     clientId: uuid(),
-    clientSecretEncrypted: "",
+    clientSecretEncrypted: cryptoService.encrypt(clientSecret),
     oceanServer: oceanServerValue("ocean"),
     oceanSiteNum: "",
     oceanClientId: "",

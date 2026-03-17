@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { handleMissingActiveTenantError } from '@/app/lib/active-tenant'
+
 type TenantMember = {
   id: string
   userId: string
@@ -34,11 +36,25 @@ const canManageTenant = computed(() =>
 )
 
 const { data: membersData, refresh: refreshMembers } = useAsyncData('tenant-members', async () => {
-  return await requestFetch<{ members: TenantMember[] }>('/api/tenant-members')
+  try {
+    return await requestFetch<{ members: TenantMember[] }>('/api/tenant-members')
+  } catch (error) {
+    if (await handleMissingActiveTenantError(error, { notify: false })) {
+      return { members: [] }
+    }
+    throw error
+  }
 })
 
 const { data: invitesData, refresh: refreshInvites } = useAsyncData('tenant-invites', async () => {
-  return await requestFetch<{ invites: TenantInvite[] }>('/api/tenant-invites')
+  try {
+    return await requestFetch<{ invites: TenantInvite[] }>('/api/tenant-invites')
+  } catch (error) {
+    if (await handleMissingActiveTenantError(error, { notify: false })) {
+      return { invites: [] }
+    }
+    throw error
+  }
 })
 
 const refreshAll = async () => {
@@ -54,6 +70,9 @@ const updateRole = async (membershipId: string, role: 'admin' | 'member') => {
     })
     await refreshMembers()
   } catch (cause) {
+    if (await handleMissingActiveTenantError(cause)) {
+      return
+    }
     error.value = cause instanceof Error ? cause.message : 'Unable to update member role.'
   }
 }
@@ -66,6 +85,9 @@ const revokeMember = async (membershipId: string) => {
     })
     await refreshMembers()
   } catch (cause) {
+    if (await handleMissingActiveTenantError(cause)) {
+      return
+    }
     error.value = cause instanceof Error ? cause.message : 'Unable to revoke membership.'
   }
 }
@@ -87,6 +109,9 @@ const createInvite = async () => {
     }
     await refreshInvites()
   } catch (cause) {
+    if (await handleMissingActiveTenantError(cause)) {
+      return
+    }
     error.value = cause instanceof Error ? cause.message : 'Unable to create invite.'
   }
 }
@@ -99,6 +124,9 @@ const revokeInvite = async (inviteId: string) => {
     })
     await refreshInvites()
   } catch (cause) {
+    if (await handleMissingActiveTenantError(cause)) {
+      return
+    }
     error.value = cause instanceof Error ? cause.message : 'Unable to revoke invite.'
   }
 }

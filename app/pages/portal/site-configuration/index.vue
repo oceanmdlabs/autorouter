@@ -8,6 +8,7 @@ import {
   EyeOff,
 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
+import { handleMissingActiveTenantError } from "@/app/lib/active-tenant";
 import { formatTimestampWithMinutePrecision } from "@/shared/lib/utils";
 import { getOceanServerUrl } from "@/src/application/services/ocean-server.utils";
 import type {
@@ -15,6 +16,7 @@ import type {
   SiteConfiguration,
 } from "@/src/entities/models/site-configuration";
 import { uuid } from "@/src/entities/models/uuid";
+const requestFetch = useRequestFetch();
 const errors = ref<Record<string, string>>({});
 const formValues = ref<NewSiteConfiguration | null>(null);
 const isNewConfig = ref(false);
@@ -54,7 +56,6 @@ const panelFields = {
   connection: [
     "name",
     "clientId",
-    "clientSecret",
     "oceanServer",
     "oceanSiteNum",
     "oceanClientId",
@@ -116,7 +117,7 @@ const cdsHookEndpoint = computed(() => {
   return `${host}/api/cds`;
 });
 const { data: loadedData, status } = useAsyncData("site", async () => {
-  return await useRequestFetch()<{
+  return await requestFetch<{
     siteConfig: SiteConfiguration | null;
   }>(`/api/site-configuration`);
 });
@@ -263,7 +264,7 @@ async function savePanel(panel: SettingsPanel) {
 
   try {
     loadedData.value = {
-      siteConfig: await $fetch<SiteConfiguration>("/api/site-configuration", {
+      siteConfig: await requestFetch<SiteConfiguration>("/api/site-configuration", {
         method: "POST",
         body: payload,
       }),
@@ -272,6 +273,9 @@ async function savePanel(panel: SettingsPanel) {
     toast.success("Settings saved");
   } catch (error: any) {
     console.error("Failed to save site configuration:", error);
+    if (await handleMissingActiveTenantError(error)) {
+      return;
+    }
     if (error?.status === 403 || error?.data?.statusCode === 403) {
       errors.value.general =
         "Only tenant admins can update site configuration settings.";
@@ -297,7 +301,7 @@ async function handleTestConnection() {
   testConnectionResult.value = null;
 
   try {
-    const response = await $fetch<{ success: boolean; error?: string }>(
+    const response = await requestFetch<{ success: boolean; error?: string }>(
       "/api/site-configuration/test-connection",
       {
         method: "POST",
@@ -310,6 +314,9 @@ async function handleTestConnection() {
     );
     testConnectionResult.value = response;
   } catch (error: any) {
+    if (await handleMissingActiveTenantError(error)) {
+      return;
+    }
     testConnectionResult.value = {
       success: false,
       error: error.data?.error || "Failed to test connection",
@@ -332,7 +339,7 @@ async function handleTestEmail() {
   testEmailResult.value = null;
 
   try {
-    const response = await $fetch<{ success: boolean; error?: string }>(
+    const response = await requestFetch<{ success: boolean; error?: string }>(
       "/api/site-configuration/test-email",
       {
         method: "POST",
@@ -350,6 +357,9 @@ async function handleTestEmail() {
       });
     }
   } catch (error: any) {
+    if (await handleMissingActiveTenantError(error)) {
+      return;
+    }
     testEmailResult.value = {
       success: false,
       error: error.data?.error || "Failed to send test email",
@@ -375,7 +385,7 @@ async function handleTestSms() {
   testSmsResult.value = null;
 
   try {
-    const response = await $fetch<{ success: boolean; error?: string }>(
+    const response = await requestFetch<{ success: boolean; error?: string }>(
       "/api/site-configuration/test-sms",
       {
         method: "POST",
@@ -392,6 +402,9 @@ async function handleTestSms() {
       });
     }
   } catch (error: any) {
+    if (await handleMissingActiveTenantError(error)) {
+      return;
+    }
     testSmsResult.value = {
       success: false,
       error: error.data?.error || "Failed to send test SMS",
@@ -472,14 +485,14 @@ function copyToClipboard(text: string) {
             class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
           >
             <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <div class="space-y-1 text-left">
-                <h2 class="text-base font-semibold text-gray-900">
+              <span class="flex flex-col gap-1 text-left">
+                <span class="text-base font-semibold text-gray-900">
                   Connecting the Autorouter to Ocean
-                </h2>
-                <p class="text-sm font-normal text-gray-600">
+                </span>
+                <span class="text-sm font-normal text-gray-600">
                   Ocean site settings, OAuth credentials, and connection test
-                </p>
-              </div>
+                </span>
+              </span>
             </AccordionTrigger>
             <AccordionContent class="pb-6">
               <div class="space-y-4">
@@ -644,15 +657,15 @@ function copyToClipboard(text: string) {
             class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
           >
             <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <div class="space-y-1 text-left">
-                <h2 class="text-base font-semibold text-gray-900">
+              <span class="flex flex-col gap-1 text-left">
+                <span class="text-base font-semibold text-gray-900">
                   Connecting Ocean to the Autorouter
-                </h2>
-                <p class="text-sm font-normal text-gray-600">
+                </span>
+                <span class="text-sm font-normal text-gray-600">
                   Inbound integration URLs, OAuth2 credentials, and connection
                   status
-                </p>
-              </div>
+                </span>
+              </span>
             </AccordionTrigger>
             <AccordionContent class="pb-6">
               <div class="space-y-6">
@@ -904,14 +917,14 @@ function copyToClipboard(text: string) {
             class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
           >
             <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <div class="space-y-1 text-left">
-                <h2 class="text-base font-semibold text-gray-900">
+              <span class="flex flex-col gap-1 text-left">
+                <span class="text-base font-semibold text-gray-900">
                   SMS Configuration
-                </h2>
-                <p class="text-sm font-normal text-gray-600">
+                </span>
+                <span class="text-sm font-normal text-gray-600">
                   Twilio credentials and outbound SMS testing
-                </p>
-              </div>
+                </span>
+              </span>
             </AccordionTrigger>
             <AccordionContent class="pb-6">
               <p class="text-sm text-gray-600 mt-2 leading-relaxed">
@@ -1063,14 +1076,14 @@ function copyToClipboard(text: string) {
             class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
           >
             <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <div class="space-y-1 text-left">
-                <h2 class="text-base font-semibold text-gray-900">
+              <span class="flex flex-col gap-1 text-left">
+                <span class="text-base font-semibold text-gray-900">
                   AI Configuration
-                </h2>
-                <p class="text-sm font-normal text-gray-600">
+                </span>
+                <span class="text-sm font-normal text-gray-600">
                   Provider, API key, and model selection
-                </p>
-              </div>
+                </span>
+              </span>
             </AccordionTrigger>
             <AccordionContent class="pb-6">
               <p class="text-sm text-gray-600 mt-2 leading-relaxed">
@@ -1157,14 +1170,14 @@ function copyToClipboard(text: string) {
             class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
           >
             <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <div class="space-y-1 text-left">
-                <h2 class="text-base font-semibold text-gray-900">
+              <span class="flex flex-col gap-1 text-left">
+                <span class="text-base font-semibold text-gray-900">
                   Email Configuration
-                </h2>
-                <p class="text-sm font-normal text-gray-600">
+                </span>
+                <span class="text-sm font-normal text-gray-600">
                   SMTP2GO credentials and outbound email testing
-                </p>
-              </div>
+                </span>
+              </span>
             </AccordionTrigger>
             <AccordionContent class="pb-6">
               <p class="text-sm text-gray-600 mt-2 leading-relaxed">
@@ -1348,15 +1361,15 @@ function copyToClipboard(text: string) {
             class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
           >
             <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <div class="space-y-1 text-left">
-                <h2 class="text-base font-semibold text-gray-900">
+              <span class="flex flex-col gap-1 text-left">
+                <span class="text-base font-semibold text-gray-900">
                   Ocean Open API Credentials
-                </h2>
-                <p class="text-sm font-normal text-gray-600">
+                </span>
+                <span class="text-sm font-normal text-gray-600">
                   Optional patient engagement credentials and encryption
                   settings
-                </p>
-              </div>
+                </span>
+              </span>
             </AccordionTrigger>
             <AccordionContent class="pb-6">
               <p class="text-sm text-gray-600 mt-2 leading-relaxed">
@@ -1483,15 +1496,15 @@ function copyToClipboard(text: string) {
             class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
           >
             <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <div class="space-y-1 text-left">
-                <h2 class="text-base font-semibold text-gray-900">
+              <span class="flex flex-col gap-1 text-left">
+                <span class="text-base font-semibold text-gray-900">
                   eRequest Archival
-                </h2>
-                <p class="text-sm font-normal text-gray-600">
+                </span>
+                <span class="text-sm font-normal text-gray-600">
                   Retain inbound eRequests and archived documents for later
                   access
-                </p>
-              </div>
+                </span>
+              </span>
             </AccordionTrigger>
             <AccordionContent class="pb-6">
               <div class="space-y-6">

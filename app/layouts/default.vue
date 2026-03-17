@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onClickOutside, useEventListener } from '@vueuse/core'
+import { handleMissingActiveTenantError } from '@/app/lib/active-tenant'
 import type { SiteConfiguration } from '@/src/entities/models/site-configuration';
 
 const { user, clear } = useUserSession();
@@ -17,6 +18,7 @@ const activeMembership = computed(() =>
 const canManageTenant = computed(() =>
   isSystemAdmin.value || activeMembership.value?.role === 'admin'
 )
+const requestFetch = useRequestFetch()
 
 // Fetch site configuration to get site name
 const { data: siteConfig } = useAsyncData('site-config', async () => {
@@ -25,9 +27,18 @@ const { data: siteConfig } = useAsyncData('site-config', async () => {
       siteConfig: null,
     };
   }
-  return await useRequestFetch()<{
-    siteConfig: SiteConfiguration | null;
-  }>('/api/site-configuration');
+  try {
+    return await requestFetch<{
+      siteConfig: SiteConfiguration | null;
+    }>('/api/site-configuration');
+  } catch (error) {
+    if (await handleMissingActiveTenantError(error, { notify: false })) {
+      return {
+        siteConfig: null,
+      };
+    }
+    throw error;
+  }
 });
 
 const isMenuOpen = ref(false)
@@ -93,10 +104,17 @@ const userInitials = computed(() => {
 const isRouteActive = (to: string) => route.path.startsWith(to)
 
 const switchTenant = async (tenantId: string) => {
-  await useRequestFetch()('/api/auth/update-tenant', {
-    method: 'POST',
-    body: { tenantId }
-  })
+  try {
+    await requestFetch('/api/auth/update-tenant', {
+      method: 'POST',
+      body: { tenantId }
+    })
+  } catch (error) {
+    if (await handleMissingActiveTenantError(error, { notify: false })) {
+      return
+    }
+    throw error
+  }
   await refreshCookie('nuxt-session')
   await useUserSession().fetch()
   await navigateTo('/portal')

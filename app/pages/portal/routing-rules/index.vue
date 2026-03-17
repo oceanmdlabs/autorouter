@@ -1,11 +1,20 @@
 <script setup lang="ts">
+import { handleMissingActiveTenantError } from '@/app/lib/active-tenant';
 import type { RoutingRule } from '@/src/entities/models/routing-rule';
 import {
 	getRoutingEventTypeDescription
 } from "@/src/entities/models/routing-event-type";
 const router = useRouter()
+const requestFetch = useRequestFetch()
 const { data: rules } = useAsyncData('rules', async () => {
-	return await useRequestFetch()<RoutingRule[]>('/api/routing-rules');
+	try {
+		return await requestFetch<RoutingRule[]>('/api/routing-rules');
+	} catch (error) {
+		if (await handleMissingActiveTenantError(error, { notify: false })) {
+			return [];
+		}
+		throw error;
+	}
 });
 const navigateToRule = (ruleId: string) => {
 	router.push(`/portal/routing-rules/${ruleId}`);

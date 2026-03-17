@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { handleMissingActiveTenantError } from "@/app/lib/active-tenant";
 import { getRoutingEventTypeDescription, routingEventTypeEnum } from "@/src/entities/models/routing-event-type";
 import type { NewRoutingRule, RoutingRule } from '@/src/entities/models/routing-rule';
 import { clientRoutingToolRegistry, routingToolNames } from '@/src/entities/models/routing-tool-client';
@@ -8,6 +9,7 @@ const router = useRouter()
 const route = useRoute()
 const id = route.params.id as string
 const isNew = id === 'new'
+const requestFetch = useRequestFetch()
 // State
 const errors = ref<Record<string, string>>({})
 const isLoading = ref(false)
@@ -27,7 +29,14 @@ const { data: loadedData, status } = useAsyncData<RoutingRule | null>('rule', as
 	if (isNew) {
 		return null;
 	}
-	return await useRequestFetch()<RoutingRule>(`/api/routing-rules/${id}`)
+	try {
+		return await requestFetch<RoutingRule>(`/api/routing-rules/${id}`)
+	} catch (error) {
+		if (await handleMissingActiveTenantError(error, { notify: false })) {
+			return null
+		}
+		throw error
+	}
 });
 
 watch(() => loadedData.value, (newData) => {
@@ -77,18 +86,21 @@ async function handleSubmit() {
 
 	try {
 		if (isNew) {
-			await $fetch<RoutingRule>('/api/routing-rules', {
+			await requestFetch<RoutingRule>('/api/routing-rules', {
 				method: 'POST',
 				body: formValues.value
 			})
 		} else {
-			await $fetch<RoutingRule>(`/api/routing-rules/${id}`, {
+			await requestFetch<RoutingRule>(`/api/routing-rules/${id}`, {
 				method: 'PUT',
 				body: formValues.value
 			})
 		}
 		router.push('/portal/routing-rules')
 	} catch (error: any) {
+		if (await handleMissingActiveTenantError(error)) {
+			return
+		}
 		console.error('Failed to save rule:', error)
 		errors.value = { error: 'Failed to save rule' }
 	} finally {
@@ -103,17 +115,14 @@ async function handleDelete() {
 	}
 
 	try {
-		const { error } = await useFetch(`/api/routing-rules/${id}`, {
+		await requestFetch(`/api/routing-rules/${id}`, {
 			method: 'DELETE'
 		})
-
-		if (error.value) {
-			errors.value = { error: error.value.message }
-			return
-		}
-
 		router.push('/portal/routing-rules')
 	} catch (error) {
+		if (await handleMissingActiveTenantError(error)) {
+			return
+		}
 		console.error('Failed to delete rule:', error)
 		errors.value = { error: 'Failed to delete rule' }
 	}

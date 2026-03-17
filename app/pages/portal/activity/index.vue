@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
+import { handleMissingActiveTenantError } from '@/app/lib/active-tenant';
 import type { ActivityLogEntry } from '@/src/entities/models/activity-log-entry';
 import { getRoutingEventTypeTitle } from '@/src/entities/models/routing-event-type';
 import { formatTimestampWithMinutePrecision } from '@/shared/lib/utils';
@@ -11,22 +12,37 @@ import type { SiteConfiguration } from '@/src/entities/models/site-configuration
 const currentPage = ref(1);
 const itemsPerPage = ref(10);
 const filterText = ref('');
+const requestFetch = useRequestFetch();
 
 const { data: logs, refresh } = useAsyncData('logs', async () => {
-  return useRequestFetch()<PaginatedResult<ActivityLogEntry>>('/api/activity-logs', {
-    params: {
-      page: currentPage.value,
-      pageSize: itemsPerPage.value,
-      search: filterText.value || undefined,
-    },
-  });
+  try {
+    return await requestFetch<PaginatedResult<ActivityLogEntry>>('/api/activity-logs', {
+      params: {
+        page: currentPage.value,
+        pageSize: itemsPerPage.value,
+        search: filterText.value || undefined,
+      },
+    });
+  } catch (error) {
+    if (await handleMissingActiveTenantError(error, { notify: false })) {
+      return { items: [], page: 1, pageSize: itemsPerPage.value, total: 0, totalPages: 0 };
+    }
+    throw error;
+  }
 });
 
 // Fetch site configuration
 const { data: siteConfig } = useAsyncData('site-config', async () => {
-  return useRequestFetch()<{
-    siteConfig: SiteConfiguration | null;
-  }>(`/api/site-configuration`);
+  try {
+    return await requestFetch<{
+      siteConfig: SiteConfiguration | null;
+    }>(`/api/site-configuration`);
+  } catch (error) {
+    if (await handleMissingActiveTenantError(error, { notify: false })) {
+      return { siteConfig: null };
+    }
+    throw error;
+  }
 });
 
 // Function to get the Ocean host URL
@@ -52,9 +68,16 @@ watch([currentPage, itemsPerPage, filterText], ([newPage, newItemsPerPage, newFi
 // Clear logs function
 async function clearLogs() {
   if (confirm('Are you sure you want to clear all activity logs? This action cannot be undone.')) {
-    await useRequestFetch()('/api/activity-logs/remove-all', {
-      method: 'POST'
-    });
+    try {
+      await requestFetch('/api/activity-logs/remove-all', {
+        method: 'POST'
+      });
+    } catch (error) {
+      if (await handleMissingActiveTenantError(error)) {
+        return;
+      }
+      throw error;
+    }
     await refresh();
   }
 }

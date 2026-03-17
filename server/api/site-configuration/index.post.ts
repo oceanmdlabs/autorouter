@@ -2,11 +2,12 @@ import {
   newSiteConfigurationSchema,
   updateSiteConfigurationSchema,
 } from "@/src/entities/models/site-configuration";
+import { uuid } from "@/src/entities/models/uuid";
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
 import { assertTenantAdmin } from "@/server/utils/tenant-access";
 export default defineEventHandler(async (event) => {
   const cxt = await toApplicationContext(event);
-  const body = await readBody(event);
+  const body = (await readBody<Record<string, unknown>>(event)) ?? {};
   const user = cxt.getUser();
   const tenantId = cxt.getTenantId();
 
@@ -25,9 +26,10 @@ export default defineEventHandler(async (event) => {
     const existingConfig = await cxt
       .getSiteConfigurationRepository()
       .getForTenant();
+    const normalizedBody = normalizeSiteConfigurationBody(body, existingConfig);
 
     if (existingConfig) {
-      const siteConfig = updateSiteConfigurationSchema.parse(body);
+      const siteConfig = updateSiteConfigurationSchema.parse(normalizedBody);
       if (siteConfig.id !== existingConfig.id) {
         throw createError({
           statusCode: 400,
@@ -36,7 +38,7 @@ export default defineEventHandler(async (event) => {
       }
       await cxt.getSiteConfigurationRepository().update(siteConfig);
     } else {
-      const siteConfig = newSiteConfigurationSchema.parse(body);
+      const siteConfig = newSiteConfigurationSchema.parse(normalizedBody);
 
       await cxt.getSiteConfigurationRepository().create(siteConfig);
     }
@@ -50,3 +52,27 @@ export default defineEventHandler(async (event) => {
     });
   }
 });
+
+function normalizeSiteConfigurationBody(
+  body: Record<string, unknown>,
+  existingConfig: { clientSecret: string } | null,
+): Record<string, unknown> {
+  const normalizedBody = { ...body };
+  const clientSecret =
+    typeof normalizedBody.clientSecret === "string"
+      ? normalizedBody.clientSecret.trim()
+      : undefined;
+
+  if (clientSecret && clientSecret.length > 0) {
+    normalizedBody.clientSecret = clientSecret;
+    return normalizedBody;
+  }
+
+  if (existingConfig?.clientSecret?.trim()) {
+    delete normalizedBody.clientSecret;
+    return normalizedBody;
+  }
+
+  normalizedBody.clientSecret = uuid();
+  return normalizedBody;
+}

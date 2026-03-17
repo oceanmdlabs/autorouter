@@ -1,15 +1,24 @@
 <script setup lang="ts">
+import { handleMissingActiveTenantError } from "@/app/lib/active-tenant";
 import type { Erequest } from "@/src/entities/models/erequest";
 import type { ErequestBlob } from "@/src/entities/models/erequest-blob";
 import { formatTimestampWithMinutePrecision } from "@/shared/lib/utils";
 
 const route = useRoute();
+const requestFetch = useRequestFetch();
 
-const { data } = useAsyncData(`erequest-${route.params.id}`, () =>
-  useRequestFetch()<Erequest & { blobs: ErequestBlob[] }>(
-    `/api/erequests/${route.params.id}`
-  )
-);
+const { data } = useAsyncData(`erequest-${route.params.id}`, async () => {
+  try {
+    return await requestFetch<Erequest & { blobs: ErequestBlob[] }>(
+      `/api/erequests/${route.params.id}`
+    );
+  } catch (error) {
+    if (await handleMissingActiveTenantError(error, { notify: false })) {
+      return null;
+    }
+    throw error;
+  }
+});
 </script>
 
 <template>

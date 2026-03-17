@@ -1,10 +1,19 @@
 <script setup lang="ts">
+import { handleMissingActiveTenantError } from '@/app/lib/active-tenant';
 import type { Bundle, Patient, Practitioner, ServiceRequest } from 'fhir/r4';
 import type { TestServiceRequest } from '@/src/entities/models/test-service-request';
 
 const router = useRouter()
+const requestFetch = useRequestFetch()
 const { data: testServiceRequests } = useAsyncData('testServiceRequests', async () => {
-	return await useRequestFetch()<TestServiceRequest[]>('/api/test-service-requests');
+	try {
+		return await requestFetch<TestServiceRequest[]>('/api/test-service-requests');
+	} catch (error) {
+		if (await handleMissingActiveTenantError(error, { notify: false })) {
+			return [];
+		}
+		throw error;
+	}
 });
 
 function getPatient(request: TestServiceRequest): Patient | undefined {

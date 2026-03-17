@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { handleMissingActiveTenantError } from "@/app/lib/active-tenant";
 import type { PaginatedResult } from "@/src/entities/models/paginated-result";
 import type { Erequest } from "@/src/entities/models/erequest";
 import type { SiteConfiguration } from "@/src/entities/models/site-configuration";
@@ -17,32 +18,47 @@ const referralRef = ref("");
 const requestedListing = ref("");
 const receivedFrom = ref("");
 const receivedTo = ref("");
+const requestFetch = useRequestFetch();
 
-const { data: siteConfig } = useAsyncData("erequest-site-config", () =>
-  useRequestFetch()<{
-    siteConfig: SiteConfiguration | null;
-  }>("/api/site-configuration")
-);
+const { data: siteConfig } = useAsyncData("erequest-site-config", async () => {
+  try {
+    return await requestFetch<{
+      siteConfig: SiteConfiguration | null;
+    }>("/api/site-configuration");
+  } catch (error) {
+    if (await handleMissingActiveTenantError(error, { notify: false })) {
+      return { siteConfig: null };
+    }
+    throw error;
+  }
+});
 
-const { data, refresh, status } = useAsyncData("erequests", () =>
-  useRequestFetch()<PaginatedResult<Erequest>>("/api/erequests", {
-    params: {
-      page: page.value,
-      pageSize: pageSize.value,
-      search: search.value || undefined,
-      healthNumber: healthNumber.value || undefined,
-      medicalRecordNumber: medicalRecordNumber.value || undefined,
-      patientName: patientName.value || undefined,
-      referringProvider: referringProvider.value || undefined,
-      receivingProvider: receivingProvider.value || undefined,
-      healthServiceType: healthServiceType.value || undefined,
-      referralRef: referralRef.value || undefined,
-      requestedListing: requestedListing.value || undefined,
-      receivedFrom: receivedFrom.value || undefined,
-      receivedTo: receivedTo.value || undefined,
-    },
-  })
-);
+const { data, refresh, status } = useAsyncData("erequests", async () => {
+  try {
+    return await requestFetch<PaginatedResult<Erequest>>("/api/erequests", {
+      params: {
+        page: page.value,
+        pageSize: pageSize.value,
+        search: search.value || undefined,
+        healthNumber: healthNumber.value || undefined,
+        medicalRecordNumber: medicalRecordNumber.value || undefined,
+        patientName: patientName.value || undefined,
+        referringProvider: referringProvider.value || undefined,
+        receivingProvider: receivingProvider.value || undefined,
+        healthServiceType: healthServiceType.value || undefined,
+        referralRef: referralRef.value || undefined,
+        requestedListing: requestedListing.value || undefined,
+        receivedFrom: receivedFrom.value || undefined,
+        receivedTo: receivedTo.value || undefined,
+      },
+    });
+  } catch (error) {
+    if (await handleMissingActiveTenantError(error, { notify: false })) {
+      return { items: [], page: 1, pageSize: pageSize.value, total: 0, totalPages: 0 };
+    }
+    throw error;
+  }
+});
 
 watch(
   [

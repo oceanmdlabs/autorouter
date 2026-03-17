@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { handleMissingActiveTenantError } from '@/app/lib/active-tenant';
 import type { TestServiceRequest } from '@/src/entities/models/test-service-request';
 import { routingEventTypeSchema, getRoutingEventTypeDescription } from '@/src/entities/models/routing-event-type';
 import type { Bundle } from 'fhir/r4';
@@ -14,10 +15,18 @@ const selectedRequest = ref('')
 const selectedEvent = ref('')
 const isLoading = ref(false)
 const results = ref<RuleEvaluationResult[] | null>(null)
+const requestFetch = useRequestFetch()
 
 // Get test service requests
 const { data: testServiceRequests } = useAsyncData('testServiceRequests', async () => {
-	return await useRequestFetch()<TestServiceRequest[]>('/api/test-service-requests');
+	try {
+		return await requestFetch<TestServiceRequest[]>('/api/test-service-requests');
+	} catch (error) {
+		if (await handleMissingActiveTenantError(error, { notify: false })) {
+			return [];
+		}
+		throw error;
+	}
 });
 
 // Form submission
@@ -26,7 +35,7 @@ async function handleSubmit(event: Event) {
 	results.value = null
 
 	try {
-		results.value = await $fetch<RuleEvaluationResult[]>('/api/test-service-requests/simulate', {
+		results.value = await requestFetch<RuleEvaluationResult[]>('/api/test-service-requests/simulate', {
 			method: 'POST',
 			body: {
 				testServiceRequestId: selectedRequest.value,
@@ -34,6 +43,9 @@ async function handleSubmit(event: Event) {
 			}
 		});
 	} catch (error: any) {
+		if (await handleMissingActiveTenantError(error)) {
+			return
+		}
 		console.error('Failed to simulate event:', error)
 	} finally {
 		isLoading.value = false;

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { handleMissingActiveTenantError } from '@/app/lib/active-tenant';
 import type { Bundle, Patient, Practitioner, PractitionerRole, QuestionnaireResponse, ServiceRequest, ContactPoint } from 'fhir/r4';
 import { z } from 'zod';
 import type { TestServiceRequest } from '@/src/entities/models/test-service-request';
@@ -23,6 +24,7 @@ const router = useRouter()
 const route = useRoute()
 const id = route.params.id as string
 const isNew = id === 'new'
+const requestFetch = useRequestFetch()
 
 // State
 const errors = ref<Record<string, string>>({})
@@ -52,12 +54,19 @@ const { data: loadedData, pending } = useAsyncData('testServiceRequest', async (
 		return null;
 	}
 
-	const response = await useRequestFetch()<TestServiceRequest>(`/api/test-service-requests/${id}`);
-	if (!response) return null;
+	try {
+		const response = await requestFetch<TestServiceRequest>(`/api/test-service-requests/${id}`);
+		if (!response) return null;
 
-	// Set raw JSON for JSON mode
-	const bundle = response.content as unknown as Bundle;
-	return JSON.stringify(bundle, null, 2);
+		// Set raw JSON for JSON mode
+		const bundle = response.content as unknown as Bundle;
+		return JSON.stringify(bundle, null, 2);
+	} catch (error) {
+		if (await handleMissingActiveTenantError(error, { notify: false })) {
+			return null
+		}
+		throw error
+	}
 });
 
 watch(() => loadedData.value, (data) => {
@@ -202,12 +211,12 @@ async function handleSubmit() {
 		}
 
 		if (isNew) {
-			await $fetch<TestServiceRequest>('/api/test-service-requests', {
+			await requestFetch<TestServiceRequest>('/api/test-service-requests', {
 				method: 'POST',
 				body: { content: bundle }
 			})
 		} else {
-			await $fetch<TestServiceRequest>(`/api/test-service-requests/${id}`, {
+			await requestFetch<TestServiceRequest>(`/api/test-service-requests/${id}`, {
 				method: 'PUT',
 				body: { id, content: bundle }
 			})
@@ -216,6 +225,9 @@ async function handleSubmit() {
 		// Navigate back to list on success
 		router.push('/portal/testing/sample-data')
 	} catch (error: any) {
+		if (await handleMissingActiveTenantError(error)) {
+			return
+		}
 		console.error('Failed to save test service request:', error)
 		errors.value = { error: 'Failed to save test service request' }
 	} finally {
@@ -230,17 +242,14 @@ async function handleDelete() {
 	}
 
 	try {
-		const { error } = await useFetch(`/api/test-service-requests/${id}`, {
+		await requestFetch(`/api/test-service-requests/${id}`, {
 			method: 'DELETE'
 		})
-
-		if (error.value) {
-			errors.value = { error: error.value.message }
-			return
-		}
-
 		router.push('/portal/testing/sample-data')
 	} catch (error) {
+		if (await handleMissingActiveTenantError(error)) {
+			return
+		}
 		console.error('Failed to delete test service request:', error)
 		errors.value = { error: 'Failed to delete test service request' }
 	}

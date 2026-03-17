@@ -1,10 +1,12 @@
 <script setup lang="ts">
+import { handleMissingActiveTenantError } from '@/app/lib/active-tenant'
 import type { HealthcareService, NewHealthcareService } from '@/src/entities/models/healthcare-service'
 
 const router = useRouter()
 const route = useRoute()
 const id = route.params.id as string
 const isNew = id === 'new'
+const requestFetch = useRequestFetch()
 const errors = ref<Record<string, string>>({})
 const isLoading = ref(false)
 const formValues = ref<NewHealthcareService>({
@@ -16,7 +18,14 @@ const { data: loadedData, status } = useAsyncData<HealthcareService | null>('hea
 	if (isNew) {
 		return null;
 	}
-	return await useRequestFetch()<HealthcareService>(`/api/healthcare-services/${id}`)
+	try {
+		return await requestFetch<HealthcareService>(`/api/healthcare-services/${id}`)
+	} catch (error) {
+		if (await handleMissingActiveTenantError(error, { notify: false })) {
+			return null
+		}
+		throw error
+	}
 });
 watch(() => loadedData.value, (data) => {
 	if (status.value === 'pending') return;
@@ -35,18 +44,21 @@ async function handleSubmit() {
 	errors.value = {}
 	try {
 		if (isNew) {
-			await $fetch<HealthcareService>('/api/healthcare-services', {
+			await requestFetch<HealthcareService>('/api/healthcare-services', {
 				method: 'POST',
 				body: formValues.value
 			})
 		} else {
-			await $fetch<HealthcareService>(`/api/healthcare-services/${id}`, {
+			await requestFetch<HealthcareService>(`/api/healthcare-services/${id}`, {
 				method: 'PUT',
 				body: formValues.value
 			})
 		}
 		router.push('/portal/listings')
 	} catch (error: any) {
+		if (await handleMissingActiveTenantError(error)) {
+			return
+		}
 		console.error('Failed to save healthcare service:', error)
 		if (error.name === 'FetchError' && Array.isArray(error.data.data)) {
 			// Map Zod validation errors to form fields
@@ -71,17 +83,14 @@ async function handleDelete() {
 	}
 
 	try {
-		const { error } = await useFetch(`/api/healthcare-services/${id}`, {
+		await requestFetch(`/api/healthcare-services/${id}`, {
 			method: 'DELETE'
 		})
-
-		if (error.value) {
-			errors.value = { error: error.value.message }
-			return
-		}
-
 		router.push('/portal/listings')
 	} catch (error) {
+		if (await handleMissingActiveTenantError(error)) {
+			return
+		}
 		console.error('Failed to delete healthcare service:', error)
 		errors.value = { error: 'Failed to delete healthcare service' }
 	}

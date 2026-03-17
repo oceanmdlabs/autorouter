@@ -1,8 +1,17 @@
 <script setup lang="ts">
+import { handleMissingActiveTenantError } from '@/app/lib/active-tenant';
 import type { HealthcareService } from '@/src/entities/models/healthcare-service';
 
+const requestFetch = useRequestFetch()
 const { data: services } = useAsyncData('services', async () => {
-	return await useRequestFetch()<HealthcareService[]>('/api/healthcare-services');
+	try {
+		return await requestFetch<HealthcareService[]>('/api/healthcare-services');
+	} catch (error) {
+		if (await handleMissingActiveTenantError(error, { notify: false })) {
+			return [];
+		}
+		throw error;
+	}
 });
 
 const router = useRouter()

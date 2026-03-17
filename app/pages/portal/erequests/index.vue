@@ -4,21 +4,60 @@ import type { PaginatedResult } from "@/src/entities/models/paginated-result";
 import type { Erequest } from "@/src/entities/models/erequest";
 import type { SiteConfiguration } from "@/src/entities/models/site-configuration";
 import { formatTimestampWithMinutePrecision } from "@/shared/lib/utils";
+import { computed, ref, watch } from "vue";
 
 const page = ref(1);
 const pageSize = ref(20);
-const search = ref("");
-const healthNumber = ref("");
-const medicalRecordNumber = ref("");
-const patientName = ref("");
-const referringProvider = ref("");
-const receivingProvider = ref("");
-const healthServiceType = ref("");
-const referralRef = ref("");
-const requestedListing = ref("");
-const receivedFrom = ref("");
-const receivedTo = ref("");
 const requestFetch = useRequestFetch();
+
+type SearchFilterType =
+  | "search"
+  | "healthNumber"
+  | "medicalRecordNumber"
+  | "patientName"
+  | "referringProvider"
+  | "receivingProvider"
+  | "healthServiceType"
+  | "referralRef"
+  | "requestedListing"
+  | "receivedFrom"
+  | "receivedTo";
+
+type SearchFilter = {
+  id: string;
+  type: SearchFilterType;
+  value: string;
+};
+
+const SEARCH_FILTER_OPTIONS: Array<{
+  value: SearchFilterType;
+  label: string;
+  inputType?: "text" | "date";
+}> = [
+  { value: "search", label: "Keyword" },
+  { value: "healthNumber", label: "Health number" },
+  { value: "medicalRecordNumber", label: "EMR ID" },
+  { value: "patientName", label: "Patient name" },
+  { value: "referringProvider", label: "Referring provider" },
+  { value: "receivingProvider", label: "Receiving provider" },
+  { value: "healthServiceType", label: "Health service type" },
+  { value: "referralRef", label: "Ocean referral reference" },
+  { value: "requestedListing", label: "Requested listing" },
+  { value: "receivedFrom", label: "Received from", inputType: "date" },
+  { value: "receivedTo", label: "Received to", inputType: "date" },
+];
+
+const searchFilters = ref<SearchFilter[]>([
+  { id: crypto.randomUUID(), type: "search", value: "" },
+]);
+
+const activeSearchParams = computed(() =>
+  searchFilters.value.reduce<Record<string, string | undefined>>((params, filter) => {
+    const trimmedValue = filter.value.trim();
+    params[filter.type] = trimmedValue || undefined;
+    return params;
+  }, {})
+);
 
 const { data: siteConfig } = useAsyncData("erequest-site-config", async () => {
   try {
@@ -39,17 +78,7 @@ const { data, refresh, status } = useAsyncData("erequests", async () => {
       params: {
         page: page.value,
         pageSize: pageSize.value,
-        search: search.value || undefined,
-        healthNumber: healthNumber.value || undefined,
-        medicalRecordNumber: medicalRecordNumber.value || undefined,
-        patientName: patientName.value || undefined,
-        referringProvider: referringProvider.value || undefined,
-        receivingProvider: receivingProvider.value || undefined,
-        healthServiceType: healthServiceType.value || undefined,
-        referralRef: referralRef.value || undefined,
-        requestedListing: requestedListing.value || undefined,
-        receivedFrom: receivedFrom.value || undefined,
-        receivedTo: receivedTo.value || undefined,
+        ...activeSearchParams.value,
       },
     });
   } catch (error) {
@@ -61,24 +90,11 @@ const { data, refresh, status } = useAsyncData("erequests", async () => {
 });
 
 watch(
-  [
-    page,
-    pageSize,
-    search,
-    healthNumber,
-    medicalRecordNumber,
-    patientName,
-    referringProvider,
-    receivingProvider,
-    healthServiceType,
-    referralRef,
-    requestedListing,
-    receivedFrom,
-    receivedTo,
-  ],
-  (_, oldValue) => {
-    if (oldValue && search.value !== oldValue[2]) {
+  [page, pageSize, () => JSON.stringify(activeSearchParams.value)],
+  ([, , newFilters], [, , oldFilters]) => {
+    if (newFilters !== oldFilters && page.value !== 1) {
       page.value = 1;
+      return;
     }
     refresh();
   }
@@ -87,6 +103,45 @@ watch(
 const archivalEnabled = computed(
   () => siteConfig.value?.siteConfig?.erequestArchivalEnabled ?? false
 );
+
+const getFilterOption = (type: SearchFilterType) =>
+  SEARCH_FILTER_OPTIONS.find((option) => option.value === type) ?? SEARCH_FILTER_OPTIONS[0];
+
+const getAvailableFilterOptions = (currentFilterId: string) => {
+  const usedTypes = new Set(
+    searchFilters.value
+      .filter((filter) => filter.id !== currentFilterId)
+      .map((filter) => filter.type)
+  );
+
+  return SEARCH_FILTER_OPTIONS.filter((option) => !usedTypes.has(option.value));
+};
+
+const canAddFilter = computed(
+  () => searchFilters.value.length < SEARCH_FILTER_OPTIONS.length
+);
+
+const addFilter = () => {
+  const usedTypes = new Set(searchFilters.value.map((filter) => filter.type));
+  const nextOption = SEARCH_FILTER_OPTIONS.find((option) => !usedTypes.has(option.value));
+  if (!nextOption) {
+    return;
+  }
+
+  searchFilters.value.push({
+    id: crypto.randomUUID(),
+    type: nextOption.value,
+    value: "",
+  });
+};
+
+const removeFilter = (filterId: string) => {
+  if (searchFilters.value.length === 1) {
+    searchFilters.value[0].value = "";
+    return;
+  }
+  searchFilters.value = searchFilters.value.filter((filter) => filter.id !== filterId);
+};
 </script>
 
 <template>
@@ -112,18 +167,69 @@ const archivalEnabled = computed(
 
       <template v-else>
         <Card>
-          <CardContent class="grid gap-3 py-6 md:grid-cols-3 xl:grid-cols-4">
-            <Input v-model="search" placeholder="Search" />
-            <Input v-model="patientName" placeholder="Patient name" />
-            <Input v-model="healthNumber" placeholder="Health number" />
-            <Input v-model="medicalRecordNumber" placeholder="MRN" />
-            <Input v-model="referralRef" placeholder="Referral reference" />
-            <Input v-model="requestedListing" placeholder="Requested listing" />
-            <Input v-model="referringProvider" placeholder="Referring provider" />
-            <Input v-model="receivingProvider" placeholder="Receiving provider" />
-            <Input v-model="healthServiceType" placeholder="Health service type" />
-            <Input v-model="receivedFrom" type="date" placeholder="Received from" />
-            <Input v-model="receivedTo" type="date" placeholder="Received to" />
+          <CardHeader>
+            <CardTitle>Search</CardTitle>
+            <CardDescription>Add one or more filters. Results match every filter shown.</CardDescription>
+          </CardHeader>
+          <CardContent class="space-y-4 py-6">
+            <div
+              v-for="(filter, index) in searchFilters"
+              :key="filter.id"
+              class="space-y-4 rounded-lg border border-slate-200 p-4"
+            >
+              <div
+                v-if="index > 0"
+                class="text-xs font-semibold uppercase tracking-wide text-slate-500"
+              >
+                AND
+              </div>
+              <div class="grid gap-4 md:grid-cols-[minmax(0,220px)_minmax(0,1fr)_auto] md:items-end">
+                <div class="space-y-2">
+                  <Label :for="`search-type-${filter.id}`">Search type</Label>
+                  <Select v-model="filter.type">
+                    <SelectTrigger :id="`search-type-${filter.id}`">
+                      <SelectValue placeholder="Select a search type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem
+                        v-for="option in getAvailableFilterOptions(filter.id)"
+                        :key="option.value"
+                        :value="option.value"
+                      >
+                        {{ option.label }}
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div class="space-y-2">
+                  <Label :for="`search-value-${filter.id}`">
+                    {{ getFilterOption(filter.type).label }}
+                  </Label>
+                  <Input
+                    :id="`search-value-${filter.id}`"
+                    v-model="filter.value"
+                    :type="getFilterOption(filter.type).inputType ?? 'text'"
+                    :placeholder="getFilterOption(filter.type).label"
+                  />
+                </div>
+
+                <Button
+                  variant="outline"
+                  type="button"
+                  :disabled="searchFilters.length === 1"
+                  @click="removeFilter(filter.id)"
+                >
+                  Remove
+                </Button>
+              </div>
+            </div>
+
+            <div class="flex justify-start">
+              <Button variant="outline" type="button" :disabled="!canAddFilter" @click="addFilter">
+                Add filter
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -133,31 +239,22 @@ const archivalEnabled = computed(
               <TableHeader>
                 <TableRow>
                   <TableHead>Received</TableHead>
-                  <TableHead>Patient</TableHead>
-                  <TableHead>Reference</TableHead>
+                  <TableHead>Ocean Reference</TableHead>
                   <TableHead>Providers</TableHead>
-                  <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow v-if="status === 'success' && !(data?.items?.length)">
-                  <TableCell :colspan="5" class="text-center text-muted-foreground">
+                  <TableCell :colspan="3" class="text-center text-muted-foreground">
                     No retained eRequests found.
                   </TableCell>
                 </TableRow>
                 <TableRow v-for="erequest in data?.items ?? []" :key="erequest.id" class="cursor-pointer" @click="navigateTo(`/portal/erequests/${erequest.id}`)">
                   <TableCell>{{ formatTimestampWithMinutePrecision(erequest.receivedAt) }}</TableCell>
-                  <TableCell>
-                    <div class="font-medium text-slate-900">{{ erequest.patientName || "-" }}</div>
-                    <div class="text-xs text-slate-500">
-                      {{ [erequest.patientHealthNumber, erequest.patientMedicalRecordNumber].filter(Boolean).join(" / ") || "-" }}
-                    </div>
-                  </TableCell>
                   <TableCell>{{ erequest.referralRef || "-" }}</TableCell>
                   <TableCell class="text-sm">
                     {{ [erequest.referringProvider, erequest.receivingProvider].filter(Boolean).join(" → ") || "-" }}
                   </TableCell>
-                  <TableCell>{{ erequest.storageStatus }}</TableCell>
                 </TableRow>
               </TableBody>
             </Table>

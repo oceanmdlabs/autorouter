@@ -12,10 +12,11 @@ import type {
   ServiceRequest,
 } from "fhir/r4";
 import { ApplicationContext } from "@/src/entities/models/application-context";
-import type { NewHealthcareService } from "@/src/entities/models/healthcare-service";
-import type { NewRoutingRule } from "@/src/entities/models/routing-rule";
-import type { NewTestServiceRequest } from "@/src/entities/models/test-service-request";
-import type { NewErequest } from "@/src/entities/models/erequest";
+import type { HealthcareService, NewHealthcareService } from "@/src/entities/models/healthcare-service";
+import type { Erequest, NewErequest, UpdateErequest } from "@/src/entities/models/erequest";
+import type { ErequestBlob } from "@/src/entities/models/erequest-blob";
+import type { NewRoutingRule, RoutingRule } from "@/src/entities/models/routing-rule";
+import type { NewTestServiceRequest, TestServiceRequest } from "@/src/entities/models/test-service-request";
 import type { RoutingToolName } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
 
 const logger = {
@@ -31,7 +32,19 @@ type Args = {
   userId: string;
 };
 
-type SampleRequestSeed = {
+type SeedAttachment = {
+  title: string;
+  description: string;
+  url: string;
+};
+
+type SeedBlob = {
+  filename: string;
+  kind: "primary_pdf" | "attachment";
+  summary: string;
+};
+
+type RequestSeed = {
   identifier: string;
   patientGivenName: string;
   patientFamilyName: string;
@@ -51,11 +64,10 @@ type SampleRequestSeed = {
   receivedAt: string;
   referralRef: string;
   sourceMessageId: string;
-  attachments?: Array<{
-    title: string;
-    description: string;
-    url: string;
-  }>;
+  includeSampleBundle?: boolean;
+  includeRawBundle?: boolean;
+  bundleAttachments?: SeedAttachment[];
+  archivedBlobs?: SeedBlob[];
 };
 
 function parseArgs(): Args {
@@ -80,7 +92,6 @@ function parseArgs(): Args {
     if (arg === "--user-id" && nextValue) {
       userId = nextValue;
       index += 1;
-      continue;
     }
   }
 
@@ -93,11 +104,96 @@ function parseArgs(): Args {
   return { tenantId, userId };
 }
 
-function checksum(value: string) {
+function checksum(value: string | Buffer) {
   return createHash("sha256").update(value).digest("hex");
 }
 
-function buildBundle(seed: SampleRequestSeed): Bundle {
+function stableMessageChecksum(seed: RequestSeed) {
+  return checksum(`seed-erequest:${seed.referralRef}:${seed.sourceMessageId}`);
+}
+
+function escapePdfText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+}
+
+function wrapText(value: string, lineLength = 72) {
+  const words = value.split(/\s+/).filter(Boolean);
+  const lines: string[] = [];
+  let current = "";
+
+  for (const word of words) {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > lineLength) {
+      if (current) {
+        lines.push(current);
+      }
+      current = word;
+    } else {
+      current = next;
+    }
+  }
+
+  if (current) {
+    lines.push(current);
+  }
+
+  return lines;
+}
+
+function createPlaceholderPdf(seed: RequestSeed, blob: SeedBlob) {
+  const lines = [
+    "Ocean Autorouter Seeded Referral Letter",
+    `Patient: ${seed.patientGivenName} ${seed.patientFamilyName}`,
+    `Referral Ref: ${seed.referralRef}`,
+    `Requested Listing: ${seed.requestedListingTitle}`,
+    `Referrer: Dr. ${seed.referrerGivenName} ${seed.referrerFamilyName}`,
+    `Received: ${seed.receivedAt}`,
+    "",
+    ...wrapText(blob.summary, 78),
+  ];
+
+  const textCommands = lines
+    .map((line, index) => `${index === 0 ? "72 720 Td" : "0 -18 Td"} (${escapePdfText(line)}) Tj`)
+    .join("\n");
+
+  const stream = `BT
+/F1 12 Tf
+${textCommands}
+ET`;
+
+  const objects = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Count 1 /Kids [3 0 R] >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    `<< /Length ${Buffer.byteLength(stream, "utf8")} >>\nstream\n${stream}\nendstream`,
+  ];
+
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (let index = 0; index < objects.length; index += 1) {
+    offsets.push(Buffer.byteLength(pdf, "utf8"));
+    pdf += `${index + 1} 0 obj\n${objects[index]}\nendobj\n`;
+  }
+
+  const xrefOffset = Buffer.byteLength(pdf, "utf8");
+  pdf += `xref
+0 ${objects.length + 1}
+0000000000 65535 f 
+${offsets
+  .slice(1)
+  .map((offset) => `${offset.toString().padStart(10, "0")} 00000 n `)
+  .join("\n")}
+trailer
+<< /Size ${objects.length + 1} /Root 1 0 R >>
+startxref
+${xrefOffset}
+%%EOF`;
+
+  return Buffer.from(pdf, "utf8");
+}
+
+function buildBundle(seed: RequestSeed): Bundle {
   const patientTelecom: ContactPoint[] = [
     ...(seed.patientPhone
       ? [{ system: "phone", value: seed.patientPhone } as ContactPoint]
@@ -178,13 +274,13 @@ function buildBundle(seed: SampleRequestSeed): Bundle {
       div: seed.referralSummary,
     },
     supportingInfo:
-      seed.attachments?.map((_, index) => ({
+      seed.bundleAttachments?.map((_, index) => ({
         reference: `DocumentReference/document-${index + 1}`,
       })) ?? [],
   };
 
   const documents: DocumentReference[] =
-    seed.attachments?.map((attachment, index) => ({
+    seed.bundleAttachments?.map((attachment, index) => ({
       resourceType: "DocumentReference",
       id: `document-${index + 1}`,
       status: "current",
@@ -227,12 +323,11 @@ function buildBundle(seed: SampleRequestSeed): Bundle {
   };
 }
 
-function toNewErequest(seed: SampleRequestSeed, bundle: Bundle): NewErequest {
+function toNewErequest(seed: RequestSeed, bundle: Bundle | null): NewErequest {
+  const hasBlobs = (seed.archivedBlobs?.length ?? 0) > 0;
   return {
     sourceMessageId: seed.sourceMessageId,
-    messageChecksum: checksum(
-      `${seed.identifier}:${JSON.stringify(bundle)}:${seed.sourceMessageId}`
-    ),
+    messageChecksum: stableMessageChecksum(seed),
     referralRef: seed.referralRef,
     triggeringEvent: "request_received",
     receivedAt: new Date(seed.receivedAt),
@@ -250,29 +345,15 @@ function toNewErequest(seed: SampleRequestSeed, bundle: Bundle): NewErequest {
     requestedServiceDescription: seed.referralSummary,
     rawBundle: bundle,
     primaryBlobId: null,
-    storageStatus: "stored",
+    storageStatus: hasBlobs ? "pending" : "stored",
     ingestionError: null,
   };
 }
 
-async function main() {
-  if (!process.env.DB_URL) {
-    throw new Error("Missing DB_URL.");
-  }
-
-  const { tenantId, userId } = parseArgs();
-  const cxt = new ApplicationContext(logger);
-  cxt.setSession({
-    user: {
-      id: userId,
-      name: "Seed Script",
-      roles: { admin: "system" },
-      activeTenantId: tenantId,
-      tenantId,
-      memberships: [],
-    },
-  });
-
+async function seedListings(
+  existingListings: HealthcareService[],
+  cxt: ApplicationContext
+) {
   const listings: NewHealthcareService[] = [
     {
       name: "Chest Pain Clinic",
@@ -298,8 +379,45 @@ async function main() {
         "General medicine triage listing used as a default destination in seed data.",
       oceanReference: "GENMEDICINE",
     },
+    {
+      name: "Neurology Rapid Access",
+      description:
+        "Rapid access neurology listing for headaches, neuropathy, and dizziness referrals.",
+      oceanReference: "NEURORAPID",
+    },
+    {
+      name: "Gastroenterology Intake",
+      description:
+        "Standard gastroenterology intake listing for abdominal pain and anemia referrals.",
+      oceanReference: "GIINTAKE",
+    },
   ];
 
+  const repository = cxt.getHealthcareServicesRepository();
+  for (const listing of listings) {
+    const existing = existingListings.find(
+      (item) =>
+        item.oceanReference === listing.oceanReference || item.name === listing.name
+    );
+
+    if (existing) {
+      await repository.update({
+        id: existing.id,
+        name: listing.name,
+        description: listing.description,
+        oceanReference: listing.oceanReference,
+      });
+      logger.info(`Updated listing: ${listing.name}`);
+    } else {
+      await repository.create(listing);
+      logger.info(`Created listing: ${listing.name}`);
+    }
+  }
+
+  return listings.length;
+}
+
+async function seedRules(existingRules: RoutingRule[], cxt: ApplicationContext) {
   const rules: Array<NewRoutingRule & { matchName: string }> = [
     {
       matchName: "Acute Safety SMS Alert",
@@ -348,7 +466,37 @@ async function main() {
     },
   ];
 
-  const samples: SampleRequestSeed[] = [
+  const repository = cxt.getRoutingRulesRepository();
+  for (const rule of rules) {
+    const existing = existingRules.find((item) => item.name === rule.matchName);
+
+    if (existing) {
+      await repository.update({
+        id: existing.id,
+        name: rule.name,
+        triggeringEvent: rule.triggeringEvent,
+        prompt: rule.prompt,
+        active: rule.active,
+        enabledTools: rule.enabledTools as RoutingToolName[],
+      });
+      logger.info(`Updated rule: ${rule.name}`);
+    } else {
+      await repository.create({
+        name: rule.name,
+        triggeringEvent: rule.triggeringEvent,
+        prompt: rule.prompt,
+        active: rule.active,
+        enabledTools: rule.enabledTools as RoutingToolName[],
+      });
+      logger.info(`Created rule: ${rule.name}`);
+    }
+  }
+
+  return rules.length;
+}
+
+function buildRequestSeeds(): RequestSeed[] {
+  return [
     {
       identifier: "Seed - Angina Referral",
       patientGivenName: "Amira",
@@ -370,6 +518,8 @@ async function main() {
       receivedAt: "2026-03-14T10:30:00.000Z",
       referralRef: "SEED-ANGINA-001",
       sourceMessageId: "seed-message-angina-001",
+      includeSampleBundle: true,
+      includeRawBundle: true,
     },
     {
       identifier: "Seed - Inbound PDF Vitals Referral",
@@ -387,16 +537,26 @@ async function main() {
       requestedListingRef: "GENMEDICINE",
       healthServiceCategory: "Internal Medicine",
       referralSummary:
-        "Please review attached consultation note and recent vitals for an 66-year-old with fatigue, edema, and worsening blood pressure control. The PDF includes the latest office measurements and medication list.",
+        "Please review attached consultation note and recent vitals for a 66-year-old with fatigue, edema, and worsening blood pressure control. The PDF includes the latest office measurements and medication list.",
       receivedAt: "2026-03-15T13:00:00.000Z",
       referralRef: "SEED-PDF-001",
       sourceMessageId: "seed-message-pdf-001",
-      attachments: [
+      includeSampleBundle: true,
+      includeRawBundle: true,
+      bundleAttachments: [
         {
           title: "office-note-vitals.pdf",
           description:
             "Office note PDF with vitals: BP 168/96, HR 92, SpO2 97%, weight 92 kg, creatinine 131.",
           url: "https://example.com/mock/office-note-vitals.pdf",
+        },
+      ],
+      archivedBlobs: [
+        {
+          filename: "referral-letter-vitals.pdf",
+          kind: "primary_pdf",
+          summary:
+            "Referral letter notes worsening edema, office blood pressure of 168 over 96, heart rate 92, and a request to review recent medication changes.",
         },
       ],
     },
@@ -420,6 +580,8 @@ async function main() {
       receivedAt: "2026-03-16T08:45:00.000Z",
       referralRef: "SEED-M2L-001",
       sourceMessageId: "seed-message-m2l-001",
+      includeSampleBundle: true,
+      includeRawBundle: true,
     },
     {
       identifier: "Seed - Acute Safety Referral",
@@ -441,125 +603,493 @@ async function main() {
       receivedAt: "2026-03-16T15:20:00.000Z",
       referralRef: "SEED-SAFETY-001",
       sourceMessageId: "seed-message-safety-001",
+      includeSampleBundle: true,
+      includeRawBundle: true,
+      archivedBlobs: [
+        {
+          filename: "urgent-referral-letter.pdf",
+          kind: "primary_pdf",
+          summary:
+            "Urgent cardiology referral documenting chest pain at rest, dyspnea, and a syncopal episode from the prior day with recommendation for immediate review.",
+        },
+      ],
+    },
+    {
+      identifier: "Seed - Headache Referral",
+      patientGivenName: "Sonia",
+      patientFamilyName: "Patel",
+      patientBirthDate: "1991-05-30",
+      patientGender: "female",
+      patientPostalCode: "M6G 2R7",
+      patientHealthNumber: "9432123522",
+      patientMedicalRecordNumber: "MRN-1005",
+      referrerGivenName: "Aaron",
+      referrerFamilyName: "Nguyen",
+      requestedListingTitle: "Neurology Rapid Access",
+      requestedListingRef: "NEURORAPID",
+      healthServiceCategory: "Neurology",
+      referralSummary:
+        "34-year-old with new migraine pattern and transient visual aura, no focal weakness, seeking rapid-access neurology review.",
+      receivedAt: "2026-03-10T09:15:00.000Z",
+      referralRef: "SEED-NEURO-001",
+      sourceMessageId: "seed-message-neuro-001",
+    },
+    {
+      identifier: "Seed - Anemia GI Referral",
+      patientGivenName: "Walter",
+      patientFamilyName: "Kim",
+      patientBirthDate: "1954-01-09",
+      patientGender: "male",
+      patientPostalCode: "L4J 3B1",
+      patientHealthNumber: "9432123533",
+      patientMedicalRecordNumber: "MRN-1006",
+      referrerGivenName: "Selina",
+      referrerFamilyName: "Morgan",
+      requestedListingTitle: "Gastroenterology Intake",
+      requestedListingRef: "GIINTAKE",
+      healthServiceCategory: "Gastroenterology",
+      referralSummary:
+        "72-year-old with iron deficiency anemia, positive FIT, and mild fatigue. Referral requests endoscopy triage.",
+      receivedAt: "2026-03-10T11:05:00.000Z",
+      referralRef: "SEED-GI-001",
+      sourceMessageId: "seed-message-gi-001",
+      archivedBlobs: [
+        {
+          filename: "anemia-referral-letter.pdf",
+          kind: "primary_pdf",
+          summary:
+            "Referral letter describes positive FIT, hemoglobin 93, ferritin 8, and a request for urgent endoscopy planning.",
+        },
+      ],
+    },
+    {
+      identifier: "Seed - Palpitations Referral",
+      patientGivenName: "Carla",
+      patientFamilyName: "Diaz",
+      patientBirthDate: "1982-08-21",
+      patientGender: "female",
+      patientPostalCode: "M1R 3N2",
+      patientHealthNumber: "9432123544",
+      patientMedicalRecordNumber: "MRN-1007",
+      referrerGivenName: "Tim",
+      referrerFamilyName: "Edwards",
+      requestedListingTitle: "General Cardiology Intake",
+      requestedListingRef: "GENCARDIOLOGY",
+      healthServiceCategory: "Cardiology",
+      referralSummary:
+        "43-year-old with intermittent palpitations, smartwatch-detected tachycardia, no syncope, requesting cardiology assessment and Holter guidance.",
+      receivedAt: "2026-03-11T08:20:00.000Z",
+      referralRef: "SEED-CARDIO-002",
+      sourceMessageId: "seed-message-cardio-002",
+    },
+    {
+      identifier: "Seed - Memory Clinic Referral",
+      patientGivenName: "Elaine",
+      patientFamilyName: "Wong",
+      patientBirthDate: "1949-12-17",
+      patientGender: "female",
+      patientPostalCode: "M2N 7C8",
+      patientHealthNumber: "9432123555",
+      patientMedicalRecordNumber: "MRN-1008",
+      referrerGivenName: "Farid",
+      referrerFamilyName: "Khan",
+      requestedListingTitle: "General Internal Medicine",
+      requestedListingRef: "GENMEDICINE",
+      healthServiceCategory: "Geriatrics",
+      referralSummary:
+        "76-year-old with progressive memory decline over 18 months, preserved function for basic ADLs, requesting initial triage and workup guidance.",
+      receivedAt: "2026-03-11T14:55:00.000Z",
+      referralRef: "SEED-GERI-001",
+      sourceMessageId: "seed-message-geri-001",
+    },
+    {
+      identifier: "Seed - Neuropathy Referral",
+      patientGivenName: "Harpreet",
+      patientFamilyName: "Gill",
+      patientBirthDate: "1963-04-11",
+      patientGender: "male",
+      patientPostalCode: "M9A 5K6",
+      patientHealthNumber: "9432123566",
+      patientMedicalRecordNumber: "MRN-1009",
+      referrerGivenName: "Leah",
+      referrerFamilyName: "Johnson",
+      requestedListingTitle: "Neurology Rapid Access",
+      requestedListingRef: "NEURORAPID",
+      healthServiceCategory: "Neurology",
+      referralSummary:
+        "61-year-old with progressive stocking-glove numbness, gait imbalance, and diabetes history. Requesting neuropathy assessment.",
+      receivedAt: "2026-03-12T10:05:00.000Z",
+      referralRef: "SEED-NEURO-002",
+      sourceMessageId: "seed-message-neuro-002",
+    },
+    {
+      identifier: "Seed - Reflux Referral",
+      patientGivenName: "Megan",
+      patientFamilyName: "Price",
+      patientBirthDate: "1974-06-08",
+      patientGender: "female",
+      patientPostalCode: "M8V 1L4",
+      patientHealthNumber: "9432123577",
+      patientMedicalRecordNumber: "MRN-1010",
+      referrerGivenName: "Omar",
+      referrerFamilyName: "Siddiqui",
+      requestedListingTitle: "Gastroenterology Intake",
+      requestedListingRef: "GIINTAKE",
+      healthServiceCategory: "Gastroenterology",
+      referralSummary:
+        "50-year-old with refractory reflux despite PPI therapy, nocturnal symptoms, and intermittent dysphagia. Seeking specialist opinion.",
+      receivedAt: "2026-03-12T12:25:00.000Z",
+      referralRef: "SEED-GI-002",
+      sourceMessageId: "seed-message-gi-002",
+    },
+    {
+      identifier: "Seed - Syncope Referral",
+      patientGivenName: "Brandon",
+      patientFamilyName: "Reid",
+      patientBirthDate: "1970-09-02",
+      patientGender: "male",
+      patientPostalCode: "L6A 4W1",
+      patientHealthNumber: "9432123588",
+      patientMedicalRecordNumber: "MRN-1011",
+      referrerGivenName: "Julia",
+      referrerFamilyName: "Tran",
+      requestedListingTitle: "General Cardiology Intake",
+      requestedListingRef: "GENCARDIOLOGY",
+      healthServiceCategory: "Cardiology",
+      referralSummary:
+        "55-year-old with two unexplained syncopal episodes over the last month, no chest pain, normal initial ECG, requesting expedited cardiology review.",
+      receivedAt: "2026-03-12T16:40:00.000Z",
+      referralRef: "SEED-CARDIO-003",
+      sourceMessageId: "seed-message-cardio-003",
+    },
+    {
+      identifier: "Seed - IBS Referral",
+      patientGivenName: "Rina",
+      patientFamilyName: "Sarkar",
+      patientBirthDate: "1988-03-14",
+      patientGender: "female",
+      patientPostalCode: "M6H 3P9",
+      patientHealthNumber: "9432123599",
+      patientMedicalRecordNumber: "MRN-1012",
+      referrerGivenName: "Paul",
+      referrerFamilyName: "Miller",
+      requestedListingTitle: "Gastroenterology Intake",
+      requestedListingRef: "GIINTAKE",
+      healthServiceCategory: "Gastroenterology",
+      referralSummary:
+        "37-year-old with alternating constipation and diarrhea, bloating, normal calprotectin, and persistent symptoms despite dietary modification.",
+      receivedAt: "2026-03-13T09:50:00.000Z",
+      referralRef: "SEED-GI-003",
+      sourceMessageId: "seed-message-gi-003",
+    },
+    {
+      identifier: "Seed - Tremor Referral",
+      patientGivenName: "Peter",
+      patientFamilyName: "Vella",
+      patientBirthDate: "1960-02-19",
+      patientGender: "male",
+      patientPostalCode: "M4S 2E3",
+      patientHealthNumber: "9432123601",
+      patientMedicalRecordNumber: "MRN-1013",
+      referrerGivenName: "Nadia",
+      referrerFamilyName: "Arora",
+      requestedListingTitle: "Neurology Rapid Access",
+      requestedListingRef: "NEURORAPID",
+      healthServiceCategory: "Neurology",
+      referralSummary:
+        "65-year-old with progressive right-hand tremor and bradykinesia over one year, requesting movement disorder triage.",
+      receivedAt: "2026-03-13T11:30:00.000Z",
+      referralRef: "SEED-NEURO-003",
+      sourceMessageId: "seed-message-neuro-003",
+      archivedBlobs: [
+        {
+          filename: "neurology-referral-letter.pdf",
+          kind: "primary_pdf",
+          summary:
+            "Letter documents unilateral resting tremor, reduced arm swing, and progressive slowness affecting handwriting over twelve months.",
+        },
+      ],
+    },
+    {
+      identifier: "Seed - Abdominal Pain Referral",
+      patientGivenName: "Dalia",
+      patientFamilyName: "Ibrahim",
+      patientBirthDate: "1996-10-24",
+      patientGender: "female",
+      patientPostalCode: "M5B 1Y5",
+      patientHealthNumber: "9432123612",
+      patientMedicalRecordNumber: "MRN-1014",
+      referrerGivenName: "Victor",
+      referrerFamilyName: "Lam",
+      requestedListingTitle: "General Internal Medicine",
+      requestedListingRef: "GENMEDICINE",
+      healthServiceCategory: "Internal Medicine",
+      referralSummary:
+        "29-year-old with chronic intermittent right upper quadrant pain, normal ultrasound, and mild transaminitis. Requesting internist review.",
+      receivedAt: "2026-03-13T15:15:00.000Z",
+      referralRef: "SEED-IM-001",
+      sourceMessageId: "seed-message-im-001",
+    },
+    {
+      identifier: "Seed - M2L Follow-up Referral",
+      patientGivenName: "George",
+      patientFamilyName: "Haddad",
+      patientBirthDate: "1957-07-01",
+      patientGender: "male",
+      patientPostalCode: "M2L 2B4",
+      patientHealthNumber: "9432123623",
+      patientMedicalRecordNumber: "MRN-1015",
+      referrerGivenName: "Rachel",
+      referrerFamilyName: "Stone",
+      requestedListingTitle: "General Cardiology Intake",
+      requestedListingRef: "GENCARDIOLOGY",
+      healthServiceCategory: "Cardiology",
+      referralSummary:
+        "68-year-old in the M2L region with exertional dyspnea and lower extremity edema, requesting local cardiology triage.",
+      receivedAt: "2026-03-14T09:05:00.000Z",
+      referralRef: "SEED-M2L-002",
+      sourceMessageId: "seed-message-m2l-002",
+    },
+    {
+      identifier: "Seed - Sleepiness Referral",
+      patientGivenName: "Tara",
+      patientFamilyName: "Lopez",
+      patientBirthDate: "1987-01-28",
+      patientGender: "female",
+      patientPostalCode: "M3C 1H8",
+      patientHealthNumber: "9432123634",
+      patientMedicalRecordNumber: "MRN-1016",
+      referrerGivenName: "Greg",
+      referrerFamilyName: "Chan",
+      requestedListingTitle: "General Internal Medicine",
+      requestedListingRef: "GENMEDICINE",
+      healthServiceCategory: "Sleep Medicine",
+      referralSummary:
+        "38-year-old with daytime somnolence, witnessed apneas, and elevated BMI. Requesting consult for sleep-disordered breathing workup.",
+      receivedAt: "2026-03-14T14:20:00.000Z",
+      referralRef: "SEED-SLEEP-001",
+      sourceMessageId: "seed-message-sleep-001",
     },
   ];
+}
+
+async function findExistingErequest(
+  cxt: ApplicationContext,
+  seed: RequestSeed,
+  existingByReferralRef: Map<string, Erequest>
+) {
+  const byReferral = existingByReferralRef.get(seed.referralRef);
+  if (byReferral) {
+    return byReferral;
+  }
+
+  const byChecksum = await cxt
+    .getErequestsRepository()
+    .findByMessageChecksum(stableMessageChecksum(seed));
+  if (byChecksum?.referralRef) {
+    existingByReferralRef.set(byChecksum.referralRef, byChecksum);
+  }
+  return byChecksum;
+}
+
+function toUpdateErequest(id: string, record: NewErequest): UpdateErequest {
+  return {
+    id,
+    sourceMessageId: record.sourceMessageId,
+    messageChecksum: record.messageChecksum,
+    referralRef: record.referralRef,
+    triggeringEvent: record.triggeringEvent,
+    receivedAt: record.receivedAt,
+    patientHealthNumber: record.patientHealthNumber,
+    patientMedicalRecordNumber: record.patientMedicalRecordNumber,
+    patientName: record.patientName,
+    patientFamilyName: record.patientFamilyName,
+    patientGivenNames: record.patientGivenNames,
+    patientDateOfBirth: record.patientDateOfBirth,
+    referringProvider: record.referringProvider,
+    receivingProvider: record.receivingProvider,
+    requestedListingRef: record.requestedListingRef,
+    requestedListingTitle: record.requestedListingTitle,
+    healthServiceTypes: record.healthServiceTypes,
+    requestedServiceDescription: record.requestedServiceDescription,
+    rawBundle: record.rawBundle,
+    primaryBlobId: record.primaryBlobId,
+    storageStatus: record.storageStatus,
+    ingestionError: record.ingestionError,
+  };
+}
+
+async function seedArchivedBlobs(
+  cxt: ApplicationContext,
+  erequest: Erequest,
+  seed: RequestSeed
+) {
+  if (!seed.archivedBlobs?.length) {
+    if (erequest.primaryBlobId || erequest.storageStatus !== "stored") {
+      await cxt.getErequestsRepository().update({
+        id: erequest.id,
+        primaryBlobId: null,
+        storageStatus: "stored",
+        ingestionError: null,
+      });
+    }
+    return 0;
+  }
+
+  const blobStorage = cxt.getBlobStorageService();
+  const existingBlobs = await cxt.getErequestsRepository().listBlobs(erequest.id);
+  let createdCount = 0;
+  let primaryBlobId = erequest.primaryBlobId ?? null;
+
+  for (const blobSeed of seed.archivedBlobs) {
+    const existing = existingBlobs.find(
+      (blob) => blob.filename === blobSeed.filename && blob.kind === blobSeed.kind
+    );
+    if (existing) {
+      if (!primaryBlobId && blobSeed.kind === "primary_pdf") {
+        primaryBlobId = existing.id;
+      }
+      continue;
+    }
+
+    const content = createPlaceholderPdf(seed, blobSeed);
+    const storageKey = blobStorage.buildStorageKey({
+      tenantId: cxt.getNonEmptyTenantId(),
+      erequestId: erequest.id,
+      filename: blobSeed.filename,
+      kind: blobSeed.kind,
+    });
+    const object = await blobStorage.putObject({
+      key: storageKey,
+      body: content,
+      contentType: "application/pdf",
+      metadata: {
+        erequestId: erequest.id,
+        referralRef: seed.referralRef,
+      },
+    });
+    const createdBlob = await cxt.getErequestsRepository().createBlob({
+      erequestId: erequest.id,
+      kind: blobSeed.kind,
+      filename: blobSeed.filename,
+      contentType: "application/pdf",
+      byteSize: object.byteSize,
+      checksumSha256: checksum(content),
+      storageProvider: blobStorage.getProvider(),
+      storageBucket: object.storageBucket,
+      storageKey: object.storageKey,
+      sourceUrl: null,
+      downloadStatus: "stored",
+    });
+    if (!primaryBlobId && blobSeed.kind === "primary_pdf") {
+      primaryBlobId = createdBlob.id;
+    }
+    createdCount += 1;
+  }
+
+  await cxt.getErequestsRepository().update({
+    id: erequest.id,
+    primaryBlobId,
+    storageStatus: "stored",
+    ingestionError: null,
+  });
+
+  return createdCount;
+}
+
+async function main() {
+  if (!process.env.DB_URL) {
+    throw new Error("Missing DB_URL.");
+  }
+
+  const { tenantId, userId } = parseArgs();
+  const cxt = new ApplicationContext(logger);
+  cxt.setSession({
+    user: {
+      id: userId,
+      name: "Seed Script",
+      roles: { admin: "system" },
+      activeTenantId: tenantId,
+      tenantId,
+      memberships: [],
+    },
+  });
 
   const healthcareServicesRepository = cxt.getHealthcareServicesRepository();
   const routingRulesRepository = cxt.getRoutingRulesRepository();
   const testServiceRequestsRepository = cxt.getTestServiceRequestsRepository();
   const erequestsRepository = cxt.getErequestsRepository();
 
-  const existingListings = await healthcareServicesRepository.getAllAtTenant();
-  const existingRules = await routingRulesRepository.getAllAtTenant();
-  const existingSamples = await testServiceRequestsRepository.getAllAtTenant();
+  const [existingListings, existingRules, existingSamples, existingErequestPage] =
+    await Promise.all([
+      healthcareServicesRepository.getAllAtTenant(),
+      routingRulesRepository.getAllAtTenant(),
+      testServiceRequestsRepository.getAllAtTenant(),
+      erequestsRepository.search({ page: 1, pageSize: 250 }),
+    ]);
 
-  for (const listing of listings) {
-    const existing = existingListings.find(
-      (item) =>
-        item.oceanReference === listing.oceanReference || item.name === listing.name
-    );
+  const existingByReferralRef = new Map<string, Erequest>(
+    existingErequestPage.items
+      .filter((item) => item.referralRef)
+      .map((item) => [item.referralRef!, item])
+  );
 
-    if (existing) {
-      await healthcareServicesRepository.update({
-        id: existing.id,
-        name: listing.name,
-        description: listing.description,
-        oceanReference: listing.oceanReference,
-      });
-      logger.info(`Updated listing: ${listing.name}`);
-      continue;
+  const listingCount = await seedListings(existingListings, cxt);
+  const ruleCount = await seedRules(existingRules, cxt);
+  const requestSeeds = buildRequestSeeds();
+
+  let sampleBundleCount = 0;
+  let erequestCount = 0;
+  let blobCount = 0;
+
+  for (const seed of requestSeeds) {
+    const bundle = seed.includeSampleBundle || seed.includeRawBundle ? buildBundle(seed) : null;
+
+    if (seed.includeSampleBundle && bundle) {
+      const sampleRecord: NewTestServiceRequest = { content: bundle };
+      const existingSample = existingSamples.find(
+        (item) => item.content.identifier?.value === seed.identifier
+      );
+
+      if (existingSample) {
+        await testServiceRequestsRepository.update({
+          id: existingSample.id,
+          content: bundle,
+        });
+        logger.info(`Updated sample data: ${seed.identifier}`);
+      } else {
+        await testServiceRequestsRepository.create(sampleRecord);
+        logger.info(`Created sample data: ${seed.identifier}`);
+      }
+      sampleBundleCount += 1;
     }
 
-    await healthcareServicesRepository.create(listing);
-    logger.info(`Created listing: ${listing.name}`);
-  }
-
-  for (const rule of rules) {
-    const existing = existingRules.find((item) => item.name === rule.matchName);
-
-    if (existing) {
-      await routingRulesRepository.update({
-        id: existing.id,
-        name: rule.name,
-        triggeringEvent: rule.triggeringEvent,
-        prompt: rule.prompt,
-        active: rule.active,
-        enabledTools: rule.enabledTools as RoutingToolName[],
-      });
-      logger.info(`Updated rule: ${rule.name}`);
-      continue;
-    }
-
-    await routingRulesRepository.create({
-      name: rule.name,
-      triggeringEvent: rule.triggeringEvent,
-      prompt: rule.prompt,
-      active: rule.active,
-      enabledTools: rule.enabledTools as RoutingToolName[],
-    });
-    logger.info(`Created rule: ${rule.name}`);
-  }
-
-  for (const sample of samples) {
-    const bundle = buildBundle(sample);
-    const sampleRecord: NewTestServiceRequest = {
-      content: bundle,
-    };
-    const existingSample = existingSamples.find(
-      (item) => item.content.identifier?.value === sample.identifier
+    const erequestRecord = toNewErequest(seed, seed.includeRawBundle ? bundle : null);
+    const existingErequest = await findExistingErequest(
+      cxt,
+      seed,
+      existingByReferralRef
     );
 
-    if (existingSample) {
-      await testServiceRequestsRepository.update({
-        id: existingSample.id,
-        content: bundle,
-      });
-      logger.info(`Updated sample data: ${sample.identifier}`);
-    } else {
-      await testServiceRequestsRepository.create(sampleRecord);
-      logger.info(`Created sample data: ${sample.identifier}`);
-    }
-
-    const erequestRecord = toNewErequest(sample, bundle);
-    const existingErequest = await erequestsRepository.findByMessageChecksum(
-      erequestRecord.messageChecksum
-    );
-
+    let persistedErequest: Erequest;
     if (existingErequest) {
-      await erequestsRepository.update({
-        id: existingErequest.id,
-        sourceMessageId: erequestRecord.sourceMessageId,
-        messageChecksum: erequestRecord.messageChecksum,
-        referralRef: erequestRecord.referralRef,
-        triggeringEvent: erequestRecord.triggeringEvent,
-        receivedAt: erequestRecord.receivedAt,
-        patientHealthNumber: erequestRecord.patientHealthNumber,
-        patientMedicalRecordNumber: erequestRecord.patientMedicalRecordNumber,
-        patientName: erequestRecord.patientName,
-        patientFamilyName: erequestRecord.patientFamilyName,
-        patientGivenNames: erequestRecord.patientGivenNames,
-        patientDateOfBirth: erequestRecord.patientDateOfBirth,
-        referringProvider: erequestRecord.referringProvider,
-        receivingProvider: erequestRecord.receivingProvider,
-        requestedListingRef: erequestRecord.requestedListingRef,
-        requestedListingTitle: erequestRecord.requestedListingTitle,
-        healthServiceTypes: erequestRecord.healthServiceTypes,
-        requestedServiceDescription: erequestRecord.requestedServiceDescription,
-        rawBundle: erequestRecord.rawBundle,
-        primaryBlobId: erequestRecord.primaryBlobId,
-        storageStatus: erequestRecord.storageStatus,
-        ingestionError: erequestRecord.ingestionError,
-      });
-      logger.info(`Updated eRequest: ${sample.referralRef}`);
-      continue;
+      persistedErequest = await erequestsRepository.update(
+        toUpdateErequest(existingErequest.id, erequestRecord)
+      );
+      existingByReferralRef.set(seed.referralRef, persistedErequest);
+      logger.info(`Updated eRequest: ${seed.referralRef}`);
+    } else {
+      persistedErequest = await erequestsRepository.create(erequestRecord);
+      existingByReferralRef.set(seed.referralRef, persistedErequest);
+      logger.info(`Created eRequest: ${seed.referralRef}`);
     }
+    erequestCount += 1;
 
-    await erequestsRepository.create(erequestRecord);
-    logger.info(`Created eRequest: ${sample.referralRef}`);
+    blobCount += await seedArchivedBlobs(cxt, persistedErequest, seed);
   }
 
   logger.info(
-    `Seed complete for tenant ${tenantId}: ${listings.length} listings, ${rules.length} rules, ${samples.length} sample bundles, ${samples.length} archived eRequests.`
+    `Seed complete for tenant ${tenantId}: ${listingCount} listings, ${ruleCount} rules, ${sampleBundleCount} sample bundles, ${erequestCount} archived eRequests, ${blobCount} new blobs.`
   );
 }
 

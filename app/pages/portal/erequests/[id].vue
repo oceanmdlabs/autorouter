@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { handleMissingActiveTenantError } from "@/app/lib/active-tenant";
+import { getOceanServerUrl } from "@/src/application/services/ocean-server.utils";
 import type { Erequest } from "@/src/entities/models/erequest";
 import type { ErequestBlob } from "@/src/entities/models/erequest-blob";
+import type { SiteConfiguration } from "@/src/entities/models/site-configuration";
 import { formatTimestampWithMinutePrecision } from "@/shared/lib/utils";
 
 const route = useRoute();
@@ -18,6 +20,27 @@ const { data } = useAsyncData(`erequest-${route.params.id}`, async () => {
     }
     throw error;
   }
+});
+
+const { data: siteConfig } = useAsyncData(`site-config-${route.params.id}`, async () => {
+  try {
+    return await requestFetch<{
+      siteConfig: SiteConfiguration | null;
+    }>("/api/site-configuration");
+  } catch (error) {
+    if (await handleMissingActiveTenantError(error, { notify: false })) {
+      return { siteConfig: null };
+    }
+    throw error;
+  }
+});
+
+const oceanReferralUrl = computed(() => {
+  if (!data.value?.referralRef) {
+    return undefined;
+  }
+  const oceanHostUrl = getOceanServerUrl(siteConfig.value?.siteConfig?.oceanServer ?? "ocean");
+  return `${oceanHostUrl}/ocean/portal.html#/referrals/${data.value.referralRef}/edit`;
 });
 </script>
 
@@ -39,12 +62,19 @@ const { data } = useAsyncData(`erequest-${route.params.id}`, async () => {
       <Card>
         <CardContent class="grid gap-4 py-6 md:grid-cols-2">
           <div>
-            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Referral reference</div>
-            <div class="mt-1 text-sm text-slate-900">{{ data.referralRef || "-" }}</div>
-          </div>
-          <div>
-            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Storage status</div>
-            <div class="mt-1 text-sm text-slate-900">{{ data.storageStatus }}</div>
+            <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Ocean Referral Reference</div>
+            <div class="mt-1 space-y-1 text-sm text-slate-900">
+              <div>{{ data.referralRef || "-" }}</div>
+              <a
+                v-if="oceanReferralUrl"
+                :href="oceanReferralUrl"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="inline-flex text-blue-600 hover:underline"
+              >
+                View eReferral in Ocean
+              </a>
+            </div>
           </div>
           <div>
             <div class="text-xs font-semibold uppercase tracking-wide text-slate-500">Patient identifiers</div>
@@ -95,10 +125,24 @@ const { data } = useAsyncData(`erequest-${route.params.id}`, async () => {
         </CardContent>
       </Card>
 
-      <Card v-if="data.rawBundle">
+      <Card>
         <CardContent class="py-6">
-          <div class="mb-4 text-sm font-medium text-slate-900">Raw bundle</div>
-          <pre class="overflow-x-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100">{{ JSON.stringify(data.rawBundle, null, 2) }}</pre>
+          <Accordion type="single" collapsible class="w-full" default-value="">
+            <AccordionItem value="raw-bundle">
+              <AccordionTrigger type="button" class="py-0 text-sm font-medium text-slate-900 hover:no-underline">
+                Raw bundle
+              </AccordionTrigger>
+              <AccordionContent class="pt-4">
+                <pre
+                  v-if="data.rawBundle"
+                  class="overflow-x-auto rounded-xl bg-slate-950 p-4 text-xs text-slate-100"
+                >{{ JSON.stringify(data.rawBundle, null, 2) }}</pre>
+                <div v-else class="text-sm text-slate-500">
+                  No raw bundle was stored for this eRequest.
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </CardContent>
       </Card>
     </div>

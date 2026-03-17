@@ -180,6 +180,16 @@ export function createErequestsRepository({
       });
     },
 
+    async count(options) {
+      const where = buildWhere(options);
+      const total = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(erequests)
+        .where(where);
+
+      return total[0]?.count ?? 0;
+    },
+
     async search(options) {
       const page = options?.page ?? 1;
       const pageSize = options?.pageSize ?? 20;

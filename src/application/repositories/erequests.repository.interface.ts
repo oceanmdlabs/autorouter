@@ -14,6 +14,7 @@ export interface IErequestsRepository {
   createBlob(record: NewErequestBlob): Promise<ErequestBlob>;
   listBlobs(erequestId: string): Promise<ErequestBlob[]>;
   get(id: string): Promise<(Erequest & { blobs: ErequestBlob[] }) | null>;
+  count(options?: Omit<ErequestSearchOptions, "page" | "pageSize">): Promise<number>;
   getBlob(
     erequestId: string,
     blobId: string

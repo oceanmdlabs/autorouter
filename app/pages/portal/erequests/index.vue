@@ -9,6 +9,7 @@ import { computed, ref, watch } from "vue";
 const page = ref(1);
 const pageSize = ref(20);
 const requestFetch = useRequestFetch();
+const hasSearched = ref(false);
 
 type SearchFilterType =
   | "search"
@@ -59,6 +60,7 @@ const activeSearchParams = computed(() =>
     return params;
   }, {})
 );
+const submittedSearchParams = ref<Record<string, string | undefined>>({});
 
 const { data: siteConfig } = useAsyncData("erequest-site-config", async () => {
   try {
@@ -73,33 +75,47 @@ const { data: siteConfig } = useAsyncData("erequest-site-config", async () => {
   }
 });
 
-const { data, refresh, status } = useAsyncData("erequests", async () => {
+const { data: totalCount } = useAsyncData("erequest-total-count", async () => {
   try {
-    return await requestFetch<PaginatedResult<Erequest>>("/api/erequests", {
-      params: {
-        page: page.value,
-        pageSize: pageSize.value,
-        ...activeSearchParams.value,
-      },
-    });
+    return await requestFetch<{ total: number }>("/api/erequests/count");
   } catch (error) {
     if (await handleMissingActiveTenantError(error, { notify: false })) {
-      return { items: [], page: 1, pageSize: pageSize.value, total: 0, totalPages: 0 };
+      return { total: 0 };
     }
     throw error;
   }
 });
 
-watch(
-  [page, pageSize, () => JSON.stringify(activeSearchParams.value)],
-  ([, , newFilters], [, , oldFilters]) => {
-    if (newFilters !== oldFilters && page.value !== 1) {
-      page.value = 1;
-      return;
+const { data, refresh, status } = useAsyncData(
+  "erequests",
+  async () => {
+    try {
+      return await requestFetch<PaginatedResult<Erequest>>("/api/erequests", {
+        params: {
+          page: page.value,
+          pageSize: pageSize.value,
+          ...submittedSearchParams.value,
+        },
+      });
+    } catch (error) {
+      if (await handleMissingActiveTenantError(error, { notify: false })) {
+        return { items: [], page: 1, pageSize: pageSize.value, total: 0, totalPages: 0 };
+      }
+      throw error;
     }
-    refresh();
+  },
+  {
+    immediate: false,
+    default: () => ({ items: [], page: 1, pageSize: pageSize.value, total: 0, totalPages: 0 }),
   }
 );
+
+watch([page, pageSize], () => {
+  if (!hasSearched.value) {
+    return;
+  }
+  refresh();
+});
 
 const archivalEnabled = computed(
   () => siteConfig.value?.siteConfig?.erequestArchivalEnabled ?? false
@@ -121,6 +137,26 @@ const getAvailableFilterOptions = (currentFilterId: string) => {
 const canAddFilter = computed(
   () => searchFilters.value.length < SEARCH_FILTER_OPTIONS.length
 );
+const hasActiveFilters = computed(() =>
+  Object.values(activeSearchParams.value).some((value) => Boolean(value))
+);
+
+const submitSearch = async () => {
+  submittedSearchParams.value = { ...activeSearchParams.value };
+  hasSearched.value = true;
+  if (page.value !== 1) {
+    page.value = 1;
+    return;
+  }
+  await refresh();
+};
+
+const clearSearch = () => {
+  searchFilters.value = [{ id: crypto.randomUUID(), type: "search", value: "" }];
+  submittedSearchParams.value = {};
+  hasSearched.value = false;
+  page.value = 1;
+};
 
 const addFilter = () => {
   const usedTypes = new Set(searchFilters.value.map((filter) => filter.type));
@@ -234,11 +270,27 @@ const removeFilter = (filterId: string) => {
                 Add filter
               </Button>
             </div>
+
+            <div class="flex flex-wrap items-center gap-3">
+              <Button type="button" :disabled="!hasActiveFilters" @click="submitSearch">
+                Search
+              </Button>
+              <Button variant="ghost" type="button" :disabled="!hasActiveFilters && !hasSearched" @click="clearSearch">
+                Clear
+              </Button>
+              <span class="text-sm text-slate-500">
+                Total retained eRequests: {{ totalCount?.total ?? 0 }}
+              </span>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent class="py-6">
+            <div v-if="hasSearched" class="mb-4 text-sm text-slate-500">
+              {{ data?.total ?? 0 }} matching eRequests
+            </div>
+
             <Table>
               <TableHeader>
                 <TableRow>
@@ -248,12 +300,22 @@ const removeFilter = (filterId: string) => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                <TableRow v-if="status === 'success' && !(data?.items?.length)">
+                <TableRow v-if="!hasSearched">
+                  <TableCell :colspan="3" class="text-center text-muted-foreground">
+                    Enter one or more filters, then run a search.
+                  </TableCell>
+                </TableRow>
+                <TableRow v-else-if="status === 'success' && !(data?.items?.length)">
                   <TableCell :colspan="3" class="text-center text-muted-foreground">
                     No retained eRequests found.
                   </TableCell>
                 </TableRow>
-                <TableRow v-for="erequest in data?.items ?? []" :key="erequest.id" class="cursor-pointer" @click="navigateTo(`/portal/erequests/${erequest.id}`)">
+                <TableRow
+                  v-for="erequest in hasSearched ? data?.items ?? [] : []"
+                  :key="erequest.id"
+                  class="cursor-pointer"
+                  @click="navigateTo(`/portal/erequests/${erequest.id}`)"
+                >
                   <TableCell>{{ formatTimestampWithMinutePrecision(erequest.receivedAt) }}</TableCell>
                   <TableCell>{{ erequest.referralRef || "-" }}</TableCell>
                   <TableCell class="text-sm">

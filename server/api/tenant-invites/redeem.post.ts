@@ -1,5 +1,7 @@
 import { hydrateSessionUser } from "@/server/utils/session-user";
 import { redeemTenantInvite } from "@/server/utils/tenant-access";
+import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
+import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 
 export default defineEventHandler(async (event) => {
   const session = await requireUserSession(event);
@@ -30,6 +32,17 @@ export default defineEventHandler(async (event) => {
     user: {
       ...user,
       activeTenantId: invite.tenantId,
+      tenantId: invite.tenantId,
+    },
+  });
+  const cxt = await toApplicationContext(event);
+  await logPrivacyAuditEvent(cxt, {
+    eventType: "tenant_invite_redeemed",
+    subjectType: "tenant_invite",
+    subjectId: invite.id,
+    summary: `Redeemed ${invite.role} invite.`,
+    sensitiveData: {
+      role: invite.role,
       tenantId: invite.tenantId,
     },
   });

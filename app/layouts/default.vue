@@ -81,6 +81,7 @@ const navItems = computed(() => {
 
   if (canManageTenant.value) {
     items.unshift({ to: '/portal/site-configuration', label: 'Site' })
+    items.push({ to: '/portal/privacy-audit', label: 'Audit' })
     items.push({ to: '/portal/members', label: 'Members' })
   }
 

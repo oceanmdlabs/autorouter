@@ -21,8 +21,7 @@ type SearchFilterType =
   | "healthServiceType"
   | "referralRef"
   | "requestedListing"
-  | "receivedFrom"
-  | "receivedTo";
+  | "receivedFrom";
 
 type SearchFilter = {
   id: string;
@@ -44,8 +43,7 @@ const SEARCH_FILTER_OPTIONS: Array<{
   { value: "healthServiceType", label: "Health service type" },
   { value: "referralRef", label: "Ocean referral reference" },
   { value: "requestedListing", label: "Requested listing" },
-  { value: "receivedFrom", label: "Received from", inputType: "date" },
-  { value: "receivedTo", label: "Received to", inputType: "date" },
+  { value: "receivedFrom", label: "Received date", inputType: "date" },
 ];
 const DEFAULT_SEARCH_FILTER_OPTION = SEARCH_FILTER_OPTIONS[0]!;
 

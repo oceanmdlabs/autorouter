@@ -105,6 +105,33 @@ export const activityLogEntry = pgTable(
   })
 );
 
+export const privacyAuditLog = pgTable(
+  "privacy_audit_log",
+  {
+    ...BaseResourceSchema,
+    ...TenantConfinedSchema,
+    actorUserId: text("actor_user_id"),
+    actorName: text("actor_name"),
+    actorProvider: text("actor_provider"),
+    eventType: text("event_type").notNull(),
+    subjectType: text("subject_type"),
+    subjectId: text("subject_id"),
+    summary: text("summary").notNull(),
+    sensitiveDataEncrypted: text("sensitive_data_encrypted"),
+  },
+  (table) => ({
+    tenantIdx: index("idx_privacy_audit_log_tenant_id").on(table.tenantId),
+    feedIdx: index("idx_privacy_audit_log_feed").on(
+      table.tenantId,
+      table.createdAt
+    ),
+    eventIdx: index("idx_privacy_audit_log_event_type").on(
+      table.tenantId,
+      table.eventType
+    ),
+  })
+);
+
 export const testServiceRequests = pgTable(
   "test_service_requests",
   {

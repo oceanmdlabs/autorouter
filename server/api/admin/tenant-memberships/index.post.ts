@@ -1,5 +1,7 @@
 import { assertSystemAdminAccess } from "@/server/utils/system-admin-access";
 import { assignUserToTenant } from "@/server/utils/tenant-access";
+import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
+import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -23,12 +25,26 @@ export default defineEventHandler(async (event) => {
 
   const body = bodySchema.parse(await readBody(event));
 
-  return {
-    membership: await assignUserToTenant({
-      tenantId: body.tenantId,
-      userId: body.userId,
+  const membership = await assignUserToTenant({
+    tenantId: body.tenantId,
+    userId: body.userId,
+    role: body.role,
+    assignedByUserId: user.id,
+  });
+
+  const cxt = await toApplicationContext(event);
+  await logPrivacyAuditEvent(cxt, {
+    tenantId: body.tenantId,
+    eventType: "tenant_member_assigned",
+    subjectType: "tenant_membership",
+    subjectId: membership.id,
+    summary: `Assigned user to tenant with ${body.role} access.`,
+    sensitiveData: {
+      targetUserId: body.userId,
       role: body.role,
-      assignedByUserId: user.id,
-    }),
-  };
+      tenantId: body.tenantId,
+    },
+  });
+
+  return { membership };
 });

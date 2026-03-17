@@ -1,13 +1,23 @@
 import { buildSessionUserFromIdentity } from "@/server/utils/session-user";
+import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
+import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 
 export default defineOAuthGoogleEventHandler({
   async onSuccess(event, { user }) {
+    const sessionUser = await buildSessionUserFromIdentity({
+      provider: "google",
+      subject: user.sub,
+      displayName: `${user.name} (Google)`,
+    });
     await setUserSession(event, {
-      user: await buildSessionUserFromIdentity({
-        provider: "google",
-        subject: user.sub,
-        displayName: `${user.name} (Google)`,
-      }),
+      user: sessionUser,
+    });
+    const cxt = await toApplicationContext(event);
+    await logPrivacyAuditEvent(cxt, {
+      eventType: "login_succeeded",
+      subjectType: "tenant",
+      subjectId: sessionUser.activeTenantId,
+      summary: "User logged in with Google OAuth.",
     });
     return sendRedirect(event, "/portal");
   },

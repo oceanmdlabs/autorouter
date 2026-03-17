@@ -1,4 +1,5 @@
 import type { IActivityLogEntriesRepository } from "@/src/application/repositories/activity-log-entries.repository.interface";
+import type { IPrivacyAuditLogsRepository } from "@/src/application/repositories/privacy-audit-logs.repository.interface";
 import type { IHealthcareServicesRepository } from "@/src/application/repositories/healthcare-services.repository.interface";
 import type { IRoutingRulesRepository } from "@/src/application/repositories/routing-rules.repository.interface";
 import type { ISiteConfigurationRepository } from "@/src/application/repositories/site-configuration.repository.interface";
@@ -21,6 +22,7 @@ import { createCryptoService } from "@/src/infrastructure/services/crypto.servic
 import { createDbService } from "@/src/infrastructure/services/db.service";
 import { createRoutingToolActionService } from "@/src/infrastructure/services/routing-tool-action.service";
 import { createActivityLogEntriesRepository } from "@/src/infrastructure/repositories/activity-log-entries.repository";
+import { createPrivacyAuditLogsRepository } from "@/src/infrastructure/repositories/privacy-audit-logs.repository";
 import { createOceanClientService } from "@/src/infrastructure/services/ocean-client.service";
 import { UnauthenticatedError, UnauthorizedError } from "../errors/auth";
 import type { Logger } from "./logger";
@@ -36,6 +38,7 @@ export class ApplicationContext implements ApplicationContext {
   private testServiceRequestsRepository?: ITestServiceRequestsRepository;
   private siteConfigurationRepository?: ISiteConfigurationRepository;
   private activityLogEntriesRepository?: IActivityLogEntriesRepository;
+  private privacyAuditLogsRepository?: IPrivacyAuditLogsRepository;
   private erequestsRepository?: IErequestsRepository;
   private aiService?: IAiService;
   private blobStorageService?: IBlobStorageService;
@@ -173,6 +176,15 @@ export class ApplicationContext implements ApplicationContext {
       });
     }
     return this.activityLogEntriesRepository;
+  }
+
+  getPrivacyAuditLogsRepository(): IPrivacyAuditLogsRepository {
+    if (!this.privacyAuditLogsRepository) {
+      this.privacyAuditLogsRepository = createPrivacyAuditLogsRepository({
+        cxt: this,
+      });
+    }
+    return this.privacyAuditLogsRepository;
   }
 
   getErequestsRepository(): IErequestsRepository {

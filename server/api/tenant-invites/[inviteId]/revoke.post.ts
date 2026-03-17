@@ -1,7 +1,10 @@
 import {
   assertTenantAdmin,
+  getTenantInvites,
   revokeTenantInvite,
 } from "@/server/utils/tenant-access";
+import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
+import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 
 export default defineEventHandler(async (event) => {
   const session = await requireUserSession(event);
@@ -30,10 +33,29 @@ export default defineEventHandler(async (event) => {
     });
   }
 
+  const invite = (await getTenantInvites(tenantId)).find(
+    (record) => record.id === inviteId
+  );
   await revokeTenantInvite({
     tenantId,
     inviteId,
     revokedByUserId: user.id,
+  });
+  const cxt = await toApplicationContext(event);
+  await logPrivacyAuditEvent(cxt, {
+    eventType: "tenant_invite_revoked",
+    subjectType: "tenant_invite",
+    subjectId: inviteId,
+    summary: invite
+      ? `Revoked ${invite.role} invite.`
+      : "Revoked tenant invite.",
+    sensitiveData: invite
+      ? {
+          role: invite.role,
+          status: invite.status,
+          expiresAt: invite.expiresAt,
+        }
+      : null,
   });
 
   return { success: true };

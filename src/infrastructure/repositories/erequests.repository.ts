@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, ilike, lte, or, sql } from "drizzle-orm";
+import { and, desc, eq, gte, ilike, or, sql } from "drizzle-orm";
 import type { ApplicationContext } from "@/src/entities/models/application-context";
 import type { IErequestsRepository } from "@/src/application/repositories/erequests.repository.interface";
 import {
@@ -89,9 +89,6 @@ export function createErequestsRepository({
     }
     if (options?.receivedFrom) {
       clauses.push(gte(erequests.receivedAt, options.receivedFrom));
-    }
-    if (options?.receivedTo) {
-      clauses.push(lte(erequests.receivedAt, options.receivedTo));
     }
 
     return and(...clauses);

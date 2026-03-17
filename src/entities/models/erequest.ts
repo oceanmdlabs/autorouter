@@ -72,5 +72,4 @@ export type ErequestSearchOptions = {
   requestedListing?: string;
   healthServiceType?: string;
   receivedFrom?: Date;
-  receivedTo?: Date;
 };

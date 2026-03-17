@@ -1,7 +1,10 @@
 import {
   assertTenantAdmin,
+  getTenantMembers,
   updateMembershipRole,
 } from "@/server/utils/tenant-access";
+import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
+import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 
 export default defineEventHandler(async (event) => {
   const session = await requireUserSession(event);
@@ -31,11 +34,29 @@ export default defineEventHandler(async (event) => {
     });
   }
 
+  const currentMembership = (await getTenantMembers(tenantId)).find(
+    (member) => member.id === membershipId
+  );
   await updateMembershipRole({
     tenantId,
     membershipId,
     role: body.role,
     updatedByUserId: user.id,
+  });
+  const cxt = await toApplicationContext(event);
+  await logPrivacyAuditEvent(cxt, {
+    eventType: "tenant_member_role_changed",
+    subjectType: "tenant_membership",
+    subjectId: membershipId,
+    summary: currentMembership
+      ? `Changed member role for ${currentMembership.name} to ${body.role}.`
+      : `Changed member role to ${body.role}.`,
+    sensitiveData: {
+      beforeRole: currentMembership?.role ?? null,
+      afterRole: body.role,
+      targetUserId: currentMembership?.userId ?? null,
+      targetName: currentMembership?.name ?? null,
+    },
   });
 
   return { success: true };

@@ -4,6 +4,10 @@ import {
 } from "@/src/entities/models/site-configuration";
 import { uuid } from "@/src/entities/models/uuid";
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
+import {
+  logPrivacyAuditEvent,
+  summarizeSiteConfigurationChange,
+} from "@/server/utils/privacy-audit";
 import { assertTenantAdmin } from "@/server/utils/tenant-access";
 export default defineEventHandler(async (event) => {
   const cxt = await toApplicationContext(event);
@@ -43,7 +47,22 @@ export default defineEventHandler(async (event) => {
       await cxt.getSiteConfigurationRepository().create(siteConfig);
     }
 
-    return await cxt.getSiteConfigurationRepository().getForTenant();
+    const savedConfig = await cxt.getSiteConfigurationRepository().getForTenant();
+    if (savedConfig) {
+      await logPrivacyAuditEvent(cxt, {
+        eventType: existingConfig
+          ? "site_configuration_changed"
+          : "site_configuration_created",
+        subjectType: "site_configuration",
+        subjectId: savedConfig.id,
+        summary: summarizeSiteConfigurationChange({
+          before: existingConfig,
+          after: savedConfig,
+        }),
+      });
+    }
+
+    return savedConfig;
   } catch (error) {
     cxt.logger.error(error);
     throw createError({

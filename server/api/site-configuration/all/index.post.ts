@@ -1,4 +1,6 @@
 import { hydrateSessionUser } from "@/server/utils/session-user";
+import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
+import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 import { assertSystemAdminAccess } from "@/server/utils/system-admin-access";
 import { createTenantSiteConfiguration } from "@/server/utils/tenant-access";
 import { z } from "zod";
@@ -42,6 +44,14 @@ export default defineEventHandler(async (event) => {
       activeTenantId: tenantId,
       tenantId,
     },
+  });
+  const cxt = await toApplicationContext(event);
+  await logPrivacyAuditEvent(cxt, {
+    tenantId,
+    eventType: "site_configuration_created",
+    subjectType: "site_configuration",
+    subjectId: tenantId,
+    summary: "Created site configuration for new tenant.",
   });
 
   return {

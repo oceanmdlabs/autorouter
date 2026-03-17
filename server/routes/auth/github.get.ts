@@ -1,4 +1,6 @@
 import { buildSessionUserFromIdentity } from "@/server/utils/session-user";
+import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
+import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 export default defineOAuthGitHubEventHandler({
   config: {
     emailRequired: true,
@@ -6,12 +8,20 @@ export default defineOAuthGitHubEventHandler({
     clientSecret: process.env.NUXT_OAUTH_GITHUB_CLIENT_SECRET,
   } satisfies OAuthGitHubConfig,
   async onSuccess(event, { user }) {
+    const sessionUser = await buildSessionUserFromIdentity({
+      provider: "github",
+      subject: user.id.toString(),
+      displayName: `${user.login} (GitHub)`,
+    });
     await setUserSession(event, {
-      user: await buildSessionUserFromIdentity({
-        provider: "github",
-        subject: user.id.toString(),
-        displayName: `${user.login} (GitHub)`,
-      }),
+      user: sessionUser,
+    });
+    const cxt = await toApplicationContext(event);
+    await logPrivacyAuditEvent(cxt, {
+      eventType: "login_succeeded",
+      subjectType: "tenant",
+      subjectId: sessionUser.activeTenantId,
+      summary: "User logged in with GitHub OAuth.",
     });
     return sendRedirect(event, "/portal");
   },

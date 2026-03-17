@@ -2,6 +2,8 @@ import {
   assertTenantAdmin,
   createTenantInvite,
 } from "@/server/utils/tenant-access";
+import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
+import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 
 export default defineEventHandler(async (event) => {
   const session = await requireUserSession(event);
@@ -33,6 +35,17 @@ export default defineEventHandler(async (event) => {
     invitedByUserId: user.id,
     role,
     expiresAt,
+  });
+  const cxt = await toApplicationContext(event);
+  await logPrivacyAuditEvent(cxt, {
+    eventType: "tenant_invite_created",
+    subjectType: "tenant_invite",
+    subjectId: invite.id,
+    summary: `Created ${role} invite expiring on ${expiresAt.toISOString()}.`,
+    sensitiveData: {
+      role,
+      expiresAt: expiresAt.toISOString(),
+    },
   });
 
   const appUrl = process.env.HOST_URL ?? process.env.URL ?? "http://localhost:4000";

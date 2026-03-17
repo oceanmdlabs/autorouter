@@ -1,5 +1,6 @@
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
 import type { SiteConfiguration } from "@/src/entities/models/site-configuration";
+import { maskSiteConfigurationSecrets } from "@/server/utils/site-configuration-secrets";
 export default defineEventHandler(
   async (
     event
@@ -14,7 +15,7 @@ export default defineEventHandler(
     }
     let siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
     return {
-      siteConfig: siteConfig,
+      siteConfig: maskSiteConfigurationSecrets(siteConfig),
     };
   }
 );

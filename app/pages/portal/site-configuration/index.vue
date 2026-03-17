@@ -51,6 +51,7 @@ const showEmailApiKey = ref(false);
 const showSiteKey = ref(false);
 const showSiteCredential = ref(false);
 const showSharedEncryptionKey = ref(false);
+const SECRET_MASK_CHARACTER = "•";
 
 const panelFields = {
   connection: [
@@ -422,6 +423,14 @@ function copyToClipboard(text: string) {
   toast.success("Copied to clipboard", {
     description: "The value has been copied to your clipboard",
   });
+}
+
+function isMaskedSecretValue(value: string | null | undefined) {
+  return (
+    typeof value === "string" &&
+    value.length > 0 &&
+    [...value].every((character) => character === SECRET_MASK_CHARACTER)
+  );
 }
 </script>
 
@@ -840,6 +849,7 @@ function copyToClipboard(text: string) {
                           variant="outline"
                           size="icon"
                           @click="copyToClipboard(formValues.clientSecret)"
+                          :disabled="isMaskedSecretValue(formValues.clientSecret)"
                         >
                           <Copy class="h-4 w-4" />
                         </Button>

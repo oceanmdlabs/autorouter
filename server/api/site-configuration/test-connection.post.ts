@@ -1,18 +1,23 @@
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
+import { resolveMaskedSecretForUpdate } from "@/server/utils/site-configuration-secrets";
 
 export default defineEventHandler(async (event) => {
   await requireUserSession(event);
   const body = await readBody(event);
-  const { oceanServer, oceanClientId, oceanClientSecret } = body;
   const cxt = await toApplicationContext(event);
   const logger = cxt.logger;
 
   try {
+    const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
+    const oceanClientSecret = resolveMaskedSecretForUpdate(
+      body?.oceanClientSecret,
+      siteConfig?.oceanClientSecret,
+    );
     const oceanClient = cxt.getOceanClientService();
     const response = await oceanClient.testConnection({
-      oceanServer,
-      oceanClientId,
-      oceanClientSecret,
+      oceanServer: body?.oceanServer,
+      oceanClientId: body?.oceanClientId,
+      oceanClientSecret: oceanClientSecret ?? "",
     });
 
     if (response.ok) {

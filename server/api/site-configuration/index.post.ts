@@ -1,5 +1,6 @@
 import {
   newSiteConfigurationSchema,
+  type SiteConfiguration,
   updateSiteConfigurationSchema,
 } from "@/src/entities/models/site-configuration";
 import { uuid } from "@/src/entities/models/uuid";
@@ -8,6 +9,7 @@ import {
   logPrivacyAuditEvent,
   summarizeSiteConfigurationChange,
 } from "@/server/utils/privacy-audit";
+import { preserveMaskedSiteConfigurationSecrets } from "@/server/utils/site-configuration-secrets";
 import { assertTenantAdmin } from "@/server/utils/tenant-access";
 export default defineEventHandler(async (event) => {
   const cxt = await toApplicationContext(event);
@@ -74,9 +76,9 @@ export default defineEventHandler(async (event) => {
 
 function normalizeSiteConfigurationBody(
   body: Record<string, unknown>,
-  existingConfig: { clientSecret: string } | null,
+  existingConfig: SiteConfiguration | null,
 ): Record<string, unknown> {
-  const normalizedBody = { ...body };
+  const normalizedBody = preserveMaskedSiteConfigurationSecrets(body, existingConfig);
   const clientSecret =
     typeof normalizedBody.clientSecret === "string"
       ? normalizedBody.clientSecret.trim()

@@ -3,13 +3,14 @@ definePageMeta({
   layout: false
 })
 
-const lastProvider = ref('')
+const lastProvider = ref<'google' | 'github' | ''>('')
 
 onMounted(() => {
-  lastProvider.value = localStorage.getItem('lastAuthProvider') || ''
+  const provider = localStorage.getItem('lastAuthProvider')
+  lastProvider.value = provider === 'google' || provider === 'github' ? provider : ''
 })
 
-const setLastProvider = (provider: string) => {
+const setLastProvider = (provider: 'google' | 'github') => {
   localStorage.setItem('lastAuthProvider', provider)
 }
 </script>
@@ -28,10 +29,12 @@ const setLastProvider = (provider: string) => {
           <span v-if="lastProvider === 'google'"
             class="absolute right-2 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">LAST</span>
         </a>
-        <a href="/auth/github"
-          class="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+        <a href="/auth/github" @click="setLastProvider('github')"
+          class="relative w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
           <Icon name="mdi:github" class="h-5 w-5 mr-2" />
           Sign in with GitHub
+          <span v-if="lastProvider === 'github'"
+            class="absolute right-2 bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded">LAST</span>
         </a>
       </div>
     </div>

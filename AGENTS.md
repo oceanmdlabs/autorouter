@@ -19,12 +19,12 @@ This is the **Ocean Autorouter** - a Nuxt/Vue.js application that uses AI to int
    If commits are listed, pull/rebase before creating a PR.
 
 3. **Commit Workflow**:
-   - Develop on feature branches created from `origin/main`
+   - Do not create a feature branch automatically. Stay on the current branch unless the user explicitly asks you to create or switch branches.
+   - If the user explicitly asks for a feature branch, create it from `origin/main`
    - Before finishing a task, run `git status --short` and group your changes into logical commits instead of one catch-all commit
    - Stage only the files for the logical unit you are committing, write a specific message, and repeat until the task's intended changes are committed
    - Do not leave task-related tracked files uncommitted when you are done unless the user explicitly asks for a partial handoff
-   - Push feature branches to `origin`
-   - Create PRs targeting `main` in GitHub
+   - If you are working on a feature branch, push it to `origin` and create PRs targeting `main` in GitHub
 
 4. **After Merge Conflicts During Rebase**:
    - Read the conflict markers carefully

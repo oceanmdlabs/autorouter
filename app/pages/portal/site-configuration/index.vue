@@ -1363,7 +1363,7 @@ function copyToClipboard(text: string) {
             <AccordionTrigger type="button" class="py-5 hover:no-underline">
               <span class="flex flex-col gap-1 text-left">
                 <span class="text-base font-semibold text-gray-900">
-                  Ocean Open API Credentials
+                  Ocean Patient Engagement Credentials
                 </span>
                 <span class="text-sm font-normal text-gray-600">
                   Optional patient engagement credentials and encryption
@@ -1498,7 +1498,7 @@ function copyToClipboard(text: string) {
             <AccordionTrigger type="button" class="py-5 hover:no-underline">
               <span class="flex flex-col gap-1 text-left">
                 <span class="text-base font-semibold text-gray-900">
-                  eRequest Archival
+                  eRequest Storage and Retrieval
                 </span>
                 <span class="text-sm font-normal text-gray-600">
                   Retain inbound eRequests and archived documents for later
@@ -1511,9 +1511,11 @@ function copyToClipboard(text: string) {
                 <div
                   class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
                 >
-                  Enabling this stores inbound eRequest metadata and documents
-                  that may include PHI. Your tenant is responsible for
-                  retention, storage access, and lifecycle management.
+                  Enabling this feature permits the Autorouter to store
+                  inbound eRequest data, documents, and PDFs that may include
+                  PHI. Your site is responsible for secure retention, access
+                  controls, and lifecycle management in accordance with PIPEDA
+                  and applicable provincial privacy laws.
                 </div>
 
                 <div
@@ -1521,7 +1523,7 @@ function copyToClipboard(text: string) {
                 >
                   <div class="space-y-1 pr-4">
                     <Label for="erequestArchivalEnabled"
-                      >Enable eRequest archival</Label
+                      >Enable eRequest storage and retrieval</Label
                     >
                     <p class="text-sm text-gray-600">
                       Turning this off stops retention of future inbound

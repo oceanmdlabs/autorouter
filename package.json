@@ -14,6 +14,7 @@
     "db:migrate:apply:local": "tsx src/scripts/apply-local-migrations.ts",
     "db:migrate:apply:aws": "npm --prefix infrastructure/cdk run db:migrate:apply",
     "db:migrate:generate": "tsx src/scripts/run-guarded-drizzle.ts generate",
+    "seed:test-data": "tsx src/scripts/seed-test-data.ts",
     "push": "tsx src/scripts/run-guarded-drizzle.ts push",
     "prepush:typecheck": "npx nuxi typecheck",
     "typecheck": "npx nuxi typecheck",

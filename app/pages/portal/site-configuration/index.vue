@@ -4,8 +4,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Copy,
-  Eye,
-  EyeOff,
 } from "lucide-vue-next";
 import { toast } from "vue-sonner";
 import { handleMissingActiveTenantError } from "@/app/lib/active-tenant";
@@ -43,14 +41,6 @@ const testConnectionResult = ref<{ success: boolean; error?: string } | null>(
   null,
 );
 
-const showClientSecret = ref(false);
-const showOceanClientSecret = ref(false);
-const showTwilioAuthToken = ref(false);
-const showAiApiKey = ref(false);
-const showEmailApiKey = ref(false);
-const showSiteKey = ref(false);
-const showSiteCredential = ref(false);
-const showSharedEncryptionKey = ref(false);
 const SECRET_MASK_CHARACTER = "•";
 
 const panelFields = {
@@ -576,22 +566,12 @@ function isMaskedSecretValue(value: string | null | undefined) {
                     <Input
                       id="oceanClientSecret"
                       v-model="formValues.oceanClientSecret"
-                      :type="showOceanClientSecret ? 'text' : 'password'"
+                      type="password"
                       :aria-invalid="
                         errors.oceanClientSecret ? 'true' : undefined
                       "
                       class="flex-1"
                     />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      @click="showOceanClientSecret = !showOceanClientSecret"
-                    >
-                      <component
-                        :is="showOceanClientSecret ? EyeOff : Eye"
-                        class="h-4 w-4"
-                      />
-                    </Button>
                   </div>
                   <p
                     v-if="errors.oceanClientSecret"
@@ -829,22 +809,12 @@ function isMaskedSecretValue(value: string | null | undefined) {
                         <Input
                           id="clientSecret"
                           v-model="formValues.clientSecret"
-                          :type="showClientSecret ? 'text' : 'password'"
+                          type="password"
                           :aria-invalid="
                             errors.clientSecret ? 'true' : undefined
                           "
                           class="flex-1"
                         />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          @click="showClientSecret = !showClientSecret"
-                        >
-                          <component
-                            :is="showClientSecret ? EyeOff : Eye"
-                            class="h-4 w-4"
-                          />
-                        </Button>
                         <Button
                           variant="outline"
                           size="icon"
@@ -962,22 +932,12 @@ function isMaskedSecretValue(value: string | null | undefined) {
                     <Input
                       id="twilioAuthToken"
                       v-model="formValues.twilioAuthToken"
-                      :type="showTwilioAuthToken ? 'text' : 'password'"
+                      type="password"
                       :aria-invalid="
                         errors.twilioAuthToken ? 'true' : undefined
                       "
                       class="flex-1"
                     />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      @click="showTwilioAuthToken = !showTwilioAuthToken"
-                    >
-                      <component
-                        :is="showTwilioAuthToken ? EyeOff : Eye"
-                        class="h-4 w-4"
-                      />
-                    </Button>
                   </div>
                   <p
                     v-if="errors.twilioAuthToken"
@@ -1126,20 +1086,10 @@ function isMaskedSecretValue(value: string | null | undefined) {
                   <Input
                     id="aiApiKey"
                     v-model="formValues.aiApiKey"
-                    :type="showAiApiKey ? 'text' : 'password'"
+                    type="password"
                     :aria-invalid="errors.aiApiKey ? 'true' : undefined"
                     class="flex-1"
                   />
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    @click="showAiApiKey = !showAiApiKey"
-                  >
-                    <component
-                      :is="showAiApiKey ? EyeOff : Eye"
-                      class="h-4 w-4"
-                    />
-                  </Button>
                 </div>
                 <p v-if="errors.aiApiKey" class="text-sm text-destructive">
                   {{ errors.aiApiKey }}
@@ -1236,20 +1186,10 @@ function isMaskedSecretValue(value: string | null | undefined) {
                     <Input
                       id="emailApiKey"
                       v-model="formValues.emailApiKey"
-                      :type="showEmailApiKey ? 'text' : 'password'"
+                      type="password"
                       :aria-invalid="errors.emailApiKey ? 'true' : undefined"
                       class="flex-1"
                     />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      @click="showEmailApiKey = !showEmailApiKey"
-                    >
-                      <component
-                        :is="showEmailApiKey ? EyeOff : Eye"
-                        class="h-4 w-4"
-                      />
-                    </Button>
                   </div>
                   <p class="text-sm text-gray-600">
                     Get your API key from the
@@ -1395,20 +1335,10 @@ function isMaskedSecretValue(value: string | null | undefined) {
                     <Input
                       id="siteKey"
                       v-model="formValues.siteKey"
-                      :type="showSiteKey ? 'text' : 'password'"
+                      type="password"
                       :aria-invalid="errors.siteKey ? 'true' : undefined"
                       class="flex-1"
                     />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      @click="showSiteKey = !showSiteKey"
-                    >
-                      <component
-                        :is="showSiteKey ? EyeOff : Eye"
-                        class="h-4 w-4"
-                      />
-                    </Button>
                   </div>
                   <p v-if="errors.siteKey" class="text-sm text-destructive">
                     {{ errors.siteKey }}
@@ -1420,20 +1350,10 @@ function isMaskedSecretValue(value: string | null | undefined) {
                     <Input
                       id="siteCredential"
                       v-model="formValues.siteCredential"
-                      :type="showSiteCredential ? 'text' : 'password'"
+                      type="password"
                       :aria-invalid="errors.siteCredential ? 'true' : undefined"
                       class="flex-1"
                     />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      @click="showSiteCredential = !showSiteCredential"
-                    >
-                      <component
-                        :is="showSiteCredential ? EyeOff : Eye"
-                        class="h-4 w-4"
-                      />
-                    </Button>
                   </div>
                   <p
                     v-if="errors.siteCredential"
@@ -1448,24 +1368,12 @@ function isMaskedSecretValue(value: string | null | undefined) {
                     <Input
                       id="sharedEncryptionKey"
                       v-model="formValues.sharedEncryptionKey"
-                      :type="showSharedEncryptionKey ? 'text' : 'password'"
+                      type="password"
                       :aria-invalid="
                         errors.sharedEncryptionKey ? 'true' : undefined
                       "
                       class="flex-1"
                     />
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      @click="
-                        showSharedEncryptionKey = !showSharedEncryptionKey
-                      "
-                    >
-                      <component
-                        :is="showSharedEncryptionKey ? EyeOff : Eye"
-                        class="h-4 w-4"
-                      />
-                    </Button>
                   </div>
                   <p
                     v-if="errors.sharedEncryptionKey"

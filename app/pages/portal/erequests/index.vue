@@ -46,6 +46,7 @@ const SEARCH_FILTER_OPTIONS: Array<{
   { value: "receivedFrom", label: "Received from", inputType: "date" },
   { value: "receivedTo", label: "Received to", inputType: "date" },
 ];
+const DEFAULT_SEARCH_FILTER_OPTION = SEARCH_FILTER_OPTIONS[0]!;
 
 const searchFilters = ref<SearchFilter[]>([
   { id: crypto.randomUUID(), type: "search", value: "" },
@@ -105,7 +106,7 @@ const archivalEnabled = computed(
 );
 
 const getFilterOption = (type: SearchFilterType) =>
-  SEARCH_FILTER_OPTIONS.find((option) => option.value === type) ?? SEARCH_FILTER_OPTIONS[0];
+  SEARCH_FILTER_OPTIONS.find((option) => option.value === type) ?? DEFAULT_SEARCH_FILTER_OPTION;
 
 const getAvailableFilterOptions = (currentFilterId: string) => {
   const usedTypes = new Set(
@@ -137,7 +138,10 @@ const addFilter = () => {
 
 const removeFilter = (filterId: string) => {
   if (searchFilters.value.length === 1) {
-    searchFilters.value[0].value = "";
+    const firstFilter = searchFilters.value[0];
+    if (firstFilter) {
+      firstFilter.value = "";
+    }
     return;
   }
   searchFilters.value = searchFilters.value.filter((filter) => filter.id !== filterId);

@@ -25,6 +25,7 @@ const route = useRoute()
 const id = route.params.id as string
 const isNew = id === 'new'
 const requestFetch = useRequestFetch()
+type SampleDataFormValues = z.infer<typeof formSchema>
 
 // State
 const errors = ref<Record<string, string>>({})
@@ -33,7 +34,7 @@ const isJsonView = ref(false)
 const jsonError = ref<string>('')
 const rawJson = ref('')
 
-const formValues = ref<z.infer<typeof formSchema>>({
+const formValues = ref<SampleDataFormValues>({
 	id: '',
 	name: '',
 	patientGivenName: '',
@@ -105,7 +106,7 @@ watch(() => loadedData.value, (data) => {
 	}
 }, { immediate: true })
 
-function createFhirBundle(formData: z.infer<typeof formSchema>): Bundle {
+function createFhirBundle(formData: SampleDataFormValues): Bundle {
 	const now = new Date().toISOString();
 	const patient: Patient = {
 		resourceType: "Patient",
@@ -184,6 +185,37 @@ function validateAndParseJson(json: string): Bundle | null {
 	}
 }
 
+function extractValidationErrors(error: any): Record<string, string> {
+	const issues = Array.isArray(error?.data?.data) ? error.data.data : []
+	if (issues.length > 0) {
+		return Object.fromEntries(
+			issues
+				.map((issue: { path?: Array<string | number>, message?: string }) => {
+					const fieldName = issue.path?.[issue.path.length - 1]
+					if (!fieldName || !issue.message) {
+						return null
+					}
+
+					return [String(fieldName), issue.message] as const
+				})
+				.filter((issue: readonly [string, string] | null): issue is readonly [string, string] => issue !== null)
+		)
+	}
+
+	return {}
+}
+
+function withErrorSummary(fieldErrors: Record<string, string>) {
+	if (Object.keys(fieldErrors).length === 0) {
+		return fieldErrors
+	}
+
+	return {
+		...fieldErrors,
+		message: 'Please correct the highlighted fields and try again.',
+	}
+}
+
 // Form submission
 async function handleSubmit() {
 	isLoading.value = true
@@ -202,9 +234,9 @@ async function handleSubmit() {
 			// Validate form data
 			const result = formSchema.safeParse(formValues.value)
 			if (!result.success) {
-				errors.value = Object.fromEntries(
+				errors.value = withErrorSummary(Object.fromEntries(
 					Object.entries(result.error.formErrors.fieldErrors).map(([k, v]) => [k, v?.[0] ?? ''])
-				)
+				))
 				return
 			}
 			bundle = createFhirBundle(result.data)
@@ -229,7 +261,12 @@ async function handleSubmit() {
 			return
 		}
 		console.error('Failed to save test service request:', error)
-		errors.value = { error: 'Failed to save test service request' }
+		const fieldErrors = extractValidationErrors(error)
+		if (Object.keys(fieldErrors).length > 0) {
+			errors.value = withErrorSummary(fieldErrors)
+			return
+		}
+		errors.value = { message: 'Failed to save test service request' }
 	} finally {
 		isLoading.value = false
 	}
@@ -385,9 +422,9 @@ watchEffect(() => {
 			</CardHeader>
 
 			<CardContent v-if="!pending">
-				<div v-if="Object.keys(errors).length > 0" class="mb-4">
+				<div v-if="errors.message" class="mb-4">
 					<p class="text-destructive">
-						{{Object.entries(errors).map(([k, v]) => `${k}: ${v}`).join('; ')}}
+						{{ errors.message }}
 					</p>
 				</div>
 

@@ -10,10 +10,10 @@ export default defineEventHandler(async (event) => {
       message: "Missing test service request id",
     });
   }
-  const parsedBody = updateTestServiceRequestSchema.parse({ ...body, id });
   const cxt = await toApplicationContext(event);
 
   try {
+    const parsedBody = updateTestServiceRequestSchema.parse({ ...body, id });
     await cxt.getTestServiceRequestsRepository().update(parsedBody);
 
     return { success: true };

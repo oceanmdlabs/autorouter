@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   } catch (error: any) {
     throw createError({
       statusCode: 400,
-      message: error.toString(),
+      message: error.message,
       data: error.errors,
     });
   }

@@ -9,6 +9,7 @@
     "preview": "nuxt preview",
     "deploy:aws": "npm --prefix infrastructure/cdk run cdk:deploy:app:env:migrate -- --require-approval never",
     "login:aws": "aws sso login --profile ocean-autorouter",
+    "logs:tail:aws": "npm --prefix infrastructure/cdk run logs:tail",
     "db:sql:aws": "npm --prefix infrastructure/cdk run db:sql --",
     "postinstall": "node src/scripts/setup-git-hooks.mjs && nuxt prepare",
     "db:migrate:apply:local": "tsx src/scripts/apply-local-migrations.ts",

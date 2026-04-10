@@ -18,6 +18,7 @@ export type DatabaseConstructProps = {
   rdsInstanceClass: string;
   auroraMinAcu: number;
   auroraMaxAcu: number;
+  auroraAutoPauseSeconds: number;
   deletionProtection: boolean;
   skipFinalSnapshot: boolean;
   finalSnapshotIdentifierPrefix: string;
@@ -76,6 +77,13 @@ export class DatabaseConstruct extends Construct {
           : RemovalPolicy.SNAPSHOT,
         enableDataApi: props.useDataApi,
       });
+
+      const cfnCluster = cluster.node.defaultChild as rds.CfnDBCluster;
+      cfnCluster.serverlessV2ScalingConfiguration = {
+        maxCapacity: props.auroraMaxAcu,
+        minCapacity: props.auroraMinAcu,
+        secondsUntilAutoPause: props.auroraAutoPauseSeconds,
+      };
 
       const password = cluster.secret?.secretValueFromJson("password").unsafeUnwrap() ?? "";
       const dbUrl = `postgresql://${props.username}:${password}@${cluster.clusterEndpoint.hostname}:5432/${props.dbName}`;

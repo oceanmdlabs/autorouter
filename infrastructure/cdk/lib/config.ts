@@ -26,6 +26,7 @@ export type InfraConfig = {
   rdsInstanceClass: string;
   auroraMinAcu: number;
   auroraMaxAcu: number;
+  auroraAutoPauseSeconds: number;
   dbDeletionProtection: boolean;
   dbSkipFinalSnapshot: boolean;
   dbFinalSnapshotIdentifierPrefix: string;
@@ -124,6 +125,7 @@ export function getInfraConfig(scope: Construct): InfraConfig {
   const rdsInstanceClass = getString(scope, "rdsInstanceClass") ?? "t4g.micro";
   const auroraMinAcu = getNumber(scope, "auroraMinAcu") ?? 0;
   const auroraMaxAcu = getNumber(scope, "auroraMaxAcu") ?? 2;
+  const auroraAutoPauseSeconds = getNumber(scope, "auroraAutoPauseSeconds") ?? 3600;
 
   const isProdStack = /\bprod(uction)?\b/i.test(stackName);
   const dbDeletionProtection = getBoolean(scope, "dbDeletionProtection") ?? isProdStack;
@@ -155,6 +157,7 @@ export function getInfraConfig(scope: Construct): InfraConfig {
     rdsInstanceClass,
     auroraMinAcu,
     auroraMaxAcu,
+    auroraAutoPauseSeconds,
     dbDeletionProtection,
     dbSkipFinalSnapshot,
     dbFinalSnapshotIdentifierPrefix,

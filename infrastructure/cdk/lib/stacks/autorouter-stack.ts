@@ -46,6 +46,7 @@ export class AutorouterStack extends Stack {
       rdsInstanceClass: cfg.rdsInstanceClass,
       auroraMinAcu: cfg.auroraMinAcu,
       auroraMaxAcu: cfg.auroraMaxAcu,
+      auroraAutoPauseSeconds: cfg.auroraAutoPauseSeconds,
       deletionProtection: cfg.dbDeletionProtection,
       skipFinalSnapshot: cfg.dbSkipFinalSnapshot,
       finalSnapshotIdentifierPrefix: cfg.dbFinalSnapshotIdentifierPrefix,

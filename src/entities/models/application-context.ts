@@ -4,6 +4,10 @@ import type { IHealthcareServicesRepository } from "@/src/application/repositori
 import type { IRoutingRulesRepository } from "@/src/application/repositories/routing-rules.repository.interface";
 import type { ISiteConfigurationRepository } from "@/src/application/repositories/site-configuration.repository.interface";
 import type { IErequestsRepository } from "@/src/application/repositories/erequests.repository.interface";
+import type {
+  ILlmRuleDecisionAuditRepository,
+  ILlmRuleToolExecutionAuditRepository,
+} from "@/src/application/repositories/llm-rule-decision-audit.repository.interface";
 import type { ITestServiceRequestsRepository } from "@/src/application/repositories/test-service-requests.repository.interface";
 import type { IAiService } from "@/src/application/services/ai.service.interface";
 import type { IBlobStorageService } from "@/src/application/services/blob-storage.service.interface";
@@ -16,6 +20,10 @@ import { createRoutingRulesRepository } from "@/src/infrastructure/repositories/
 import { createSiteConfigurationRepository } from "@/src/infrastructure/repositories/site-configuration.repository";
 import { createTestServiceRequestsRepository } from "@/src/infrastructure/repositories/test-service-requests.repository";
 import { createErequestsRepository } from "@/src/infrastructure/repositories/erequests.repository";
+import {
+  createLlmRuleDecisionAuditRepository,
+  createLlmRuleToolExecutionAuditRepository,
+} from "@/src/infrastructure/repositories/llm-rule-decision-audit.repository";
 import { createAiService } from "@/src/infrastructure/services/ai.service";
 import { createBlobStorageService } from "@/src/infrastructure/services/blob-storage.service";
 import { createCryptoService } from "@/src/infrastructure/services/crypto.service";
@@ -40,6 +48,8 @@ export class ApplicationContext implements ApplicationContext {
   private activityLogEntriesRepository?: IActivityLogEntriesRepository;
   private privacyAuditLogsRepository?: IPrivacyAuditLogsRepository;
   private erequestsRepository?: IErequestsRepository;
+  private llmRuleDecisionAuditRepository?: ILlmRuleDecisionAuditRepository;
+  private llmRuleToolExecutionAuditRepository?: ILlmRuleToolExecutionAuditRepository;
   private aiService?: IAiService;
   private blobStorageService?: IBlobStorageService;
   private routingToolActionService?: IRoutingToolActionService;
@@ -192,6 +202,22 @@ export class ApplicationContext implements ApplicationContext {
       this.erequestsRepository = createErequestsRepository({ cxt: this });
     }
     return this.erequestsRepository;
+  }
+
+  getLlmRuleDecisionAuditRepository(): ILlmRuleDecisionAuditRepository {
+    if (!this.llmRuleDecisionAuditRepository) {
+      this.llmRuleDecisionAuditRepository =
+        createLlmRuleDecisionAuditRepository({ cxt: this });
+    }
+    return this.llmRuleDecisionAuditRepository;
+  }
+
+  getLlmRuleToolExecutionAuditRepository(): ILlmRuleToolExecutionAuditRepository {
+    if (!this.llmRuleToolExecutionAuditRepository) {
+      this.llmRuleToolExecutionAuditRepository =
+        createLlmRuleToolExecutionAuditRepository({ cxt: this });
+    }
+    return this.llmRuleToolExecutionAuditRepository;
   }
 
   getBlobStorageService(): IBlobStorageService {

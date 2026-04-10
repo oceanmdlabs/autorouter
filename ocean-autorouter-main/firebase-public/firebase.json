@@ -1,0 +1,33 @@
+{
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "X-Forwarded-Proto",
+            "value": "https"
+          },
+          {
+            "key": "X-Forwarded-Host",
+            "value": "autorouter.snowdog.health"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "run": {
+          "serviceId": "ocean-autorouter",
+          "region": "northamerica-northeast2"
+        }
+      }
+    ]
+  }
+}

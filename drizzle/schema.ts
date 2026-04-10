@@ -9,6 +9,7 @@ import {
   index,
   uniqueIndex,
   integer,
+  real,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 type FhirBundle = { resourceType: "Bundle" };
@@ -129,6 +130,97 @@ export const privacyAuditLog = pgTable(
       table.tenantId,
       table.eventType
     ),
+  })
+);
+
+export const llmDecisionEnum = pgEnum("llm_decision", [
+  "EXECUTE",
+  "SKIP",
+  "ERROR",
+]);
+
+export const llmValidationStatusEnum = pgEnum("llm_validation_status", [
+  "VALID",
+  "INVALID_JSON",
+  "INVALID_SCHEMA",
+  "DISALLOWED_CONTENT",
+  "OTHER",
+]);
+
+export const llmToolExecutionStatusEnum = pgEnum("llm_tool_execution_status", [
+  "PLANNED",
+  "SUCCESS",
+  "FAILED",
+  "SKIPPED",
+]);
+
+export const llmReasonCodeEnum = pgEnum("llm_reason_code", [
+  "ROUTING_RULE_MATCHED",
+  "NO_ACTION_NEEDED",
+  "MISSING_INFORMATION",
+  "OUTSIDE_SCOPE",
+  "PATIENT_OPT_OUT",
+  "VALIDATION_FAILED",
+  "MODEL_ERROR",
+]);
+
+export const llmRuleDecisionAudit = pgTable(
+  "llm_rule_decision_audit",
+  {
+    ...BaseResourceSchema,
+    ...TenantConfinedSchema,
+    siteId: text("site_id").notNull(),
+    referralId: text("referral_id").notNull(),
+    ruleId: text("rule_id").notNull(),
+    ruleName: text("rule_name").notNull(),
+    ruleVersion: text("rule_version").notNull().default("1.0"),
+    decision: llmDecisionEnum("decision").notNull(),
+    confidence: real("confidence"),
+    reasonCode: llmReasonCodeEnum("reason_code"),
+    reasonSummary: text("reason_summary"),
+    modelName: text("model_name"),
+    modelRequestId: text("model_request_id"),
+    validationStatus: llmValidationStatusEnum("validation_status").notNull(),
+    validationError: text("validation_error"),
+  },
+  (table) => ({
+    tenantIdx: index("idx_llm_rule_decision_audit_tenant_id").on(table.tenantId),
+    siteReferralRuleIdx: index(
+      "idx_llm_rule_decision_audit_site_referral_rule"
+    ).on(table.siteId, table.referralId, table.ruleId, table.createdAt),
+  })
+);
+
+export const llmRuleToolExecutionAudit = pgTable(
+  "llm_rule_tool_execution_audit",
+  {
+    ...BaseResourceSchema,
+    ...TenantConfinedSchema,
+    decisionAuditId: uuid("decision_audit_id")
+      .notNull()
+      .references(() => llmRuleDecisionAudit.id),
+    siteId: text("site_id").notNull(),
+    referralId: text("referral_id").notNull(),
+    ruleId: text("rule_id").notNull(),
+    toolIndex: integer("tool_index").notNull(),
+    toolName: text("tool_name").notNull(),
+    argsHash: text("args_hash"),
+    status: llmToolExecutionStatusEnum("status").notNull(),
+    errorCode: text("error_code"),
+    errorSummary: text("error_summary"),
+    startedAt: timestamp("started_at"),
+    finishedAt: timestamp("finished_at"),
+  },
+  (table) => ({
+    tenantIdx: index("idx_llm_rule_tool_execution_audit_tenant_id").on(
+      table.tenantId
+    ),
+    siteReferralRuleIdx: index(
+      "idx_llm_rule_tool_execution_audit_site_referral_rule"
+    ).on(table.siteId, table.referralId, table.ruleId),
+    decisionToolIdx: index(
+      "idx_llm_rule_tool_execution_audit_decision_tool"
+    ).on(table.decisionAuditId, table.toolIndex),
   })
 );
 

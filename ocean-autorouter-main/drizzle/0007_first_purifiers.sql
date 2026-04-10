@@ -1,0 +1,1 @@
+ALTER TABLE "routing_rules" ADD COLUMN "minutes_saved_estimate" integer;

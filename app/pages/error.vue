@@ -13,7 +13,7 @@ const pageCopy = computed(() => {
     return {
       title: "Database Waking Up",
       body:
-        "This test environment was asleep and the database is still resuming from auto-pause. Wait a few seconds, then start sign-in again to get a fresh OAuth code.",
+        "The database is resuming from auto-pause. Return to the login page and wait for the readiness check to finish before starting sign-in again.",
       actionLabel: "Back to login",
     };
   }

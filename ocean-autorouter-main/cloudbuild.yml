@@ -1,0 +1,87 @@
+steps:
+  - name: gcr.io/cloud-builders/docker
+    id: Build
+    args:
+      [ "build","-t","${_IMAGE_PATH}:$COMMIT_SHA","." ]
+
+  - name: gcr.io/cloud-builders/docker
+    id: Push
+    args: [ "push","${_IMAGE_PATH}:$COMMIT_SHA" ]
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Get Digest
+    entrypoint: bash
+    args:
+      - -lc
+      - |
+        set -euo pipefail
+        echo "Resolving digest for ${_IMAGE_PATH}:$COMMIT_SHA"
+        DIGEST=$$(gcloud artifacts docker images describe \
+          "${_IMAGE_PATH}:$COMMIT_SHA" \
+          --format='value(image_summary.digest)')
+        if [[ -z "$$DIGEST" ]]; then
+          echo "ERROR: Empty digest for ${_IMAGE_PATH}:$COMMIT_SHA"; exit 1
+        fi
+        echo "Digest: $$DIGEST"
+        echo -n "$$DIGEST" > /workspace/DIGEST
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy Job
+    entrypoint: bash
+    args:
+      - -lc
+      - |
+        set -euo pipefail
+        DIGEST=$$(cat /workspace/DIGEST)
+        IMAGE_WITH_DIGEST="${_IMAGE_PATH}@$$DIGEST"
+        echo "Deploying job ${_JOB_NAME} with image $$IMAGE_WITH_DIGEST"
+        gcloud run jobs deploy "${_JOB_NAME}" \
+          --region="${_DEPLOY_REGION}" \
+          --image="$$IMAGE_WITH_DIGEST" \
+          --set-cloudsql-instances="${_CLOUDSQL}" \
+          --set-env-vars="DB_URL=${_DB_URL}" \
+          --command="npm" \
+          --args="run","drizzle-migrate" \
+          --quiet
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Execute Job
+    entrypoint: gcloud
+    args: [ "run","jobs","execute","${_JOB_NAME}","--region","${_DEPLOY_REGION}","--wait" ]
+
+  - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    id: Deploy Service
+    entrypoint: bash
+    args:
+      - -lc
+      - |
+        set -euo pipefail
+        DIGEST=$$(cat /workspace/DIGEST)
+        IMAGE_WITH_DIGEST="${_IMAGE_PATH}@$$DIGEST"
+        echo "Updating service ${_SERVICE_NAME} to $$IMAGE_WITH_DIGEST"
+        gcloud run services update "${_SERVICE_NAME}" \
+          --platform=managed \
+          --image="$$IMAGE_WITH_DIGEST" \
+          --labels=managed-by=gcp-cloud-build-deploy-cloud-run,commit-sha="$COMMIT_SHA",gcb-build-id="$BUILD_ID",gcb-trigger-id="${_TRIGGER_ID}" \
+          --region="${_DEPLOY_REGION}" \
+          --quiet
+
+images:
+  - ${_IMAGE_PATH}:$COMMIT_SHA
+
+options:
+  substitutionOption: ALLOW_LOOSE
+  logging: CLOUD_LOGGING_ONLY
+
+substitutions:
+  _SERVICE_NAME: ocean-autorouter
+  _DEPLOY_REGION: northamerica-northeast2
+  _AR_HOSTNAME: northamerica-northeast2-docker.pkg.dev
+  _AR_REPOSITORY: cloud-run-source-deploy
+  _AR_PROJECT_ID: autorouter-469920
+  _TRIGGER_ID: 4fb902e6-9f09-4c95-9bf0-3617c902d74d
+  _PLATFORM: managed
+  _JOB_NAME: db-migrate
+  _CLOUDSQL: autorouter-469920:northamerica-northeast2:autorouter-db-1
+  _IMAGE_PATH: northamerica-northeast2-docker.pkg.dev/autorouter-469920/cloud-run-source-deploy/ocean-autorouter
+  _DB_URL: # Add your database URL here

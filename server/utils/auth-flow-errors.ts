@@ -96,7 +96,10 @@ export async function withDatabaseResumeRetry<T>(
   operation: () => Promise<T>,
   options: RetryOptions = {}
 ) {
-  const maxAttempts = options.maxAttempts ?? 4;
+  // Aurora resume typically takes around 15 seconds, so auth should wait long
+  // enough for the common case instead of immediately bouncing the user back
+  // into another OAuth round-trip.
+  const maxAttempts = options.maxAttempts ?? 5;
   const delayMs = options.delayMs ?? 2000;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -127,7 +130,7 @@ export function buildAuthErrorRedirect(args: {
 
   if (isDatabaseResumingError(args.error)) {
     params.set("reason", "database-resuming");
-    return `/error?${params.toString()}`;
+    return `/login?${params.toString()}`;
   }
 
   if (isExpiredOAuthCodeError(args.error)) {

@@ -9,7 +9,7 @@
     "cdk:synth": "cdk synth",
     "cdk:diff": "cdk diff",
     "cdk:deploy": "cdk deploy",
-    "cdk:deploy:app": "NITRO_PRESET=aws_lambda npm --prefix ../.. run build && cdk deploy",
+    "cdk:deploy:app": "npm --prefix ../.. run build:aws && cdk deploy",
     "cdk:deploy:app:env": "./scripts/deploy-app-with-env.sh",
     "cdk:deploy:app:env:migrate": "./scripts/deploy-app-and-migrate.sh",
     "logs:tail": "./scripts/tail-aws-logs.sh",

@@ -1,0 +1,91 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Call OpenAPI Webhook",
+			"type": "shell",
+			"command": "curl",
+			"args": [
+				"-X",
+				"POST",
+				"-H",
+				"Content-Type: application/json",
+				"-d",
+				"@${workspaceFolder}/.vscode/webhook-test-data.json",
+				"localhost:4000/api/openapi/webhook/6c8d1149-a07d-4a55-b721-ef3d561b3828"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Terminate Debugging Tasks",
+			"type": "shell",
+			"command": "for port in 5173 5174 8888 4000; do lsof -i TCP:$port | grep LISTEN | awk '{print $2}' | xargs -r kill -9; done",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Drizzle Push",
+			"type": "shell",
+			"command": "npm run push",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "Typecheck",
+			"type": "shell",
+			"command": "npm run typecheck",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "vitest",
+			"type": "npm",
+			"script": "test",
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
+			"problemMatcher": [],
+			"detail": "vitest"
+		},
+		{
+			"label": "dev",
+			"type": "npm",
+			"script": "dev",
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "ngrok",
+			"type": "shell",
+			"command": "ngrok http 4000",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"problemMatcher": []
+		},
+		{
+			"label": "codex",
+			"type": "shell",
+			"command": "codex",
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			},
+			"problemMatcher": []
+		}
+	]
+}

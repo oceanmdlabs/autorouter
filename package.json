@@ -9,6 +9,7 @@
     "generate": "nuxt generate",
     "preview": "nuxt preview",
     "deploy:aws": "npm --prefix infrastructure/cdk run cdk:deploy:app:env:migrate -- --require-approval never",
+    "deploy:aws:app": "npm --prefix infrastructure/cdk run cdk:deploy:app:env -- --require-approval never",
     "login:aws": "aws sso login --profile ocean-autorouter",
     "logs:tail:aws": "npm --prefix infrastructure/cdk run logs:tail",
     "db:sql:aws": "npm --prefix infrastructure/cdk run db:sql --",

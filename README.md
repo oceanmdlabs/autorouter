@@ -121,3 +121,15 @@ Deployment and hosting guidance:
 
 - [HOSTING.md](HOSTING.md) - hosting options, requirements, and provider-specific guidance
 - [infrastructure/cdk/README.md](infrastructure/cdk/README.md) - AWS CDK deployment path
+
+For routine AWS app-only updates that do not include schema changes, prefer:
+
+```bash
+npm run deploy:aws:app
+```
+
+Use the full deploy+migrate path only when infrastructure or database changes require it:
+
+```bash
+npm run deploy:aws
+```

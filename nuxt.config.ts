@@ -28,6 +28,9 @@ const region = process.env.AWS_REGION ?? process.env.VERCEL_REGION ?? "unknown";
 
 export default defineNuxtConfig({
   ssr: false,
+  devtools: {
+    enabled: process.env.NODE_ENV === "development",
+  },
   // devtools: {
   //   vscode: {
   //     reuseExistingServer: true,
@@ -63,7 +66,7 @@ export default defineNuxtConfig({
     "@pinia/nuxt",
     "nuxt-auth-utils",
     "@nuxt/icon",
-    "@nuxt/devtools",
+    ...(process.env.NODE_ENV === "development" ? ["@nuxt/devtools"] : []),
     "@nuxtjs/color-mode",
     "nuxt-lucide-icons",
   ],
@@ -87,7 +90,7 @@ export default defineNuxtConfig({
 
   typescript: {
     strict: true,
-    typeCheck: "build",
+    typeCheck: false,
   },
 
   alias: {

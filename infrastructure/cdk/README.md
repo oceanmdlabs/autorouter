@@ -163,6 +163,10 @@ Build + deploy + apply SQL migrations:
 npm run cdk:deploy:app:env:migrate -- --profile "$AWS_PROFILE" --require-approval never
 ```
 
+Use `cdk:deploy:app:env` as the default fast path for routine app-only deploys. It skips the post-deploy migration step.
+
+Use `cdk:deploy:app:env:migrate` only when schema changes or operational sequencing require applying committed SQL migrations in the deployed environment.
+
 The deploy wrapper prints post-deploy admin bootstrap instructions at the end of a successful deploy. Do not skip that step on a new environment.
 
 ## Keep deploy secrets in `.env.deploy` (simplest path)

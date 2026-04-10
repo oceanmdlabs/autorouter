@@ -133,3 +133,12 @@ Use the full deploy+migrate path only when infrastructure or database changes re
 ```bash
 npm run deploy:aws
 ```
+
+To measure local typecheck and build phases before touching AWS:
+
+```bash
+npm run benchmark:typecheck
+npm run benchmark:build
+```
+
+Current investigation notes live in [docs/aws-deploy-and-typecheck-investigation.md](docs/aws-deploy-and-typecheck-investigation.md).

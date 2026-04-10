@@ -20,6 +20,8 @@
     "seed:test-data": "tsx src/scripts/seed-test-data.ts",
     "push": "tsx src/scripts/run-guarded-drizzle.ts push",
     "prepush:typecheck": "npx nuxi typecheck",
+    "benchmark:typecheck": "node src/scripts/benchmark-pipeline.mjs --group typecheck",
+    "benchmark:build": "node src/scripts/benchmark-pipeline.mjs --group build",
     "typecheck": "npx nuxi typecheck",
     "test": "vitest",
     "test:coverage": "vitest run --coverage",

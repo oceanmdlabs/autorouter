@@ -4,6 +4,7 @@
   "version": "0.0.1",
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit",
+    "build:tsgo": "npm exec --package @typescript/native-preview -- tsgo -p tsconfig.json --noEmit --moduleResolution node16 --module node16 --types node",
     "audit": "npm audit --audit-level=critical",
     "audit:full": "npm audit",
     "cdk:synth": "cdk synth",

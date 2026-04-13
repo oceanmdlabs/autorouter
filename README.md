@@ -122,13 +122,21 @@ Deployment and hosting guidance:
 - [HOSTING.md](HOSTING.md) - hosting options, requirements, and provider-specific guidance
 - [infrastructure/cdk/README.md](infrastructure/cdk/README.md) - AWS CDK deployment path
 
-For routine AWS app-only updates that do not include schema changes, prefer:
+For routine AWS app-only code updates that do not change infrastructure or deployed environment variables, prefer:
 
 ```bash
 npm run deploy:aws:app
 ```
 
-Use the full deploy+migrate path only when infrastructure or database changes require it:
+That path rebuilds the Lambda bundle and updates the deployed Lambda code directly, without running CloudFormation.
+
+If you changed infrastructure, deploy-time environment variables, or any DB-related CDK settings, use the stack deploy path instead:
+
+```bash
+npm run deploy:aws:stack
+```
+
+Use the full deploy+migrate path only when infrastructure or database changes require it and committed SQL migrations must also run:
 
 ```bash
 npm run deploy:aws

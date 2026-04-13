@@ -147,6 +147,27 @@ Fill in `.env.deploy`:
 
 From `infrastructure/cdk`:
 
+Routine code-only app deploy, with no CloudFormation update:
+
+```bash
+npm run cdk:deploy:code:env
+```
+
+This wrapper command:
+- Loads `.env.deploy`
+- Builds the Nuxt Lambda bundle (`NITRO_PRESET=aws_lambda`)
+- Packages the local `.output` directory
+- Updates the existing deployed Lambda code directly with `aws lambda update-function-code`
+- Avoids CloudFormation and therefore avoids routine Aurora stack churn for pure app-code changes
+
+Use this path only when all of the following are true:
+- Lambda code changed
+- Infrastructure did not change
+- Deploy-time app environment values did not change
+- You do not need to run DB migrations
+
+Stack-based app deploy via CDK:
+
 ```bash
 npm run cdk:deploy:app:env -- --profile "$AWS_PROFILE" --require-approval never
 ```
@@ -163,7 +184,9 @@ Build + deploy + apply SQL migrations:
 npm run cdk:deploy:app:env:migrate -- --profile "$AWS_PROFILE" --require-approval never
 ```
 
-Use `cdk:deploy:app:env` as the default fast path for routine app-only deploys. It skips the post-deploy migration step.
+Use `cdk:deploy:code:env` as the default fast path for routine app-only code deploys. It skips CloudFormation entirely.
+
+Use `cdk:deploy:app:env` when app deploy-time configuration or infrastructure changed but committed SQL migrations are not needed.
 
 Use `cdk:deploy:app:env:migrate` only when schema changes or operational sequencing require applying committed SQL migrations in the deployed environment.
 

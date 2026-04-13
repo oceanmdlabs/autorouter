@@ -15,7 +15,7 @@ fi
 
 if [[ "${AUTOROUTER_SKIP_FULL_DEPLOY_WARNING:-}" != "1" ]]; then
   echo "Warning: deploy-app-and-migrate runs both the AWS app deploy and deployed DB migrations."
-  echo "Use deploy-app-with-env for routine app-only changes that do not require schema or sequencing work."
+  echo "Use deploy-app-code-only for routine app-only changes that do not require schema or sequencing work."
   echo "Set AUTOROUTER_SKIP_FULL_DEPLOY_WARNING=1 to suppress this reminder."
   echo
 fi

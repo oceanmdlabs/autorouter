@@ -1,6 +1,13 @@
 import type { User } from "#auth-utils";
+import type { H3Event } from "h3";
+import { deleteCookie, getCookie } from "h3";
+import {
+  PENDING_INVITE_CODE_COOKIE,
+  getInviteAuthStatusMessage,
+} from "@/shared/invite-access";
 import {
   ensureLegacyMembership,
+  getTenantInviteRedemptionState,
   getMembershipsForUser,
   getUserById,
   resolveActiveTenantId,
@@ -62,6 +69,55 @@ export async function buildSessionUserFromIdentity(identity: UserIdentity) {
     tenantId: activeTenantId,
     memberships,
   } satisfies User;
+}
+
+function hasActiveMembership(user: Pick<User, "memberships" | "roles">) {
+  return (
+    user.roles.admin === "system" ||
+    user.memberships.some((membership) => membership.status === "active")
+  );
+}
+
+async function assertSessionAccess(event: H3Event, sessionUser: User) {
+  if (hasActiveMembership(sessionUser)) {
+    return;
+  }
+
+  const pendingInviteCode = getCookie(event, PENDING_INVITE_CODE_COOKIE)?.trim();
+  if (!pendingInviteCode) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: getInviteAuthStatusMessage("invite-required"),
+    });
+  }
+
+  const inviteState = await getTenantInviteRedemptionState(pendingInviteCode);
+  if (inviteState === "pending") {
+    return;
+  }
+
+  deleteCookie(event, PENDING_INVITE_CODE_COOKIE);
+
+  const reasonByState = {
+    not_found: "invite-not-found",
+    redeemed: "invite-redeemed",
+    revoked: "invite-revoked",
+    expired: "invite-expired",
+  } as const;
+
+  throw createError({
+    statusCode: 403,
+    statusMessage: getInviteAuthStatusMessage(reasonByState[inviteState]),
+  });
+}
+
+export async function buildAuthorizedSessionUserFromIdentity(
+  event: H3Event,
+  identity: UserIdentity
+) {
+  const sessionUser = await buildSessionUserFromIdentity(identity);
+  await assertSessionAccess(event, sessionUser);
+  return sessionUser;
 }
 
 export async function hydrateSessionUser(

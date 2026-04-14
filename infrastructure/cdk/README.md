@@ -241,23 +241,15 @@ Identity mapping used by the app:
 - Google `subject` = OAuth `sub`
 - GitHub `subject` = numeric OAuth `user.id`, stored as text
 
-The easiest way to get those values after first login is to stay signed in and open:
-
-```text
-https://<your-app-url>/api/_auth/session
-```
-
-Read:
-- `user.provider`
-- `user.subject`
-
-If you prefer a database lookup, or if you are troubleshooting a session issue on Aurora Data API, you can also query:
+Use a database lookup to get those values after the first login attempt:
 
 ```bash
 npm run db:sql:aws -- --sql "select provider, subject, display_name, last_login_at from users order by last_login_at desc nulls last, created_at desc limit 10;"
 ```
 
 Pick the row for the account you just used to sign in.
+
+On a brand-new environment, this is the expected bootstrap path. The login attempt creates the `users` row even if the app rejects the session because no site invite or system-admin allowlist entry exists yet.
 
 System admin is resolved at OAuth login time and stored in the session (`roles.admin = "system"`). It is not looked up on every request.
 
@@ -321,9 +313,8 @@ Current privileged operations guarded by this role include:
 If you are logged in but `roles.admin` is still `tenant` after adding an allowlist row:
 
 - Confirm you are using the deployed stack URL output from CDK (not another environment).
-- Sign in, then open `/api/_auth/session` and copy:
-  - GitHub: `user.gitHubId`
-  - Google: `user.googleId`
+- Confirm the `provider` + `subject` pair matches the row in `users`:
+  - `npm run db:sql:aws -- --sql "select provider, subject, display_name, last_login_at from users order by last_login_at desc nulls last, created_at desc limit 10;"`
 - Insert that value into `system_admin_allowlist` with the matching `provider` (`github` or `google`), `subject`, and `active=true`.
 - Log out and log back in (admin role is determined at login time).
 

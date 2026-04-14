@@ -1,7 +1,13 @@
 <script setup lang="ts">
+import {
+  PENDING_INVITE_CODE_COOKIE,
+  PENDING_INVITE_CODE_STORAGE_KEY,
+} from "@/shared/invite-access"
+
 const route = useRoute()
 const router = useRouter()
 const { user, fetch } = useUserSession()
+const pendingInviteCookie = useCookie<string | null>(PENDING_INVITE_CODE_COOKIE)
 
 const memberships = computed(() => user.value?.memberships ?? [])
 const activeTenantId = computed(() => user.value?.activeTenantId ?? user.value?.tenantId ?? null)
@@ -9,6 +15,45 @@ const inviteCode = ref(typeof route.query.code === 'string' ? route.query.code :
 const status = ref('')
 const error = ref('')
 const isRedeeming = ref(false)
+
+const clearPendingInvite = () => {
+  pendingInviteCookie.value = null
+  localStorage.removeItem(PENDING_INVITE_CODE_STORAGE_KEY)
+}
+
+const getErrorStatusCode = (cause: unknown) => {
+  if (!cause || typeof cause !== 'object') {
+    return null
+  }
+
+  const maybeError = cause as {
+    statusCode?: unknown
+    status?: unknown
+    data?: { statusCode?: unknown }
+  }
+
+  const statusCode =
+    maybeError.statusCode ??
+    maybeError.status ??
+    maybeError.data?.statusCode
+
+  return typeof statusCode === 'number' ? statusCode : null
+}
+
+const getInviteRedemptionErrorMessage = (cause: unknown) => {
+  const statusCode = getErrorStatusCode(cause)
+
+  switch (statusCode) {
+    case 404:
+      return 'That invite code was not found. Check the code or ask a site admin for a new invite.'
+    case 409:
+      return 'That invite has already been redeemed. Ask a site admin for a new invite if you still need access.'
+    case 410:
+      return 'That invite is no longer valid because it was revoked or expired. Ask a site admin for a new invite.'
+    default:
+      return cause instanceof Error ? cause.message : 'Unable to redeem invite.'
+  }
+}
 
 const switchTenant = async (tenantId: string) => {
   error.value = ''
@@ -35,19 +80,22 @@ const redeemInvite = async (code = inviteCode.value) => {
       method: 'POST',
       body: { code }
     })
-    localStorage.removeItem('pendingInviteCode')
+    clearPendingInvite()
     await fetch()
     status.value = 'Invite redeemed. Your active site has been updated.'
     await router.push('/portal/routing-rules')
   } catch (cause) {
-    error.value = cause instanceof Error ? cause.message : 'Unable to redeem invite.'
+    if ([404, 409, 410].includes(getErrorStatusCode(cause) ?? -1)) {
+      clearPendingInvite()
+    }
+    error.value = getInviteRedemptionErrorMessage(cause)
   } finally {
     isRedeeming.value = false
   }
 }
 
 onMounted(async () => {
-  const pendingInviteCode = localStorage.getItem('pendingInviteCode')
+  const pendingInviteCode = localStorage.getItem(PENDING_INVITE_CODE_STORAGE_KEY) || pendingInviteCookie.value
   if (!inviteCode.value && pendingInviteCode) {
     inviteCode.value = pendingInviteCode
   }

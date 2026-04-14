@@ -2,6 +2,8 @@ import { hydrateSessionUser } from "@/server/utils/session-user";
 import { redeemTenantInvite } from "@/server/utils/tenant-access";
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
 import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
+import { PENDING_INVITE_CODE_COOKIE } from "@/shared/invite-access";
+import { deleteCookie } from "h3";
 
 export default defineEventHandler(async (event) => {
   const session = await requireUserSession(event);
@@ -35,6 +37,7 @@ export default defineEventHandler(async (event) => {
       tenantId: invite.tenantId,
     },
   });
+  deleteCookie(event, PENDING_INVITE_CODE_COOKIE);
   const cxt = await toApplicationContext(event);
   await logPrivacyAuditEvent(cxt, {
     eventType: "tenant_invite_redeemed",

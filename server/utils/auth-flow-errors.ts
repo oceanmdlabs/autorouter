@@ -1,3 +1,8 @@
+import {
+  getInviteAuthReasonFromMessage,
+  type InviteAuthFailureReason,
+} from "@/shared/invite-access";
+
 type RetryOptions = {
   maxAttempts?: number;
   delayMs?: number;
@@ -88,6 +93,34 @@ export function isExpiredOAuthCodeError(error: unknown): boolean {
   return false;
 }
 
+export function getInviteAuthFailureReason(
+  error: unknown
+): InviteAuthFailureReason | null {
+  let current: unknown = error;
+
+  for (let depth = 0; depth < 5 && current; depth += 1) {
+    if (current && typeof current === "object") {
+      const maybeError = current as {
+        message?: unknown;
+        statusMessage?: unknown;
+      };
+
+      for (const candidate of [maybeError.statusMessage, maybeError.message]) {
+        if (typeof candidate === "string") {
+          const reason = getInviteAuthReasonFromMessage(candidate);
+          if (reason) {
+            return reason;
+          }
+        }
+      }
+    }
+
+    current = getErrorCause(current);
+  }
+
+  return null;
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -135,6 +168,12 @@ export function buildAuthErrorRedirect(args: {
 
   if (isExpiredOAuthCodeError(args.error)) {
     params.set("reason", "oauth-code-expired");
+    return `/error?${params.toString()}`;
+  }
+
+  const inviteAuthFailureReason = getInviteAuthFailureReason(args.error);
+  if (inviteAuthFailureReason) {
+    params.set("reason", inviteAuthFailureReason);
     return `/error?${params.toString()}`;
   }
 

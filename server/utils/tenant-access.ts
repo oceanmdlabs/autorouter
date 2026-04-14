@@ -50,6 +50,13 @@ export interface TenantInviteSummary {
   redeemedAt: Date | null;
 }
 
+export type TenantInviteRedemptionState =
+  | "pending"
+  | "not_found"
+  | "redeemed"
+  | "revoked"
+  | "expired";
+
 export interface ActiveSystemUserMembershipSummary {
   id: string;
   tenantId: string;
@@ -419,6 +426,43 @@ export async function getTenantInvites(
         ? "expired"
         : record.status,
   }));
+}
+
+export async function getTenantInviteRedemptionState(code: string): Promise<TenantInviteRedemptionState> {
+  const db = createDbClient();
+  const invite = await db.query.tenantInvites.findFirst({
+    where: eq(tenantInvites.code, code),
+  });
+
+  if (!invite) {
+    return "not_found";
+  }
+
+  if (invite.status === "revoked") {
+    return "revoked";
+  }
+
+  if (invite.status === "redeemed") {
+    return "redeemed";
+  }
+
+  if (invite.status === "expired") {
+    return "expired";
+  }
+
+  if (invite.expiresAt.getTime() <= Date.now()) {
+    await db
+      .update(tenantInvites)
+      .set({
+        status: inviteStatusValue("expired"),
+        updatedBy: "system",
+      })
+      .where(eq(tenantInvites.id, invite.id));
+
+    return "expired";
+  }
+
+  return "pending";
 }
 
 export async function createTenantInvite(args: {

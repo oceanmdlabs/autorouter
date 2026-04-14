@@ -1,5 +1,12 @@
 <script setup lang="ts">
+import {
+  PENDING_INVITE_CODE_COOKIE,
+  PENDING_INVITE_CODE_STORAGE_KEY,
+  isInviteAuthFailureReason,
+} from "@/shared/invite-access"
+
 const route = useRoute();
+const pendingInviteCookie = useCookie<string | null>(PENDING_INVITE_CODE_COOKIE);
 
 const reason = computed(() =>
   typeof route.query.reason === "string" ? route.query.reason : "oauth-failed"
@@ -27,12 +34,66 @@ const pageCopy = computed(() => {
     };
   }
 
+  if (reason.value === "invite-required") {
+    return {
+      title: "Invite Required",
+      body:
+        "This app only allows users with an active site membership or a valid invite. Enter an invite code on the login page or use a redeemable invite link before signing in.",
+      actionLabel: "Back to login",
+    };
+  }
+
+  if (reason.value === "invite-not-found") {
+    return {
+      title: "Invite Not Found",
+      body:
+        "The invite attached to this sign-in could not be found. Ask a site admin for a new invite code or link, then try again.",
+      actionLabel: "Back to login",
+    };
+  }
+
+  if (reason.value === "invite-redeemed") {
+    return {
+      title: "Invite Already Used",
+      body:
+        "That invite has already been redeemed. Ask a site admin for a new invite if this account still needs access.",
+      actionLabel: "Back to login",
+    };
+  }
+
+  if (reason.value === "invite-revoked") {
+    return {
+      title: "Invite Revoked",
+      body:
+        "That invite is no longer active. Ask a site admin for a replacement invite before trying again.",
+      actionLabel: "Back to login",
+    };
+  }
+
+  if (reason.value === "invite-expired") {
+    return {
+      title: "Invite Expired",
+      body:
+        "That invite has expired. Ask a site admin to issue a new invite code or redeemable link before signing in again.",
+      actionLabel: "Back to login",
+    };
+  }
+
   return {
     title: "Sign-In Failed",
     body:
       "The sign-in flow did not complete. Try again, and if the problem persists check the server logs for the auth callback.",
     actionLabel: "Back to login",
   };
+});
+
+onMounted(() => {
+  if (!isInviteAuthFailureReason(reason.value)) {
+    return;
+  }
+
+  pendingInviteCookie.value = null;
+  localStorage.removeItem(PENDING_INVITE_CODE_STORAGE_KEY);
 });
 </script>
 

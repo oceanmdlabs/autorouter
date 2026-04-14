@@ -138,15 +138,11 @@ echo "1. Sign in once with the Google or GitHub account that should become the f
 echo "2. That first login creates the user row and determines the admin identifier:"
 echo "   - Google subject = OAuth sub"
 echo "   - GitHub subject = numeric OAuth user.id stored as text"
-echo "3. While still signed in, open /api/_auth/session and note user.provider + user.subject."
-if [[ -n "$deploy_url" ]]; then
-  echo "   Session URL: ${deploy_url%/}/api/_auth/session"
-else
-  echo "   Session URL: https://<your-app-url>/api/_auth/session"
-fi
+echo "3. If the login is rejected before the first admin is allowlisted, that is expected."
 echo
-echo "   Database lookup fallback:"
+echo "   Query the users table to get user.provider + user.subject:"
 echo '   npm run db:sql:aws -- --sql "select provider, subject, display_name, last_login_at from users order by last_login_at desc nulls last, created_at desc limit 10;"'
+echo "   Pick the row for the account you just used to sign in."
 echo
 echo "4. Insert the matching provider + subject into system_admin_allowlist."
 echo

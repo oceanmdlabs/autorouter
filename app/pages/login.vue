@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import {
+  PENDING_INVITE_CODE_COOKIE,
+  PENDING_INVITE_CODE_STORAGE_KEY,
+} from "@/shared/invite-access"
+
 definePageMeta({
   layout: false
 })
@@ -13,6 +18,11 @@ const providerFromQuery = computed(() =>
   typeof route.query.provider === 'string' ? route.query.provider : 'sign-in'
 )
 const showResumeNotice = computed(() => route.query.reason === 'database-resuming')
+const inviteCode = ref('')
+const pendingInviteCookie = useCookie<string | null>(PENDING_INVITE_CODE_COOKIE, {
+  sameSite: 'lax',
+  maxAge: 60 * 60 * 24 * 7,
+})
 
 let warmupPromise: Promise<void> | null = null
 let warmupRetryTimer: ReturnType<typeof setTimeout> | null = null
@@ -20,11 +30,26 @@ let warmupRetryTimer: ReturnType<typeof setTimeout> | null = null
 onMounted(() => {
   const provider = localStorage.getItem('lastAuthProvider')
   lastProvider.value = provider === 'google' || provider === 'github' ? provider : ''
+  const pendingInviteCode = localStorage.getItem(PENDING_INVITE_CODE_STORAGE_KEY)
+  inviteCode.value = pendingInviteCode || pendingInviteCookie.value || ''
   void ensureDatabaseReady()
 })
 
 const setLastProvider = (provider: 'google' | 'github') => {
   localStorage.setItem('lastAuthProvider', provider)
+}
+
+function persistInviteCode() {
+  const normalizedInviteCode = inviteCode.value.trim()
+  inviteCode.value = normalizedInviteCode
+  pendingInviteCookie.value = normalizedInviteCode || null
+
+  if (normalizedInviteCode) {
+    localStorage.setItem(PENDING_INVITE_CODE_STORAGE_KEY, normalizedInviteCode)
+    return
+  }
+
+  localStorage.removeItem(PENDING_INVITE_CODE_STORAGE_KEY)
 }
 
 const warmupCopy = computed(() => {
@@ -103,6 +128,7 @@ async function ensureDatabaseReady() {
 
 async function handleSignIn(provider: Provider) {
   setLastProvider(provider)
+  persistInviteCode()
 
   if (warmupState.value !== 'ready') {
     await ensureDatabaseReady()
@@ -133,6 +159,21 @@ onBeforeUnmount(() => {
         <p class="mt-1 text-sm leading-6">{{ warmupCopy.body }}</p>
       </div>
       <div class="mt-8 space-y-4">
+        <div class="space-y-2 text-left">
+          <label for="invite-code" class="block text-sm font-medium text-gray-700">
+            Invite code
+          </label>
+          <input
+            id="invite-code"
+            v-model="inviteCode"
+            type="text"
+            placeholder="Enter a site invite code if you have one"
+            class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 shadow-sm"
+          />
+          <p class="text-xs leading-5 text-gray-500">
+            New users need an active invite before they can access the portal.
+          </p>
+        </div>
         <button
           type="button"
           :disabled="warmupState !== 'ready'"

@@ -1,4 +1,4 @@
-import { buildSessionUserFromIdentity } from "@/server/utils/session-user";
+import { buildAuthorizedSessionUserFromIdentity } from "@/server/utils/session-user";
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
 import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 import {
@@ -10,7 +10,7 @@ export default defineOAuthGoogleEventHandler({
   async onSuccess(event, { user }) {
     try {
       const sessionUser = await withDatabaseResumeRetry(() =>
-        buildSessionUserFromIdentity({
+        buildAuthorizedSessionUserFromIdentity(event, {
           provider: "google",
           subject: user.sub,
           displayName: `${user.name} (Google)`,

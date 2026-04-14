@@ -57,9 +57,11 @@ Important first-run step:
 - That first login creates the user record and determines the admin allowlist identifier:
   - Google: OAuth `sub`
   - GitHub: numeric OAuth `user.id` stored as text
-- The easiest way to inspect that value is while signed in: visit `/api/_auth/session` and read `user.provider` and `user.subject`.
+- On a new environment, the app may reject that first login before a normal session is created. Use a database lookup to get the identifier:
+  - `npm run db:sql:aws -- --sql "select provider, subject, display_name, last_login_at from users order by last_login_at desc nulls last, created_at desc limit 10;"`
+  - Pick the row for the account you just used to sign in.
 - Then add that `provider` + `subject` pair to `system_admin_allowlist` and log out / log back in.
-- The AWS CDK deploy scripts print these post-deploy instructions automatically, with a database lookup fallback if needed.
+- The AWS CDK deploy scripts print these post-deploy instructions automatically.
 
 
 ### Google Cloud Platform Deployment

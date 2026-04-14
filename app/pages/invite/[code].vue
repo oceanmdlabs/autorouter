@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import {
+  PENDING_INVITE_CODE_COOKIE,
+  PENDING_INVITE_CODE_STORAGE_KEY,
+} from "@/shared/invite-access"
+
 definePageMeta({
   layout: false
 })
@@ -6,10 +11,15 @@ definePageMeta({
 const route = useRoute()
 const { loggedIn } = useUserSession()
 const code = route.params.code?.toString() ?? ''
+const pendingInviteCookie = useCookie<string | null>(PENDING_INVITE_CODE_COOKIE, {
+  sameSite: 'lax',
+  maxAge: 60 * 60 * 24 * 7,
+})
 
 onMounted(() => {
   if (code) {
-    localStorage.setItem('pendingInviteCode', code)
+    pendingInviteCookie.value = code
+    localStorage.setItem(PENDING_INVITE_CODE_STORAGE_KEY, code)
   }
 
   if (loggedIn.value) {

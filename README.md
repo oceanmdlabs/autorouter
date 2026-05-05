@@ -69,6 +69,18 @@ npm run typecheck
 npm run test
 ```
 
+## Current Boundaries
+
+This repository is an intentionally practical reference implementation, not a complete clinical routing platform.
+
+- Rules evaluate the referral event payload, the rule prompt, and any tool-specific inputs available at evaluation time. They do not natively query external EMRs, scheduling systems, or live Ocean operational data during rule evaluation.
+- The Testing UI simulates rule evaluation and shows the actions that would be triggered, but it does not execute those actions against external systems.
+- Rule collisions are still possible when multiple rules apply to the same event. Rules are evaluated and executed sequentially today, but there is no explicit rule priority model yet.
+- Forwarding currently targets a single named listing per tool call. Ranked alternatives and criteria-based fallback routing are future enhancements rather than current behavior.
+- SMS and email integrations are optional tenant-level features. A deployment can run without Twilio or SMTP2GO if those tools are not needed.
+
+For a detailed review of PMIO demo feedback, current applicability, and open-source roadmap ideas, see [docs/pmio-demo-lessons-learned-review.md](docs/pmio-demo-lessons-learned-review.md).
+
 ## Database
 
 The app supports two DB connection modes:

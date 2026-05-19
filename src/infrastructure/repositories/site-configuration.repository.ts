@@ -184,10 +184,25 @@ export const createSiteConfigurationRepository = ({
     },
 
     async findByClientId(clientId: string): Promise<SiteConfiguration | null> {
-      const record = await dbService.findFirst(siteConfig, {
+      // Must use findFirstUnscoped here: this method is called during OAuth2 token
+      // issuance to validate client credentials before any tenant context exists.
+      // The tenant ID is unknown at this point — it's derived from the site config
+      // record itself. client_id is globally unique, so no tenant filter is needed.
+      const record = await dbService.findFirstUnscoped(siteConfig, {
         where: eq(siteConfig.clientId, clientId),
       });
       return mapToEntity(record);
+    },
+
+    async recordSuccessfulConnection(id: string): Promise<void> {
+      // Must use updateUnscoped: called during OAuth2 token issuance before any
+      // tenant context exists. The record ID is already known and specific enough
+      // to be safe without a tenant filter.
+      await dbService.updateUnscoped(
+        siteConfig,
+        { lastSuccessfulConnection: new Date() },
+        eq(siteConfig.id, id)
+      );
     },
 
     async create(record: SiteConfiguration) {

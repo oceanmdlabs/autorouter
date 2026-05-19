@@ -35,10 +35,7 @@ export default defineEventHandler(async (event) => {
   });
 
   clearTokenRateLimit(event);
-  await cxt.getSiteConfigurationRepository().update({
-    id: siteConfig!.id,
-    lastSuccessfulConnection: new Date(),
-  });
+  await cxt.getSiteConfigurationRepository().recordSuccessfulConnection(siteConfig!.id);
   return {
     access_token: accessToken,
     token_type: "Bearer",

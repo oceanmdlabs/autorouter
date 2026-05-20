@@ -152,6 +152,21 @@ export const createDbService = (deps: Dependencies): IDbService => {
     return result[0] ?? null;
   }
 
+  // No tenant filter applied — only for pre-authentication lookups where the
+  // tenant context does not exist yet. Do not use for general data access.
+  async function findFirstUnscoped<T extends PgTable>(
+    table: T,
+    options: { where?: SQL<unknown> } = {}
+  ): Promise<any | null> {
+    const { where } = options;
+    const result = await db
+      .select()
+      .from(table as any)
+      .where(where)
+      .limit(1);
+    return result[0] ?? null;
+  }
+
   async function insert<T extends PgTable & { tenantId: PgColumn }>(
     table: T,
     values: any
@@ -173,6 +188,17 @@ export const createDbService = (deps: Dependencies): IDbService => {
       .update(table as any)
       .set(values)
       .where(siteWhere);
+  }
+
+  // No tenant filter applied — only for updates that occur before a tenant context
+  // exists (e.g. recording last_successful_connection during OAuth2 token issuance).
+  // The caller is responsible for supplying a sufficiently specific where clause.
+  async function updateUnscoped<T extends PgTable>(
+    table: T,
+    values: any,
+    where: SQL<unknown>
+  ): Promise<void> {
+    await db.update(table as any).set(values).where(where);
   }
 
   async function deleteRecord<T extends PgTable & { tenantId: PgColumn }>(
@@ -212,7 +238,9 @@ export const createDbService = (deps: Dependencies): IDbService => {
     findExistingResourceBasedOnIdOrIdentifier,
     findMany,
     findFirst,
+    findFirstUnscoped,
     insert,
+    updateUnscoped,
     update,
     delete: deleteRecord,
     count,

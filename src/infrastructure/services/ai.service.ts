@@ -72,7 +72,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
       model,
       prompt,
       tools,
-      toolChoice: "required",
+      toolChoice: "auto",
     });
     return response.toolCalls.map((toolCall) => {
       return {

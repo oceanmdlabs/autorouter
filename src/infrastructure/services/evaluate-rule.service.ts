@@ -134,7 +134,8 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
         ruleName: rule.name,
         evaluation: {
           actions: aiSuggestedActions,
-          triggered: true,
+          triggered: aiSuggestedActions.length > 0,
+          comment: aiSuggestedActions.length === 0 ? "The AI determined no actions were required." : undefined,
           prompt,
         },
       };

@@ -160,6 +160,12 @@ async function handleSubmit(event: Event) {
 												({{ result.evaluation.comment }})</span>
 										</span>
 									</div>
+									<template v-if="result.evaluation.reasoning">
+										<div class="mt-3 rounded-md bg-gray-50 border p-3">
+											<p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">AI Reasoning</p>
+											<p class="text-sm text-gray-700 whitespace-pre-wrap">{{ result.evaluation.reasoning }}</p>
+										</div>
+									</template>
 									<template v-if="result.evaluation.prompt">
 										<Collapsible class="mt-2">
 											<CollapsibleTrigger

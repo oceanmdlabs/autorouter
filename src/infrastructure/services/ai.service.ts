@@ -6,7 +6,7 @@ import { generateObject, generateText, type LanguageModel } from "ai";
 import type { z } from "zod";
 import type {
   IAiService,
-  ToolCall,
+  ToolCallResult,
   ToolSet,
 } from "@/src/application/services/ai.service.interface";
 import { InvalidArgumentsError } from "@/src/entities/errors/common";
@@ -65,7 +65,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
   async function getToolCalls<TOOLS extends ToolSet>(
     prompt: string,
     tools: TOOLS
-  ): Promise<ToolCall[]> {
+  ): Promise<ToolCallResult> {
     const model = await getAiModel();
 
     const response = await generateText({
@@ -74,14 +74,15 @@ export const createAiService = (deps: Dependencies): IAiService => {
       tools,
       toolChoice: "auto",
     });
-    return response.toolCalls.map((toolCall) => {
-      return {
+    return {
+      toolCalls: response.toolCalls.map((toolCall) => ({
         tool: toolCall.toolName,
         input: toolCall.input as z.infer<
           RoutingToolRegistry[RoutingToolName]["input"]
         >,
-      };
-    });
+      })),
+      reasoning: response.text || undefined,
+    };
   }
 
   async function prompt(prompt: string, schema: z.ZodSchema): Promise<object> {

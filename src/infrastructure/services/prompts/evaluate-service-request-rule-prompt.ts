@@ -28,5 +28,7 @@ IMPORTANT: Only call a tool if the referral content EXPLICITLY and DIRECTLY meet
     rule.prompt +
     "\n-- END USER INSTRUCTIONS --";
 
+  prompt += "\n\nBefore calling any tools, briefly explain in 1-3 sentences whether the rule criteria are met and why, then call the appropriate tools or do nothing.";
+
   return prompt;
 };

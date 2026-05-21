@@ -1,5 +1,4 @@
 import { ApplicationContext } from "@/src/entities/models/application-context";
-import { getRoutingToolActionDescription } from "@/src/entities/models/routing-tool";
 import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluate-rule.service";
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
 import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
@@ -65,8 +64,9 @@ export async function processServiceRequestEventUseCase(
         ruleName: r.ruleName,
         triggered: r.evaluation.triggered ?? false,
         ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
+        ...(r.evaluation.reasoning ? { reasoning: r.evaluation.reasoning } : {}),
         ...(r.evaluation.triggered && r.evaluation.actions.length > 0
-          ? { actions: r.evaluation.actions.map(getRoutingToolActionDescription) }
+          ? { actions: r.evaluation.actions.map((a) => ({ tool: a.tool, input: a.input })) }
           : {}),
       }));
       details = JSON.stringify({ rules: rulesSummary });

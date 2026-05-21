@@ -13,11 +13,11 @@ export const setBookingInstructionsTool: RoutingToolDefinition<
   name,
   input: parameters,
   description: "Provide booking instructions",
-  handler: async (action, eventContext, cxt) => {
+  handler: async (action, eventContext, cxt, ruleName) => {
     // Dynamically import the handler to avoid loading server-side dependencies on the client
     const { setBookingInstructionsHandler } = await import(
       "./handlers/set-booking-instructions-handler"
     );
-    return setBookingInstructionsHandler(action, eventContext, cxt);
+    return setBookingInstructionsHandler(action, eventContext, cxt, ruleName);
   },
 };

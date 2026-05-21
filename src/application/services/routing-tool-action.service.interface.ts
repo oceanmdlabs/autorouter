@@ -5,6 +5,7 @@ import type { RoutingToolName } from "@/src/infrastructure/services/routing-tool
 export interface IRoutingToolActionService {
   executeActions(
     actions: RoutingToolAction<RoutingToolName>[],
-    routingEventContext: RoutingEventContext
+    routingEventContext: RoutingEventContext,
+    ruleName?: string
   ): Promise<void>;
 }

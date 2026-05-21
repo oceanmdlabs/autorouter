@@ -50,6 +50,25 @@ const getOceanHost = () => {
   return getOceanServerUrl('ocean');
 };
 
+type StructuredDetails = {
+  rules: {
+    ruleName: string;
+    triggered: boolean;
+    comment?: string;
+    actions?: string[];
+  }[];
+  archival?: string;
+};
+
+function parseStructuredDetails(details: string | null | undefined): StructuredDetails | null {
+  if (!details) return null;
+  try {
+    const parsed = JSON.parse(details);
+    if (parsed && Array.isArray(parsed.rules)) return parsed as StructuredDetails;
+  } catch {}
+  return null;
+}
+
 // Function to generate the referral URL
 const getReferralUrl = (referralRef: string): string | undefined => {
   if (!referralRef || !siteConfig.value?.siteConfig?.oceanSiteNum) return undefined;
@@ -139,12 +158,35 @@ async function clearLogs() {
                   </template>
                   <template v-else>-</template>
                 </TableCell>
-                <TableCell class="whitespace-pre-wrap"><template v-if="log.error">
-                    <span class="text-red-500">{{ log.error }}</span>
-                    <span class="text-muted-foreground">{{ log.details }}</span>
+                <TableCell class="whitespace-pre-wrap text-xs">
+                  <template v-if="parseStructuredDetails(log.details)">
+                    <div class="space-y-2">
+                      <div
+                        v-for="rule in parseStructuredDetails(log.details)!.rules"
+                        :key="rule.ruleName"
+                        class="space-y-0.5"
+                      >
+                        <div class="font-medium">{{ rule.ruleName }}</div>
+                        <div :class="rule.triggered ? 'text-green-600' : 'text-red-500'">
+                          {{ rule.triggered ? 'Triggered' : 'Not triggered' }}
+                          <span v-if="rule.comment" class="text-muted-foreground"> — {{ rule.comment }}</span>
+                        </div>
+                        <div v-if="rule.triggered && rule.actions?.length" class="text-muted-foreground pl-2 space-y-0.5">
+                          <div v-for="action in rule.actions" :key="action">{{ action }}</div>
+                        </div>
+                      </div>
+                      <div v-if="parseStructuredDetails(log.details)!.archival" class="text-muted-foreground">
+                        {{ parseStructuredDetails(log.details)!.archival }}
+                      </div>
+                    </div>
+                    <div v-if="log.error" class="text-red-500 mt-1">{{ log.error }}</div>
                   </template>
                   <template v-else>
-                    {{ log.details }}
+                    <template v-if="log.error">
+                      <span class="text-red-500">{{ log.error }}</span>
+                      <span class="text-muted-foreground">{{ log.details }}</span>
+                    </template>
+                    <template v-else>{{ log.details }}</template>
                   </template>
                 </TableCell>
               </TableRow>

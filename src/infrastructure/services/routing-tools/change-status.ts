@@ -17,11 +17,11 @@ export const changeStatusTool: RoutingToolDefinition<
   input: parameters,
   description: "Accept, decline, or complete the request",
   briefDescription: "Change status",
-  handler: async (action, eventContext, cxt) => {
+  handler: async (action, eventContext, cxt, ruleName) => {
     // Dynamically import the handler to avoid loading server-side dependencies on the client
     const { changeStatusHandler } = await import(
       "./handlers/change-status-handler"
     );
-    return changeStatusHandler(action, eventContext, cxt);
+    return changeStatusHandler(action, eventContext, cxt, ruleName);
   },
 };

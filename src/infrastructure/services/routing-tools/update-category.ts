@@ -13,11 +13,11 @@ export const updateCategoryTool: RoutingToolDefinition<
   name,
   input: parameters,
   description: "Update the health service category of the request",
-  handler: async (action, eventContext, cxt) => {
+  handler: async (action, eventContext, cxt, ruleName) => {
     // Dynamically import the handler to avoid loading server-side dependencies on the client
     const { updateCategoryHandler } = await import(
       "./handlers/update-category-handler"
     );
-    return updateCategoryHandler(action, eventContext, cxt);
+    return updateCategoryHandler(action, eventContext, cxt, ruleName);
   },
 };

@@ -17,9 +17,9 @@ export const sendEmailTool: RoutingToolDefinition<
   name,
   input: parameters,
   description: "Send an email message to the specified recipient",
-  handler: async (action, eventContext, cxt) => {
+  handler: async (action, eventContext, cxt, ruleName) => {
     // Dynamically import the handler to reduce cold start times
     const { sendEmailHandler } = await import("./handlers/send-email-handler");
-    return await sendEmailHandler(action, eventContext, cxt);
+    return await sendEmailHandler(action, eventContext, cxt, ruleName);
   },
 };

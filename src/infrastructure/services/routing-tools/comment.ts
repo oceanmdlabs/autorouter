@@ -13,9 +13,9 @@ export const commentTool: RoutingToolDefinition<
   name,
   input: parameters,
   description: "Add a comment to the Autorouter's Activity Log",
-  handler: async (action, eventContext, cxt) => {
+  handler: async (action, eventContext, cxt, ruleName) => {
     // Dynamically import the handler to avoid loading server-side dependencies on the client
     const { commentHandler } = await import("./handlers/comment-handler");
-    await commentHandler(action, eventContext, cxt);
+    await commentHandler(action, eventContext, cxt, ruleName);
   },
 };

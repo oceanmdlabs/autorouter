@@ -19,16 +19,18 @@ export const createRoutingToolActionService = (
 
   async function executeActions(
     actions: RoutingToolAction<RoutingToolName>[],
-    eventContext: RoutingEventContext
+    eventContext: RoutingEventContext,
+    ruleName?: string
   ) {
     for (const action of actions) {
-      await executeAction(action, eventContext);
+      await executeAction(action, eventContext, ruleName);
     }
   }
 
   async function executeAction(
     action: RoutingToolAction<RoutingToolName>,
-    eventContext: RoutingEventContext
+    eventContext: RoutingEventContext,
+    ruleName?: string
   ): Promise<void> {
     // Log the action being executed
     cxt.logger.info(
@@ -47,10 +49,11 @@ export const createRoutingToolActionService = (
     const handler = tool.handler as (
       action: RoutingToolAction<RoutingToolName>,
       eventContext: RoutingEventContext,
-      cxt: ApplicationContext
+      cxt: ApplicationContext,
+      ruleName?: string
     ) => Promise<void>;
     try {
-      await handler(action, eventContext, cxt);
+      await handler(action, eventContext, cxt, ruleName);
     } catch (e) {
       cxt.logger.error(e);
     }

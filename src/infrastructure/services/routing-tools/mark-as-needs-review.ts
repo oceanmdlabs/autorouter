@@ -13,11 +13,11 @@ export const markAsNeedsReviewTool: RoutingToolDefinition<
   name,
   input: parameters,
   description: "Mark a service request as needing review with a message",
-  handler: async (action, eventContext, cxt) => {
+  handler: async (action, eventContext, cxt, ruleName) => {
     // Dynamically import the handler to avoid loading server-side dependencies on the client
     const { markAsNeedsReviewHandler } = await import(
       "./handlers/mark-as-needs-review-handler"
     );
-    return markAsNeedsReviewHandler(action, eventContext, cxt);
+    return markAsNeedsReviewHandler(action, eventContext, cxt, ruleName);
   },
 };

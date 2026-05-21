@@ -14,9 +14,9 @@ export const sendSmsTool: RoutingToolDefinition<
   name,
   input: parameters,
   description: "Send an SMS message",
-  handler: async (action, eventContext, cxt) => {
+  handler: async (action, eventContext, cxt, ruleName) => {
     // Dynamically import the handler to avoid loading server-side dependencies on the client
     const { sendSmsHandler } = await import("./handlers/send-sms-handler");
-    return sendSmsHandler(action, eventContext, cxt);
+    return sendSmsHandler(action, eventContext, cxt, ruleName);
   },
 };

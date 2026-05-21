@@ -47,7 +47,7 @@ export async function processPatientEngagementEventUseCase(
     try {
       await cxt
         .getRoutingToolActionService()
-        .executeActions(result.evaluation.actions, event);
+        .executeActions(result.evaluation.actions, event, result.ruleName);
     } catch (e) {
       cxt.logger.error(
         `Error executing actions for patient engagement event ${getPatientEngagementEventContextDescription(
@@ -58,23 +58,18 @@ export async function processPatientEngagementEventUseCase(
     }
   }
 
-  details = evaluationResults
-    .filter((r) => r.evaluation.triggered)
-    .map(
-      (r) =>
-        `${r.ruleName}: ${
-          r.evaluation.comment ? r.evaluation.comment + ": " : ""
-        } ` +
-        r.evaluation.actions
-          .map((action) => getRoutingToolActionDescription(action))
-          .join("\n")
-    )
-    .filter(Boolean)
-    .join("\n");
-  if (!details) {
-    details = "No actions taken.";
+  if (evaluationResults.length === 0) {
+    details = details || "No actions taken.";
   } else {
-    details = `${details}`;
+    const rulesSummary = evaluationResults.map((r) => ({
+      ruleName: r.ruleName,
+      triggered: r.evaluation.triggered ?? false,
+      ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
+      ...(r.evaluation.triggered && r.evaluation.actions.length > 0
+        ? { actions: r.evaluation.actions.map(getRoutingToolActionDescription) }
+        : {}),
+    }));
+    details = JSON.stringify({ rules: rulesSummary });
   }
   error = evaluationResults
     .map((r) => r.evaluation.error)

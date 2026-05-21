@@ -5,7 +5,8 @@ import type { ApplicationContext } from "@/src/entities/models/application-conte
 export async function commentHandler(
   action: RoutingToolAction<"comment">,
   eventContext: RoutingEventContext,
-  cxt: ApplicationContext
+  cxt: ApplicationContext,
+  _ruleName?: string
 ): Promise<void> {
   const { comment } = action.input;
 

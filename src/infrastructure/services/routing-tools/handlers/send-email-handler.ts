@@ -7,7 +7,8 @@ const TOOL_NAME = "sendEmail";
 export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
   action,
   eventContext,
-  cxt
+  cxt,
+  ruleName
 ) => {
   const { to, subject, message, cc, bcc } = action.input;
   cxt.logger.info(`Planning to send email to ${to}: "${subject}"`);
@@ -19,10 +20,11 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
     !siteConfig.emailFromAddress ||
     !siteConfig.emailApiKey
   ) {
+    const rulePrefix = ruleName ? `[${ruleName}] ` : "";
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      error: `Email configuration is not set up`,
+      error: `${rulePrefix}Email configuration is not set up — attempted to send to ${to}: "${subject}"`,
     });
     return;
   }
@@ -60,19 +62,21 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
     cxt.logger.info(`Successfully sent email to ${to}: "${subject}"`);
 
     // Log the action
+    const rulePrefix = ruleName ? `[${ruleName}] ` : "";
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      details: `Sent email to ${to}: "${subject}"`,
+      details: `${rulePrefix}Sent email to ${to}: "${subject}"`,
     });
   } catch (error) {
     cxt.logger.error(`Failed to send email to ${to}: "${subject}"`, {
       error,
     });
+    const rulePrefix = ruleName ? `[${ruleName}] ` : "";
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      error: `Failed to send email to ${to}: "${subject}"`,
+      error: `${rulePrefix}Failed to send email to ${to}: "${subject}"`,
       details: (error as Error).message,
     });
   }

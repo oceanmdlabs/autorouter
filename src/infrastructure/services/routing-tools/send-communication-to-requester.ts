@@ -13,11 +13,11 @@ export const sendCommunicationTool: RoutingToolDefinition<
   name,
   input: parameters,
   description: "Send a message to the referrer",
-  handler: async (action, eventContext, cxt) => {
+  handler: async (action, eventContext, cxt, ruleName) => {
     // Dynamically import the handler to avoid loading server-side dependencies on the client
     const { sendCommunicationHandler } = await import(
       "./handlers/send-communication-handler"
     );
-    return sendCommunicationHandler(action, eventContext, cxt);
+    return sendCommunicationHandler(action, eventContext, cxt, ruleName);
   },
 };

@@ -16,7 +16,8 @@ export type RoutingToolAction<T extends RoutingToolName> = {
 export type RoutingToolHandler<T extends RoutingToolName> = (
   action: RoutingToolAction<T>,
   eventContext: RoutingEventContext,
-  cxt: ApplicationContext
+  cxt: ApplicationContext,
+  ruleName?: string
 ) => Promise<void>;
 
 export type RoutingToolDefinition<

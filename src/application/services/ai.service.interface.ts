@@ -15,6 +15,11 @@ export type ToolCall = {
   input: z.infer<RoutingToolRegistry[RoutingToolName]["input"]>;
 };
 
+export type ToolCallResult = {
+  toolCalls: ToolCall[];
+  reasoning?: string;
+};
+
 export interface IAiService {
   /**
    * Sends a prompt to the AI service and returns a parsed response according to the provided schema
@@ -22,7 +27,7 @@ export interface IAiService {
    * @param schema The Zod schema to validate and parse the response
    * @returns A promise that resolves to the parsed response object
    */
-  getToolCalls(prompt: string, tools: ToolSet): Promise<ToolCall[]>;
+  getToolCalls(prompt: string, tools: ToolSet): Promise<ToolCallResult>;
   prompt(prompt: string, schema?: z.ZodSchema): Promise<object>;
 
   /**

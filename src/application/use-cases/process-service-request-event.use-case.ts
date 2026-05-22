@@ -1,5 +1,4 @@
 import { ApplicationContext } from "@/src/entities/models/application-context";
-import { getRoutingToolActionDescription } from "@/src/entities/models/routing-tool";
 import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluate-rule.service";
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
 import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
@@ -49,7 +48,7 @@ export async function processServiceRequestEventUseCase(
       try {
         await cxt
           .getRoutingToolActionService()
-          .executeActions(result.evaluation.actions, event);
+          .executeActions(result.evaluation.actions, event, result.ruleName);
       } catch (e) {
         cxt.logger.error(
           `Error executing actions for ${event.referralRef}: ${e}`
@@ -58,23 +57,19 @@ export async function processServiceRequestEventUseCase(
       }
     }
 
-    details = evaluationResults
-      .filter((r) => r.evaluation.triggered)
-      .map(
-        (r) =>
-          `${r.ruleName}: ${
-            r.evaluation.comment ? r.evaluation.comment + ": " : ""
-          } ` +
-          r.evaluation.actions
-            .map((action) => getRoutingToolActionDescription(action))
-            .join("\n")
-      )
-      .filter(Boolean)
-      .join("\n");
-    if (!details) {
-      details = "No actions taken.";
+    if (evaluationResults.length === 0) {
+      details = details || "No actions taken.";
     } else {
-      details = `${details}`;
+      const rulesSummary = evaluationResults.map((r) => ({
+        ruleName: r.ruleName,
+        triggered: r.evaluation.triggered ?? false,
+        ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
+        ...(r.evaluation.reasoning ? { reasoning: r.evaluation.reasoning } : {}),
+        ...(r.evaluation.triggered && r.evaluation.actions.length > 0
+          ? { actions: r.evaluation.actions.map((a) => ({ tool: a.tool, input: a.input })) }
+          : {}),
+      }));
+      details = JSON.stringify({ rules: rulesSummary });
     }
     error = evaluationResults
       .map((r) => r.evaluation.error)
@@ -83,9 +78,15 @@ export async function processServiceRequestEventUseCase(
   }
 
   if (event.archivalMessage) {
-    details = [details, `Archival: ${event.archivalMessage}`]
-      .filter(Boolean)
-      .join("\n");
+    try {
+      const parsed = JSON.parse(details ?? "");
+      parsed.archival = event.archivalMessage;
+      details = JSON.stringify(parsed);
+    } catch {
+      details = [details, `Archival: ${event.archivalMessage}`]
+        .filter(Boolean)
+        .join("\n");
+    }
   }
   if (event.archivalError) {
     error = [error, `Archival: ${event.archivalError}`]

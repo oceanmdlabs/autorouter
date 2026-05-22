@@ -4,7 +4,17 @@ import type { TestServiceRequest } from '@/src/entities/models/test-service-requ
 import { routingEventTypeSchema, getRoutingEventTypeDescription } from '@/src/entities/models/routing-event-type';
 import type { Bundle } from 'fhir/r4';
 import type { RuleEvaluationResult } from '@/src/entities/models/routing-evaluation';
-import { getRoutingToolActionDescription } from '@/src/entities/models/routing-tool';
+import { clientRoutingToolRegistry } from '@/src/entities/models/routing-tool-client';
+import type { RoutingToolName } from '@/src/infrastructure/services/routing-tools/routing-tool-registry';
+
+function describeAction(action: { tool: string; input: Record<string, any> }): { type: string; taken: string } {
+	const tool = clientRoutingToolRegistry[action.tool as RoutingToolName];
+	if (tool?.actionType && tool?.getActionTaken) {
+		return { type: tool.actionType, taken: tool.getActionTaken(action.input) };
+	}
+	return { type: action.tool, taken: 'Action taken' };
+}
+
 const EVENT_TYPES = routingEventTypeSchema.options.map((event) => ({
 	label: getRoutingEventTypeDescription(event),
 	value: event,
@@ -145,9 +155,14 @@ async function handleSubmit(event: Event) {
 									<div class="space-y-2">
 										<template v-if="result.evaluation.actions.length > 0" class="space-y-2">
 											<div v-for="(action, index) in result.evaluation.actions" :key="index"
-												class="flex items-center gap-2 text-sm">
-												<Icon name="lucide:check" class="h-4 w-4 text-green-500" />
-												<span>{{ getRoutingToolActionDescription(action) }}</span>
+												class="flex items-start gap-2 text-sm">
+												<Icon name="lucide:check" class="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+												<div class="text-muted-foreground whitespace-pre-wrap">
+													<template v-if="describeAction(action).type">
+														<span class="font-medium text-foreground">Action Type:</span> {{ describeAction(action).type }}<br/>
+													</template>
+													<span class="font-medium text-foreground">Action Taken:</span> {{ describeAction(action).taken }}
+												</div>
 											</div>
 										</template>
 										<template v-else-if="result.evaluation.error">
@@ -160,6 +175,12 @@ async function handleSubmit(event: Event) {
 												({{ result.evaluation.comment }})</span>
 										</span>
 									</div>
+									<template v-if="result.evaluation.reasoning">
+										<div class="mt-3 rounded-md bg-gray-50 border p-3">
+											<p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">AI Reasoning</p>
+											<p class="text-sm text-gray-700 whitespace-pre-wrap">{{ result.evaluation.reasoning }}</p>
+										</div>
+									</template>
 									<template v-if="result.evaluation.prompt">
 										<Collapsible class="mt-2">
 											<CollapsibleTrigger

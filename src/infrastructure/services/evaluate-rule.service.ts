@@ -1,5 +1,4 @@
 import type {
-  ToolCall,
   ToolSet,
 } from "@/src/application/services/ai.service.interface";
 import type { ApplicationContext } from "@/src/entities/models/application-context";
@@ -110,7 +109,7 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
       );
 
       // ask the AI for tool calls:
-      const toolCalls: ToolCall[] = await cxt
+      const { toolCalls, reasoning } = await cxt
         .getAiService()
         .getToolCalls(prompt, toolSet);
       cxt.logger.info(`Received tool calls for request ${requestDescription}`, {
@@ -134,7 +133,9 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
         ruleName: rule.name,
         evaluation: {
           actions: aiSuggestedActions,
-          triggered: true,
+          triggered: aiSuggestedActions.length > 0,
+          comment: aiSuggestedActions.length === 0 ? "The AI determined no actions were required." : undefined,
+          reasoning,
           prompt,
         },
       };

@@ -9,6 +9,7 @@ export type RuleEvaluation = {
   triggered?: boolean;
   error?: string;
   comment?: string;
+  reasoning?: string;
 };
 
 export type RuleEvaluationResult = {

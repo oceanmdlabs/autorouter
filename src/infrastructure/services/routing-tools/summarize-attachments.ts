@@ -15,10 +15,10 @@ export const summarizeAttachmentsTool: RoutingToolDefinition<
   name,
   input: parameters,
   description: "Analyze and summarize information from attachments using AI",
-  handler: async (action, eventContext, cxt) => {
+  handler: async (action, eventContext, cxt, ruleName) => {
     const { summarizeAttachmentsHandler } = await import(
       "./handlers/summarize-attachments-handler"
     );
-    return summarizeAttachmentsHandler(action, eventContext, cxt);
+    return summarizeAttachmentsHandler(action, eventContext, cxt, ruleName);
   },
 };

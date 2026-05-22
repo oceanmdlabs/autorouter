@@ -13,9 +13,9 @@ export const forwardTool: RoutingToolDefinition<
   name,
   input: parameters,
   description: "Forward the request to a specific listing",
-  handler: async (action, eventContext, cxt) => {
+  handler: async (action, eventContext, cxt, ruleName) => {
     // Dynamically import the handler to avoid loading server-side dependencies on the client
     const { forwardHandler } = await import("./handlers/forward-handler");
-    return forwardHandler(action, eventContext, cxt);
+    return forwardHandler(action, eventContext, cxt, ruleName);
   },
 };

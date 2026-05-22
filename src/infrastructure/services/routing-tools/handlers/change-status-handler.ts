@@ -12,7 +12,8 @@ const TOOL_NAME = "changeStatus";
 export const changeStatusHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
   action,
   eventContext,
-  cxt
+  cxt,
+  ruleName
 ) => {
   let details = null;
   let error = null;
@@ -33,7 +34,9 @@ export const changeStatusHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
     cxt.logger.warn(`Failed to accept service request: ${response.status}`);
     error = `Failed to ${action.input.status} service request`;
   } else {
-      details = description;
+      const ruleContext = ruleName ? ` (triggered by rule: ${ruleName})` : "";
+      const reasonContext = action.input.reason ? ` — reason: ${action.input.reason}` : "";
+      details = `${description}${ruleContext}${reasonContext}`;
     }
   }
 

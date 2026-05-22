@@ -50,6 +50,39 @@ Recommended first version:
 
 Do not add conflict groups in the first version unless design review finds a concrete need. A global stop flag is easier to explain and enough for common cases like "auto-reject vasectomy, then stop."
 
+### Stop Subsequent Rule Evaluations
+
+"Stop subsequent rule evaluations" should be treated as an execution-control outcome, not as a normal routing tool.
+
+Routing tools produce operational side effects such as changing status, forwarding, sending a message, or adding a comment. Stopping later rules changes the evaluator's control flow. Keeping that as first-class rule metadata makes the behavior easier to reason about, test, and audit:
+
+- The system can stop before spending model calls on later rules.
+- Testing can show skipped rules without pretending a user-facing tool executed.
+- Audit records can distinguish "rule executed a tool" from "rule controlled the evaluation plan."
+- The behavior remains deterministic and does not depend on the model remembering to call a special tool.
+
+The UI label can still be direct: `Stop subsequent rule evaluations after this rule matches`.
+
+## Evaluation Context Between Rules
+
+The current system does not feed previous rule outcomes into subsequent rule evaluations. Each rule is evaluated independently against the original event payload and its own rule instructions.
+
+There are two viable designs:
+
+1. Stop evaluation when an earlier rule reaches a terminal outcome.
+2. Continue evaluation, but include prior rule decisions and planned actions in the prompt context for later rules.
+
+The first design should be the default for terminal outcomes such as auto-decline, auto-complete, or other actions that intentionally resolve the referral workflow. It is cheaper, more deterministic, and avoids asking later rules to reason around an already-terminal state.
+
+The second design is useful when later rules should enrich or notify based on earlier decisions. For example, one rule may classify the referral as urgent, and a later rule may send different internal notifications based on that classification. If this design is added, the context should be structured and bounded rather than a free-form transcript.
+
+Recommended first version:
+
+- Add an internal `RuleExecutionPlan` model that accumulates evaluated rules, planned actions, skips, conflicts, and terminal outcomes.
+- Do not feed prior outcomes into LLM prompts by default.
+- Stop later evaluations when a matched rule has `stopProcessingOnMatch`.
+- Consider prior-outcome prompt context later, after there is a concrete use case that cannot be solved with rule order plus stop-processing.
+
 ## Conflict Detection
 
 Generic duplicate messages are not the highest concern. Clinics may intentionally send similar internal notifications to multiple teams or send a requester-facing message plus an internal notification for the same event.
@@ -155,6 +188,7 @@ Analytics can come later. The first audit pass should optimize for traceability 
 - Add `stopProcessingOnMatch`.
 - Update production and Testing evaluation loops to produce an ordered execution plan.
 - Include skipped-rule results in the returned model.
+- Record stop-processing as execution-control metadata rather than a routing tool action.
 - Add tests for triggered, non-triggered, errored, and skipped rules.
 
 ### Slice 3: Conflict Analysis
@@ -183,3 +217,4 @@ Analytics can come later. The first audit pass should optimize for traceability 
 3. Should blocking conflicts prevent production execution by default, or should the first release be warning-only in production?
 4. How much rendered payload detail can be safely shown to each role when PHI may be present?
 5. Should sandbox execution live in the Testing page only, or should it also be available from audit records for replay/debug workflows?
+6. Are there concrete workflows where later rules need structured prior-outcome context, or can the first release rely on priority plus stop-processing?

@@ -212,6 +212,8 @@ Analyze information in the eReferral, including the referring provider, patient 
 
 Analyze and summarize information in attachment files sent with an eReferral. Attachment analysis is typically used early in a rule to inform downstream actions based on content in the attachments.
 
+Attachment analysis should be treated as higher-risk because attachments can contain PHI that cannot be reliably redacted before AI processing. See [Privacy Considerations](privacy-considerations.md) before enabling this capability for real patient data.
+
 ### Triage and Assignment
 
 Automatically assign a referral to the most appropriate provider based on information within the eReferral, or forward the referral to a specific directory listing such as a central intake, regional hub, or provider group.

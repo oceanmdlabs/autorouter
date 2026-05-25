@@ -8,6 +8,8 @@ Built as a standalone Nuxt application, it monitors referral events in real time
 
 The result is faster intake operations, reduced administrative burden, and stronger support for scalable virtual care pathways.
 
+Because the Autorouter may process clinical referral content with AI, review [docs/privacy-considerations.md](docs/privacy-considerations.md) before using it with real patient data.
+
 ## Tech Stack
 
 - [Nuxt](https://nuxt.com/) + [Vue.js](https://vuejs.org/)

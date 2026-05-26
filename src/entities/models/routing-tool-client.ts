@@ -6,7 +6,7 @@ export interface ClientRoutingTool {
   briefDescription?: string;
   supportsCdsHook?: boolean;
   actionType?: string;
-  getActionTaken?: (input: Record<string, any>) => string;
+  getActionTaken?: (input: Record<string, any>, result?: string) => string;
 }
 
 export const clientRoutingToolRegistry: Record<
@@ -83,9 +83,9 @@ export const clientRoutingToolRegistry: Record<
   },
   summarizeAttachments: {
     name: "summarizeAttachments",
-    description: "Analyze and summarize information from attachments using AI",
+    description: "Send message of attachment summary and analysis using AI",
     actionType: "Summarize Attachments",
-    getActionTaken: () => "Attachments summarized",
+    getActionTaken: (_input, result) => result ?? "Attachments summarized",
   },
   sendEmail: {
     name: "sendEmail",

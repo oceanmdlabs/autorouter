@@ -1,4 +1,4 @@
-import { createSendCommunicationFromRequesterMessage } from "../../ocean-message.service";
+import { createSendCommunicationMessage } from "../../ocean-message.service";
 import type { RoutingToolHandler } from "@/src/entities/models/routing-tool";
 
 const TOOL_NAME = "summarizeAttachments";
@@ -9,6 +9,7 @@ export const summarizeAttachmentsHandler: RoutingToolHandler<
   const { instructions } = action.input;
   let details = null;
   let error = null;
+  let summary: string | undefined;
   const attachments =
     "attachments" in eventContext ? eventContext.attachments : null;
   const serviceRequestBundle =
@@ -29,7 +30,6 @@ export const summarizeAttachmentsHandler: RoutingToolHandler<
 
     const aiService = cxt.getAiService();
 
-    let summary: string | undefined;
     try {
       summary = await aiService.summarizeAttachments(instructions, attachments);
     } catch (error) {
@@ -37,17 +37,14 @@ export const summarizeAttachmentsHandler: RoutingToolHandler<
       summary = `Error analyzing attachments: ${(error as Error).message}`;
     }
 
-    const message = createSendCommunicationFromRequesterMessage(
+    const message = createSendCommunicationMessage(
       serviceRequestBundle,
       {
         message: `Attachment Summary: ${summary}`,
       }
     );
 
-    const response = await cxt.getOceanClientService().sendMessage({
-      message,
-      version: "v12",
-    });
+    const response = await cxt.getOceanClientService().sendMessage({ message });
     if (response.status !== 200) {
       cxt.logger.warn(
         `Failed to send communication to provider (attachment analysis): ${response.status}`
@@ -64,4 +61,6 @@ export const summarizeAttachmentsHandler: RoutingToolHandler<
     details,
     error,
   });
+
+  return summary !== undefined ? `Attachment Summary: ${summary}` : undefined;
 };

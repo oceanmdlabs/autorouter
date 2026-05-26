@@ -7,5 +7,5 @@ export interface IRoutingToolActionService {
     actions: RoutingToolAction<RoutingToolName>[],
     routingEventContext: RoutingEventContext,
     ruleName?: string
-  ): Promise<void>;
+  ): Promise<Map<string, string>>;
 }

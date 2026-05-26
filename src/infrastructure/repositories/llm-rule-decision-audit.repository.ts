@@ -22,7 +22,7 @@ import {
   llmRuleDecisionAudit,
   llmRuleToolExecutionAudit,
 } from "@/drizzle/schema";
-import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 
 type Dependencies = {
   cxt: ApplicationContext;
@@ -41,14 +41,14 @@ export const createLlmRuleDecisionAuditRepository = ({
         ruleId: record.ruleId,
         ruleName: record.ruleName,
         ruleVersion: record.ruleVersion,
-        decision: record.decision,
         confidence: record.confidence,
-        reasonCode: record.reasonCode,
         reasonSummary: record.reasonSummary,
         modelName: record.modelName,
         modelRequestId: record.modelRequestId,
-        validationStatus: record.validationStatus,
         validationError: record.validationError,
+        decision: sql`${record.decision}::llm_decision`,
+        reasonCode: record.reasonCode ? sql`${record.reasonCode}::llm_reason_code` : null,
+        validationStatus: sql`${record.validationStatus}::llm_validation_status`,
       });
       await dbService.insert(llmRuleDecisionAudit, inserted);
       return inserted.id;
@@ -290,11 +290,11 @@ export const createLlmRuleToolExecutionAuditRepository = ({
         toolIndex: record.toolIndex,
         toolName: record.toolName,
         argsHash: record.argsHash,
-        status: record.status,
         errorCode: record.errorCode,
         errorSummary: record.errorSummary,
         startedAt: record.startedAt,
         finishedAt: record.finishedAt,
+        status: sql`${record.status}::llm_tool_execution_status`,
       });
       await dbService.insert(llmRuleToolExecutionAudit, inserted);
       return inserted.id;
@@ -312,11 +312,11 @@ export const createLlmRuleToolExecutionAuditRepository = ({
           toolIndex: record.toolIndex,
           toolName: record.toolName,
           argsHash: record.argsHash,
-          status: record.status,
           errorCode: record.errorCode,
           errorSummary: record.errorSummary,
           startedAt: record.startedAt,
           finishedAt: record.finishedAt,
+          status: sql`${record.status}::llm_tool_execution_status`,
         })
       );
       for (const row of inserted) {
@@ -345,7 +345,7 @@ export const createLlmRuleToolExecutionAuditRepository = ({
 
       const nextRecord = {
         ...existing,
-        status,
+        status: sql`${status}::llm_tool_execution_status`,
         errorCode: updates.errorCode ?? existing.errorCode,
         errorSummary: updates.errorSummary ?? existing.errorSummary,
         startedAt: updates.startedAt ?? existing.startedAt,

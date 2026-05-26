@@ -1,5 +1,5 @@
 import { ApplicationContext } from "@/src/entities/models/application-context";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { routingRules } from "@/drizzle/schema";
 import type {
   NewRoutingRule,
@@ -37,12 +37,19 @@ export const createRoutingRulesRepository = ({
     },
 
     async create(record: NewRoutingRule) {
-      await dbService.insert(routingRules, dbService.initMetadataAndTenant(record));
+      const prepared = dbService.initMetadataAndTenant(record);
+      await dbService.insert(routingRules, {
+        ...prepared,
+        triggeringEvent: sql`${prepared.triggeringEvent}::triggering_event`,
+      });
     },
 
     async update(record) {
       dbService.updateMetadata(record);
-      await dbService.update(routingRules, record, eq(routingRules.id, record.id));
+      await dbService.update(routingRules, {
+        ...record,
+        triggeringEvent: sql`${record.triggeringEvent}::triggering_event`,
+      }, eq(routingRules.id, record.id));
     },
 
     async remove(id) {

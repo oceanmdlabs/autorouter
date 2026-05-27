@@ -185,7 +185,7 @@ const bedrockModelIsPreset = computed(() =>
   !formValues.value?.aiModel || BEDROCK_PRESET_MODELS.includes(formValues.value.aiModel!)
 );
 
-function onBedrockModelSelect(value: string | number | boolean | Record<string, any> | null | undefined) {
+function onBedrockModelSelect(value: unknown) {
   if (!formValues.value || typeof value !== "string") return;
   if (value === "custom") {
     formValues.value.aiModel = "";

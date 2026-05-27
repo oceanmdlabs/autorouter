@@ -247,6 +247,7 @@ export const aiProviderEnum = pgEnum("ai_provider", [
   "openai",
   "google",
   "cohere",
+  "bedrock",
 ]);
 
 export const erequestStorageProviderEnum = pgEnum(

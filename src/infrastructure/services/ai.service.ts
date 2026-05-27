@@ -1,4 +1,5 @@
 import { ApplicationContext } from "@/src/entities/models/application-context";
+import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
 import { createCohere } from "@ai-sdk/cohere";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
@@ -13,6 +14,13 @@ import { InvalidArgumentsError } from "@/src/entities/errors/common";
 import type { Attachment } from "@/src/entities/models/attachment";
 import type { RoutingToolRegistry } from "../services/routing-tools/routing-tool-registry";
 import type { RoutingToolName } from "../services/routing-tools/routing-tool-registry";
+
+type BedrockModelId =
+  | "anthropic.claude-3-5-sonnet-20241022-v2:0"
+  | "anthropic.claude-3-5-haiku-20241022-v1:0"
+  | "anthropic.claude-3-opus-20240229-v1:0"
+  | "amazon.nova-pro-v1:0"
+  | "amazon.nova-lite-v1:0";
 
 type CohereChatModelId = "command-a-03-2025";
 
@@ -57,6 +65,8 @@ export const createAiService = (deps: Dependencies): IAiService => {
         return createGoogleGenerativeAI({
           apiKey: aiInfo.apiKey,
         }).languageModel(aiInfo.model as GoogleGenerativeAIModelId);
+      case "bedrock":
+        return createAmazonBedrock().languageModel(aiInfo.model as BedrockModelId) as unknown as LanguageModel;
       default:
         throw new Error(`Unsupported AI provider: ${aiInfo.provider}`);
     }
@@ -144,6 +154,8 @@ function getDefaultModel(provider: string): string | null | undefined {
       return "command-a";
     case "google":
       return "gemini-2.5-flash-preview-05-20";
+    case "bedrock":
+      return "anthropic.claude-3-5-sonnet-20241022-v2:0";
     default:
       throw new InvalidArgumentsError(`Unsupported AI provider: ${provider}`);
   }

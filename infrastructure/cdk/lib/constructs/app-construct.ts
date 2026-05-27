@@ -74,6 +74,13 @@ export class AppConstruct extends Construct {
       );
     }
 
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+        resources: ["*"],
+      })
+    );
+
     const baseEnv: Record<string, string> = {
       ...props.env,
       ...props.secretEnv,

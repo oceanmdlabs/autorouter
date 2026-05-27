@@ -173,6 +173,26 @@ const oceanServerUrl = computed(() => {
   return getOceanServerUrl(formValues.value?.oceanServer ?? "ocean");
 });
 
+const BEDROCK_PRESET_MODELS = [
+  "anthropic.claude-3-5-sonnet-20241022-v2:0",
+  "anthropic.claude-3-5-haiku-20241022-v1:0",
+  "anthropic.claude-3-opus-20240229-v1:0",
+  "amazon.nova-pro-v1:0",
+  "amazon.nova-lite-v1:0",
+];
+
+const bedrockModelIsPreset = computed(() =>
+  !formValues.value?.aiModel || BEDROCK_PRESET_MODELS.includes(formValues.value.aiModel!)
+);
+
+function onBedrockModelSelect(value: string) {
+  if (value === "custom") {
+    formValues.value.aiModel = "";
+  } else {
+    formValues.value.aiModel = value;
+  }
+}
+
 const isRecentSuccessfulInboundConnection = computed(() => {
   if (!lastSuccessfulConnection.value) return false;
   return (
@@ -1074,13 +1094,14 @@ function isMaskedSecretValue(value: string | null | undefined) {
                     <SelectItem value="openai">OpenAI</SelectItem>
                     <SelectItem value="google">Google</SelectItem>
                     <SelectItem value="cohere">Cohere</SelectItem>
+                    <SelectItem value="bedrock">AWS Bedrock</SelectItem>
                   </SelectContent>
                 </Select>
                 <p v-if="errors.aiProvider" class="text-sm text-destructive">
                   {{ errors.aiProvider }}
                 </p>
               </div>
-              <div class="space-y-2">
+              <div v-if="formValues.aiProvider !== 'bedrock'" class="space-y-2">
                 <Label for="aiApiKey">API Key</Label>
                 <div class="flex items-center gap-2">
                   <Input
@@ -1095,7 +1116,37 @@ function isMaskedSecretValue(value: string | null | undefined) {
                   {{ errors.aiApiKey }}
                 </p>
               </div>
-              <div class="space-y-2">
+              <div v-if="formValues.aiProvider === 'bedrock'" class="space-y-2">
+                <Label for="aiModel">Model</Label>
+                <Select
+                  id="aiModel"
+                  :model-value="bedrockModelIsPreset ? (formValues.aiModel ?? '') : 'custom'"
+                  @update:model-value="onBedrockModelSelect"
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a model" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet</SelectItem>
+                    <SelectItem value="anthropic.claude-3-5-haiku-20241022-v1:0">Claude 3.5 Haiku</SelectItem>
+                    <SelectItem value="anthropic.claude-3-opus-20240229-v1:0">Claude 3 Opus</SelectItem>
+                    <SelectItem value="amazon.nova-pro-v1:0">Amazon Nova Pro</SelectItem>
+                    <SelectItem value="amazon.nova-lite-v1:0">Amazon Nova Lite</SelectItem>
+                    <SelectItem value="custom">Custom model ID...</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  v-if="!bedrockModelIsPreset"
+                  v-model="formValues.aiModel"
+                  placeholder="e.g. anthropic.claude-3-5-sonnet-20241022-v2:0"
+                  :aria-invalid="errors.aiModel ? 'true' : undefined"
+                />
+                <p class="text-xs text-muted-foreground">Uses the IAM role attached to the service. No API key required.</p>
+                <p v-if="errors.aiModel" class="text-sm text-destructive">
+                  {{ errors.aiModel }}
+                </p>
+              </div>
+              <div v-else class="space-y-2">
                 <Label for="aiModel">Model</Label>
                 <Input
                   id="aiModel"

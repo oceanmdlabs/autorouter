@@ -75,11 +75,7 @@ export default defineNuxtConfig({
     namePrefix: "Icon",
   },
 
-  app: {
-    // https://nuxt.com/docs/getting-started/transitions#page-transitions
-    pageTransition: { name: "page", mode: "out-in" },
-    layoutTransition: { name: "layout", mode: "out-in" },
-  },
+  app: {},
 
   nitro: {
     serveStatic: "inline",

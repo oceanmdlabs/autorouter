@@ -201,7 +201,7 @@ onMounted(() => {
 			<CardHeader class="flex flex-row items-center justify-between">
 				<CardTitle>{{ isNew ? 'New Rule' : 'Edit Rule' }}</CardTitle>
 				<div class="flex gap-2">
-					<Button variant="outline" type="button" @click="router.back()">
+					<Button variant="outline" type="button" @click="router.push('/portal/routing-rules')">
 						Cancel
 					</Button>
 					<Button v-if="!isNew" variant="destructive" type="button" @click="handleDelete">

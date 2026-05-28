@@ -174,16 +174,15 @@ const oceanServerUrl = computed(() => {
 });
 
 const BEDROCK_PRESET_MODELS = [
-  "anthropic.claude-3-5-sonnet-20241022-v2:0",
-  "anthropic.claude-3-5-haiku-20241022-v1:0",
-  "anthropic.claude-3-opus-20240229-v1:0",
-  "amazon.nova-pro-v1:0",
-  "amazon.nova-lite-v1:0",
+  "mistral.mistral-large-2402-v1:0",
+  "anthropic.claude-3-haiku-20240307-v1:0",
+  "anthropic.claude-3-sonnet-20240229-v1:0",
 ];
 
-const bedrockModelIsPreset = computed(() =>
-  !formValues.value?.aiModel || BEDROCK_PRESET_MODELS.includes(formValues.value.aiModel!)
-);
+const bedrockModelIsPreset = computed(() => {
+  const model = formValues.value?.aiModel;
+  return model == null || BEDROCK_PRESET_MODELS.includes(model);
+});
 
 function onBedrockModelSelect(value: unknown) {
   if (!formValues.value || typeof value !== "string") return;
@@ -1128,11 +1127,9 @@ function isMaskedSecretValue(value: string | null | undefined) {
                     <SelectValue placeholder="Select a model" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="anthropic.claude-3-5-sonnet-20241022-v2:0">Claude 3.5 Sonnet</SelectItem>
-                    <SelectItem value="anthropic.claude-3-5-haiku-20241022-v1:0">Claude 3.5 Haiku</SelectItem>
-                    <SelectItem value="anthropic.claude-3-opus-20240229-v1:0">Claude 3 Opus</SelectItem>
-                    <SelectItem value="amazon.nova-pro-v1:0">Amazon Nova Pro</SelectItem>
-                    <SelectItem value="amazon.nova-lite-v1:0">Amazon Nova Lite</SelectItem>
+                    <SelectItem value="mistral.mistral-large-2402-v1:0">Mistral Large</SelectItem>
+                    <SelectItem value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku</SelectItem>
+                    <SelectItem value="anthropic.claude-3-sonnet-20240229-v1:0">Claude 3 Sonnet</SelectItem>
                     <SelectItem value="custom">Custom model ID...</SelectItem>
                   </SelectContent>
                 </Select>

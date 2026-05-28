@@ -1,9 +1,10 @@
 import { ApplicationContext } from "@/src/entities/models/application-context";
 import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
+import { fromNodeProviderChain } from "@aws-sdk/credential-providers";
 import { createCohere } from "@ai-sdk/cohere";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateObject, generateText, type LanguageModel } from "ai";
+import { generateObject, generateText, tool, type LanguageModel } from "ai";
 import type { z } from "zod";
 import type {
   IAiService,
@@ -16,11 +17,9 @@ import type { RoutingToolRegistry } from "../services/routing-tools/routing-tool
 import type { RoutingToolName } from "../services/routing-tools/routing-tool-registry";
 
 type BedrockModelId =
-  | "anthropic.claude-3-5-sonnet-20241022-v2:0"
-  | "anthropic.claude-3-5-haiku-20241022-v1:0"
-  | "anthropic.claude-3-opus-20240229-v1:0"
-  | "amazon.nova-pro-v1:0"
-  | "amazon.nova-lite-v1:0";
+  | "mistral.mistral-large-2402-v1:0"
+  | "anthropic.claude-3-haiku-20240307-v1:0"
+  | "anthropic.claude-3-sonnet-20240229-v1:0";
 
 type CohereChatModelId = "command-a-03-2025";
 
@@ -45,8 +44,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
     return {
       provider,
       apiKey: siteConfig?.aiApiKey || "",
-      model: (siteConfig?.aiModel ||
-        getDefaultModel(provider)) as LanguageModel,
+      model: (siteConfig?.aiModel || getDefaultModel(provider)) as string,
     };
   }
 
@@ -56,17 +54,20 @@ export const createAiService = (deps: Dependencies): IAiService => {
       case "openai":
         return createOpenAI({
           apiKey: aiInfo.apiKey,
-        }).languageModel(aiInfo.model as OpenAIResponsesModelId);
+        }).languageModel(aiInfo.model as unknown as OpenAIResponsesModelId);
       case "cohere":
         return createCohere({
           apiKey: aiInfo.apiKey,
-        }).languageModel(aiInfo.model as CohereChatModelId);
+        }).languageModel(aiInfo.model as unknown as CohereChatModelId);
       case "google":
         return createGoogleGenerativeAI({
           apiKey: aiInfo.apiKey,
-        }).languageModel(aiInfo.model as GoogleGenerativeAIModelId);
+        }).languageModel(aiInfo.model as unknown as GoogleGenerativeAIModelId);
       case "bedrock":
-        return createAmazonBedrock().languageModel(aiInfo.model as BedrockModelId) as unknown as LanguageModel;
+        return createAmazonBedrock({
+          region: "ca-central-1",
+          bedrockOptions: { region: "ca-central-1", credentials: fromNodeProviderChain() },
+        }).languageModel(aiInfo.model as unknown as BedrockModelId) as unknown as LanguageModel;
       default:
         throw new Error(`Unsupported AI provider: ${aiInfo.provider}`);
     }
@@ -78,16 +79,23 @@ export const createAiService = (deps: Dependencies): IAiService => {
   ): Promise<ToolCallResult> {
     const model = await getAiModel();
 
+    const sdkTools = Object.fromEntries(
+      Object.entries(tools).map(([name, t]) => [
+        name,
+        tool({ parameters: t.inputSchema, execute: t.execute }),
+      ])
+    );
+
     const response = await generateText({
       model,
       prompt,
-      tools,
+      tools: sdkTools,
       toolChoice: "auto",
     });
     return {
       toolCalls: response.toolCalls.map((toolCall) => ({
         tool: toolCall.toolName,
-        input: toolCall.input as z.infer<
+        input: toolCall.args as z.infer<
           RoutingToolRegistry[RoutingToolName]["input"]
         >,
       })),
@@ -109,12 +117,6 @@ export const createAiService = (deps: Dependencies): IAiService => {
     attachments: Attachment[]
   ): Promise<string> {
     const model = await getAiModel();
-    type Attachment = {
-      type: "file";
-      mediaType: string;
-      data: Buffer<ArrayBufferLike>;
-      filename: string;
-    };
     const result = await generateText({
       model,
       messages: [
@@ -122,16 +124,12 @@ export const createAiService = (deps: Dependencies): IAiService => {
           role: "user",
           content: [
             { type: "text", text: instructions },
-            ...attachments.map(
-              (attachment) =>
-                ({
-                  type: "file",
-                  mediaType: attachment.contentType,
-                  data: attachment.data,
-                  filename: attachment.title,
-                } as Attachment)
-            ),
-          ],
+            ...attachments.map((attachment) => ({
+              type: "file" as const,
+              mimeType: attachment.contentType,
+              data: attachment.data,
+            })),
+          ] as any,
         },
       ],
     });
@@ -155,7 +153,7 @@ function getDefaultModel(provider: string): string | null | undefined {
     case "google":
       return "gemini-2.5-flash-preview-05-20";
     case "bedrock":
-      return "anthropic.claude-3-5-sonnet-20241022-v2:0";
+      return "anthropic.claude-3-sonnet-20240229-v1:0";
     default:
       throw new InvalidArgumentsError(`Unsupported AI provider: ${provider}`);
   }

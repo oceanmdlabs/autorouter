@@ -36,6 +36,13 @@
       "when": 1779913573583,
       "tag": "0004_polite_king_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1779995657267,
+      "tag": "0005_sturdy_patch",
+      "breakpoints": true
     }
   ]
 }

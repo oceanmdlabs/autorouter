@@ -18,8 +18,13 @@ const formValues = ref<NewRoutingRule>({
 	triggeringEvent: "request_received",
 	prompt: '',
 	active: true,
-	enabledTools: []
+	enabledTools: [],
+	summarizeAttachmentsAcknowledged: false,
 })
+
+// Warning dialog state
+const showWarningDialog = ref(false)
+const warningChecked = ref(false)
 
 // Reactive object to track tool enabled states for v-model
 const toolStates = reactive<Record<RoutingToolName, boolean>>({} as Record<RoutingToolName, boolean>)
@@ -47,7 +52,8 @@ watch(() => loadedData.value, (newData) => {
 			triggeringEvent: newData.triggeringEvent,
 			prompt: newData.prompt,
 			active: newData.active,
-			enabledTools: newData.enabledTools || []
+			enabledTools: newData.enabledTools || [],
+			summarizeAttachmentsAcknowledged: newData.summarizeAttachmentsAcknowledged ?? false,
 		};
 		// Initialize toolStates from loaded data
 		routingToolNames.forEach(toolName => {
@@ -68,6 +74,23 @@ watch(toolStates, (newToolStates) => {
 		.map(([toolName, _]) => toolName as RoutingToolName)
 }, { deep: true })
 
+function confirmWarning() {
+	formValues.value.summarizeAttachmentsAcknowledged = true
+	toolStates.summarizeAttachments = true
+	showWarningDialog.value = false
+	warningChecked.value = false
+}
+
+function cancelWarning() {
+	showWarningDialog.value = false
+	warningChecked.value = false
+}
+
+const needsAcknowledgement = computed(() =>
+	formValues.value.enabledTools.includes('summarizeAttachments') &&
+	!formValues.value.summarizeAttachmentsAcknowledged
+)
+
 // Form submission
 async function handleSubmit() {
 	isLoading.value = true
@@ -76,6 +99,13 @@ async function handleSubmit() {
 	// Validate that at least one tool is enabled
 	if (formValues.value.enabledTools.length === 0) {
 		errors.value = { enabledTools: 'At least one tool must be enabled.' }
+		isLoading.value = false
+		return
+	}
+
+	// Block save if summarizeAttachments is enabled without acknowledgement
+	if (needsAcknowledgement.value) {
+		showWarningDialog.value = true
 		isLoading.value = false
 		return
 	}
@@ -278,8 +308,16 @@ onMounted(() => {
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 								<div v-for="toolName in availableTools" :key="toolName"
 									class="flex items-center space-x-3 p-3 rounded-md border bg-white hover:bg-gray-50 transition-colors">
-									<Switch :id="`tool-${toolName}`" v-model="toolStates[toolName]"
-										:disabled="!formValues.active" />
+									<div class="relative">
+										<Switch :id="`tool-${toolName}`"
+											v-model="toolStates[toolName]"
+											:disabled="!formValues.active" />
+										<div
+											v-if="toolName === 'summarizeAttachments' && !formValues.summarizeAttachmentsAcknowledged"
+											class="absolute inset-0 cursor-pointer"
+											@click.stop="showWarningDialog = true"
+										/>
+									</div>
 									<div class="flex-1 min-w-0">
 										<Label :for="`tool-${toolName}`" class="text-sm font-medium cursor-pointer">
 											{{ clientRoutingToolRegistry[toolName].description }}
@@ -306,4 +344,36 @@ onMounted(() => {
 			</CardContent>
 		</form>
 	</Card>
+
+	<!-- Privacy warning dialog shown when summarizeAttachments is toggled on -->
+	<Teleport to="body">
+		<div v-if="showWarningDialog" class="fixed inset-0 z-50 flex items-center justify-center">
+			<div class="fixed inset-0 bg-black/50" @click="cancelWarning" />
+			<div class="relative z-50 bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 space-y-4">
+				<h2 class="flex items-center gap-2 text-amber-700 font-semibold text-lg">
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+					</svg>
+					Privacy Warning — Attachment Summarization
+				</h2>
+				<div class="space-y-3 text-sm text-muted-foreground">
+					<p>Attachment summarization may send full referral attachment contents to the configured AI provider. Attachments can contain PHI in headers, footers, scanned documents, embedded metadata, and free text. The Autorouter cannot reliably redact PHI from attachments before AI processing.</p>
+					<p>Use this only after your organization has reviewed the <strong class="text-foreground">privacy, consent/transparency, data residency, and contractual implications</strong>.</p>
+					<ul class="list-disc pl-4 space-y-1">
+						<li>Attachments may contain PHI that cannot be reliably redacted before AI processing</li>
+						<li>Attachment contents may be sent to your configured AI provider and model</li>
+						<li>Your organization/HIC should review privacy, consent, data residency, and contractual obligations before use with real patient data</li>
+					</ul>
+				</div>
+				<label class="flex items-start gap-2 cursor-pointer">
+					<input type="checkbox" class="mt-0.5 h-4 w-4 accent-amber-600" v-model="warningChecked" />
+					<span class="text-sm font-medium">I understand and accept the privacy implications of enabling attachment summarization.</span>
+				</label>
+				<div class="flex justify-end gap-2">
+					<Button variant="outline" type="button" @click="cancelWarning">Cancel</Button>
+					<Button type="button" :disabled="!warningChecked" @click="confirmWarning" class="bg-amber-600 hover:bg-amber-700 text-white">Enable Attachment Summarization</Button>
+				</div>
+			</div>
+		</div>
+	</Teleport>
 </template>

@@ -307,17 +307,11 @@ onMounted(() => {
 						<div class="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 								<div v-for="toolName in availableTools" :key="toolName"
-									class="flex items-center space-x-3 p-3 rounded-md border bg-white hover:bg-gray-50 transition-colors">
-									<div class="relative">
-										<Switch :id="`tool-${toolName}`"
-											v-model="toolStates[toolName]"
-											:disabled="!formValues.active" />
-										<div
-											v-if="toolName === 'summarizeAttachments' && !formValues.summarizeAttachmentsAcknowledged"
-											class="absolute inset-0 cursor-pointer"
-											@click.stop="showWarningDialog = true"
-										/>
-									</div>
+									class="flex items-center space-x-3 p-3 rounded-md border bg-white hover:bg-gray-50 transition-colors"
+									@pointerdown.capture="toolName === 'summarizeAttachments' && !formValues.summarizeAttachmentsAcknowledged ? ($event.preventDefault(), $event.stopPropagation(), showWarningDialog = true) : undefined">
+									<Switch :id="`tool-${toolName}`"
+										v-model="toolStates[toolName]"
+										:disabled="!formValues.active" />
 									<div class="flex-1 min-w-0">
 										<Label :for="`tool-${toolName}`" class="text-sm font-medium cursor-pointer">
 											{{ clientRoutingToolRegistry[toolName].description }}
@@ -346,10 +340,9 @@ onMounted(() => {
 	</Card>
 
 	<!-- Privacy warning dialog shown when summarizeAttachments is toggled on -->
-	<Teleport to="body">
-		<div v-if="showWarningDialog" class="fixed inset-0 z-50 flex items-center justify-center">
-			<div class="fixed inset-0 bg-black/50" @click="cancelWarning" />
-			<div class="relative z-50 bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 space-y-4">
+	<div v-if="showWarningDialog" style="position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;">
+		<div style="position:fixed;inset:0;background:rgba(0,0,0,0.5);" @click="cancelWarning" />
+		<div class="relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 space-y-4" style="z-index:10000;">
 				<h2 class="flex items-center gap-2 text-amber-700 font-semibold text-lg">
 					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 						<path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
@@ -374,6 +367,5 @@ onMounted(() => {
 					<Button type="button" :disabled="!warningChecked" @click="confirmWarning" class="bg-amber-600 hover:bg-amber-700 text-white">Enable Attachment Summarization</Button>
 				</div>
 			</div>
-		</div>
-	</Teleport>
+	</div>
 </template>

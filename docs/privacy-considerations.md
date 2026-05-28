@@ -24,6 +24,8 @@ Before using the Autorouter with real patient data, the organization should docu
 - patient transparency and opt-out approach, where appropriate;
 - whether a Privacy Impact Assessment or equivalent review is needed.
 
+Use [privacy-impact-assessment-templates.md](privacy-impact-assessment-templates.md) as the starting point for PHIPA, PIPEDA, and province-specific PIA reviews.
+
 The health information custodian or responsible organization should decide whether the use fits its privacy posture. Project maintainers should make sure the software does not silently enable higher-risk AI behavior just because code has been deployed.
 
 ## Attachment Summarization
@@ -47,6 +49,7 @@ Implementation expectations:
 
 Related tracking issues:
 
+- [Build reusable PIA templates for PHIPA and PIPEDA deployments](https://github.com/oceanmdlabs/autorouter/issues/30)
 - [Enforce explicit opt-in before fetching or sending referral attachments to AI](https://github.com/oceanmdlabs/autorouter/issues/24)
 - [Warn users when enabling attachment summarization that PHI cannot be reliably redacted](https://github.com/oceanmdlabs/autorouter/issues/23)
 

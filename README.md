@@ -8,7 +8,7 @@ Built as a standalone Nuxt application, it monitors referral events in real time
 
 The result is faster intake operations, reduced administrative burden, and stronger support for scalable virtual care pathways.
 
-Because the Autorouter may process clinical referral content with AI, review [docs/privacy-considerations.md](docs/privacy-considerations.md) before using it with real patient data. For production privacy review, use the reusable [Privacy Impact Assessment templates](docs/privacy-impact-assessment-templates.md).
+Because the Autorouter may process clinical referral content with AI, review [docs/privacy/privacy-considerations.md](docs/privacy/privacy-considerations.md) before using it with real patient data. For production privacy review, use the reusable [Privacy Impact Assessment templates](docs/privacy/privacy-impact-assessment-templates.md).
 
 ## Tech Stack
 

@@ -14,6 +14,7 @@ Use the current versions of these sources when completing a PIA:
 - [OPC PIPEDA Fair Information Principles](https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/) for private-sector PIPEDA framing.
 - [Canada Digital Privacy Playbook: Privacy Impact Assessments](https://www.canada.ca/en/government/system/digital-government/digital-privacy-playbook/privacy-impact-assessments.html) for a concise public-sector PIA trigger and deliverables model.
 - [Amazon Bedrock regional availability](https://docs.aws.amazon.com/bedrock/latest/userguide/models-region-compatibility.html) and relevant model cards before approving any AI model or inference routing.
+- [Amazon RDS encryption](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html) and [Amazon Aurora encryption](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Overview.Encryption.html) guidance before approving database storage, backups, snapshots, replicas, or key management.
 
 ## Template Set
 
@@ -36,8 +37,9 @@ Complete this before the PIA. If any critical assumption is false, update the PI
 | Primary AWS region     | Application services run in AWS Canada (Central), `ca-central-1`, commonly treated as Toronto for project purposes.                                                | AWS deployment configuration and production environment variables.                                                                                                                           | TBD    |
 | AI inference           | AI inference runs through Amazon Bedrock in `ca-central-1` using an Anthropic Claude 3 Haiku or Claude Sonnet-family model where in-region inference is available. | Bedrock model ID, inference profile or direct model ID, AWS regional availability evidence, CloudTrail or configuration proof that cross-region/global inference is disabled where required. | TBD    |
 | Model fallback         | No automatic fallback sends PHI to a non-Canadian region unless explicitly approved in the PIA and contract.                                                       | Application configuration, Bedrock client configuration, operational runbook.                                                                                                                | TBD    |
-| Database               | PostgreSQL database runs in the same AWS Canada (Central) region as the application.                                                                               | RDS/Aurora/Postgres configuration, backups, read replicas, snapshots, KMS key region.                                                                                                        | TBD    |
-| Object and log storage | Any referral payloads, attachments, audit logs, traces, backups, and operational logs stay in Canadian AWS regions unless separately approved.                     | S3, CloudWatch, OpenTelemetry, error monitoring, backup, and export configuration.                                                                                                           | TBD    |
+| Database               | PostgreSQL database runs in the same AWS Canada (Central) region as the application and is encrypted at rest. Aurora defaults may provide encryption for new clusters, but each deployment must verify encryption status, key type, and key region. | RDS/Aurora/Postgres configuration, `StorageEncrypted` or cluster encryption evidence, backups, read replicas, snapshots, KMS key type, KMS key region.                                      | TBD    |
+| Object and log storage | Any referral payloads, attachments, audit logs, traces, backups, and operational logs stay in Canadian AWS regions, are encrypted at rest, and have defined retention unless separately approved. | S3, CloudWatch, OpenTelemetry, error monitoring, backup, export, encryption, KMS, and retention configuration.                                                                                | TBD    |
+| PHI storage posture    | Patient identifiers, health numbers, contact details, full referral payloads, and attachments are not stored by default. Storage requires a documented purpose, minimum necessary field set, retention period, encryption-at-rest evidence, and tenant opt-in where applicable. | Data inventory, schema review, logging review, tenant configuration, eRequests opt-in record if archival is enabled.                                                                          | TBD    |
 | Optional email         | Email tooling, if enabled, uses AWS Canada-region services or another approved Canadian-residency service path.                                                    | SES or vendor configuration, data elements sent, retention and bounce/complaint handling.                                                                                                    | TBD    |
 | Optional SMS           | SMS tooling, if enabled, uses AWS Canada-region services or another approved Canadian-residency service path.                                                      | SNS/Pinpoint or vendor configuration, telecom routing limits, message payload minimization.                                                                                                  | TBD    |
 | Transient processing   | Any transient processing outside Canada is prohibited by default unless documented as legally permissible, contractually covered, minimized, and privacy-approved. | Exception record and legal/privacy approval.                                                                                                                                                 | TBD    |
@@ -52,6 +54,8 @@ Answer these before treating the baseline assumption as approved:
 - Which exact Bedrock model IDs are permitted for PHI, and are they direct in-region IDs rather than geo/global inference profiles?
 - Are attachments in scope, or only structured referral and eConsult fields?
 - Are AI prompts, completions, tool inputs, traces, or evaluation datasets retained? If yes, where, for how long, and who can access them?
+- Are patient identifiers, health numbers, full referral payloads, or eRequest blobs stored, or are they only processed transiently?
+- If eRequests archival is enabled, what tenant opt-in, minimum necessary field review, retention, disposal, and encryption-at-rest evidence exists?
 - Are email or SMS messages allowed to contain PHI, or only minimal notification metadata?
 - What tenant-facing transparency, notices, and configuration warnings are required before a customer enables AI routing?
 
@@ -100,7 +104,7 @@ For higher-risk deployments, explicitly assess necessity, effectiveness, proport
 
 | Data category             | Examples                                                 | Source                             | Required? | Used by AI? | Stored? | Retention | Notes                                   |
 | ------------------------- | -------------------------------------------------------- | ---------------------------------- | --------- | ----------- | ------- | --------- | --------------------------------------- |
-| Patient identifiers       | Name, health card number, date of birth, contact details | Ocean referral payload             | TBD       | TBD         | TBD     | TBD       | TBD                                     |
+| Patient identifiers       | Ocean referral/event reference; avoid name, health number, date of birth, contact details, and MRN unless explicitly required | Ocean referral payload             | TBD       | TBD         | No by default; explicit approval required | TBD       | Prefer source-system references over stored identifiers. Health number should not be stored for AI routing unless separately justified and approved. |
 | Clinical referral content | Reason for referral, history, medications, form answers  | Ocean referral/eConsult            | TBD       | TBD         | TBD     | TBD       | TBD                                     |
 | Attachments               | PDFs, scanned reports, EMR exports, images               | Ocean documents                    | TBD       | TBD         | TBD     | TBD       | Higher risk; assume PHI may be present. |
 | Provider and site data    | Referring clinician, recipient listing, site metadata    | Ocean directories/referral payload | TBD       | TBD         | TBD     | TBD       | TBD                                     |
@@ -109,6 +113,7 @@ For higher-risk deployments, explicitly assess necessity, effectiveness, proport
 | Audit logs                | User actions, system actions, referral event IDs         | Autorouter                         | TBD       | No          | TBD     | TBD       | Required for accountability.            |
 | Email/SMS payloads        | Notifications, routing status, recipient contact info    | Optional tools                     | TBD       | No          | TBD     | TBD       | Minimize PHI by default.                |
 | Operational telemetry     | Logs, metrics, traces, errors                            | Infrastructure                     | TBD       | No          | TBD     | TBD       | Redact PHI where feasible.              |
+| eRequest archival         | Stored eRequest payloads and blobs, if enabled           | Ocean eRequest data                | No by default | TBD       | Opt-in only | TBD       | Higher-retention PHI storage pathway; requires tenant opt-in, encryption-at-rest verification, access controls, and disposal plan. |
 
 ### 5. Data Flow Map
 
@@ -129,12 +134,14 @@ Address at least:
 
 - authentication, authorization, tenant isolation, and administrator access;
 - encryption in transit and at rest, including KMS key location and key access;
+- explicit verification of database, backup, snapshot, replica, object storage, and log encryption-at-rest settings;
 - network isolation and private connectivity where applicable;
 - least-privilege IAM for application, database, Bedrock, email, SMS, logging, and deployment roles;
 - audit logging for configuration changes, rule evaluations, AI actions, and access to sensitive records;
 - monitoring, alerting, incident response, and breach notification procedures;
 - secure SDLC, code review, dependency scanning, secret management, and deployment controls;
 - retention and secure disposal for application data, AI artifacts, logs, backups, and exports;
+- default avoidance of stored patient identifiers, health numbers, full referral payloads, and attachments unless specifically approved;
 - vendor, subcontractor, and support access controls;
 - tenant configuration review before real PHI processing.
 
@@ -195,13 +202,13 @@ Use this addendum when the deployment processes personal health information for 
 | Area                   | PIA question                                                                                                                                                  | Evidence |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- |
 | Accountability         | Has the HIC/service provider relationship been documented with privacy obligations, permitted uses, safeguards, breach reporting, and subcontractor controls? | TBD      |
-| Limiting collection    | Is AI sent only the minimum referral content necessary for the routing rule?                                                                                  | TBD      |
+| Limiting collection    | Is AI sent only the minimum referral content necessary for the routing rule, and are patient identifiers or health numbers excluded unless explicitly required? | TBD      |
 | Limiting use           | Is PHI used only for configured routing, audit, support, and approved operational purposes?                                                                   | TBD      |
 | Limiting disclosure    | Are disclosures to Bedrock, database, email, SMS, support, and logs documented and approved?                                                                  | TBD      |
 | Safeguards             | Are technical, administrative, and physical safeguards appropriate to PHI sensitivity?                                                                        | TBD      |
 | Openness               | Are customer administrators warned when enabling AI or attachment processing?                                                                                 | TBD      |
 | Access and correction  | Can the HIC respond to patient access/correction requests using source systems and Autorouter audit records?                                                  | TBD      |
-| Retention and disposal | Are retention periods defined for PHI, AI prompts/responses, logs, backups, and exports?                                                                      | TBD      |
+| Retention and disposal | Are retention periods defined for any approved PHI storage, AI prompts/responses, logs, backups, exports, and eRequest archival data?                         | TBD      |
 | Audit                  | Are AI-related accesses, evaluations, and triggered actions logged in a privacy-auditable form?                                                               | TBD      |
 | Breach management      | Is there a documented incident response path for unauthorized access, misrouting, or vendor-region misconfiguration?                                          | TBD      |
 
@@ -211,7 +218,8 @@ The preferred Ontario deployment position is:
 
 - PHI remains in Canada for application hosting, database, logs, backups, and AI inference.
 - Amazon Bedrock inference uses direct in-region processing in `ca-central-1`; geo or global cross-region inference is disabled unless separately approved.
-- PostgreSQL, snapshots, replicas, and KMS keys remain in `ca-central-1` unless an approved disaster-recovery design documents the privacy implications.
+- PostgreSQL storage, snapshots, replicas, backups, and logs are encrypted at rest; KMS keys remain in `ca-central-1` unless an approved disaster-recovery design documents the privacy implications.
+- Patient identifiers, health numbers, full referral payloads, and attachments are not stored by default. The eRequests module is opt-in because it can store PHI and requires separate retention, access-control, and encryption review.
 - Email and SMS notifications contain the minimum necessary content and do not include clinical detail unless specifically approved.
 - Attachment processing is treated as high risk because reliable de-identification cannot be guaranteed for free text, scans, reports, and metadata.
 
@@ -223,6 +231,7 @@ The preferred Ontario deployment position is:
 | Misrouting or erroneous AI recommendation  | TBD             | TBD         | Rule testing, human oversight, audit, rollback.                          |
 | Attachment PHI cannot be reliably redacted | TBD             | TBD         | Explicit opt-in, warning, minimum necessary attachment scope.            |
 | Operational logs accidentally contain PHI  | TBD             | TBD         | Redaction, retention limits, restricted access.                          |
+| Stored patient identifiers exceed need     | TBD             | TBD         | Avoid health number and direct identifiers by default; store source-system references; require explicit opt-in and retention limits for eRequests archival. |
 | Email/SMS notification over-discloses PHI  | TBD             | TBD         | Minimal payload policy, template review, opt-in.                         |
 
 ## Template 4: PIPEDA and Provincial Adaptation Addendum
@@ -316,11 +325,12 @@ The baseline deployment keeps PHI and sensitive personal information in Canada, 
 | PIA-001 | Bedrock model or inference profile routes PHI outside Canada contrary to deployment assumption. | High        | TBD        | TBD                   | Allow only approved direct in-region model IDs; monitor config; block geo/global profiles unless approved. | TBD   | TBD      | TBD             | TBD      |
 | PIA-002 | Clinical attachments contain PHI that cannot be reliably redacted before AI processing.         | High        | TBD        | TBD                   | Disable by default; explicit opt-in; warning; minimum necessary attachment scope; audit.                   | TBD   | TBD      | TBD             | TBD      |
 | PIA-003 | AI output causes incorrect routing or delayed care.                                             | High        | TBD        | TBD                   | Rule testing, human review for high-risk workflows, action audit, rollback path, incident review.          | TBD   | TBD      | TBD             | TBD      |
-| PIA-004 | Logs, traces, or error monitoring capture PHI.                                                  | High        | TBD        | TBD                   | Redaction, restricted access, retention limits, secure log storage in Canada, sampling controls.           | TBD   | TBD      | TBD             | TBD      |
+| PIA-004 | Logs, traces, or error monitoring capture PHI.                                                  | High        | TBD        | TBD                   | Redaction, restricted access, retention limits, secure encrypted log storage in Canada, sampling controls. | TBD   | TBD      | TBD             | TBD      |
 | PIA-005 | Email or SMS notification includes excessive PHI.                                               | Medium/High | TBD        | TBD                   | Use minimal templates, avoid clinical detail by default, approve exceptions, audit templates.              | TBD   | TBD      | TBD             | TBD      |
 | PIA-006 | Support or administrator access exceeds least privilege.                                        | High        | TBD        | TBD                   | RBAC, just-in-time access, audit logs, support procedures, periodic access review.                         | TBD   | TBD      | TBD             | TBD      |
 | PIA-007 | Prompt/completion retention exceeds approved retention.                                         | Medium/High | TBD        | TBD                   | Define retention; avoid storing prompts where possible; disposal job; backup retention review.             | TBD   | TBD      | TBD             | TBD      |
 | PIA-008 | Model upgrade changes privacy or accuracy characteristics.                                      | Medium/High | TBD        | TBD                   | Treat model changes as material changes; re-test; update PIA; approval gate.                               | TBD   | TBD      | TBD             | TBD      |
+| PIA-009 | Patient identifiers, health numbers, full referral payloads, or eRequest blobs are stored without a documented need. | High | TBD | TBD | Store source-system references by default; require tenant opt-in, data inventory, retention/disposal plan, encryption-at-rest verification, and access review for eRequests archival. | TBD | TBD | TBD | TBD |
 
 ## Decision Log
 
@@ -329,13 +339,16 @@ The baseline deployment keeps PHI and sensitive personal information in Canada, 
 | TBD  | Use AWS Canada Central as baseline residency posture.       | Reduces privacy and trust risk for Canadian health data; supports PHIPA/PIPEDA review. | TBD      | Confirm all services and backups.          |
 | TBD  | Use Bedrock only with approved in-region model IDs for PHI. | Prevents accidental cross-region inference.                                            | TBD      | Validate model availability and lifecycle. |
 | TBD  | Treat attachment processing as high risk and opt-in.        | Attachments may contain unstructured PHI that cannot be reliably redacted.             | TBD      | Add/admin warning and review workflow.     |
+| TBD  | Avoid stored patient identifiers by default.                | Reduces PHI storage and breach impact; keeps Ocean or the customer system as source of truth. | TBD      | Confirm eRequests archival remains opt-in. |
 
 ## Go-Live Checklist
 
 - PIA workbook and relevant addenda completed.
 - Deployment Assumption Record has evidence for every critical assumption.
 - Bedrock model ID, region, and inference routing verified.
-- PostgreSQL, backups, logs, traces, and object storage region verified.
+- PostgreSQL, backups, logs, traces, and object storage region and encryption-at-rest status verified.
+- Patient identifier storage reviewed; health number storage prohibited unless specifically justified and approved.
+- eRequests archival disabled by default or explicitly approved with retention, access, encryption, and disposal evidence.
 - Contracts and service-provider obligations reviewed.
 - Tenant AI configuration and attachment-processing settings reviewed.
 - Email/SMS payload templates reviewed and minimized.

@@ -9,6 +9,7 @@ This PIA uses the reusable [Privacy Impact Assessment templates](privacy-impact-
 - [Ontario IPC PHIPA PIA Guidelines](https://www.ipc.on.ca/en/resources-and-decisions/privacy-impact-assessment-guidelines-ontario-personal-health-information-protection-act)
 - [Office of the Privacy Commissioner of Canada PIA Process Guide](https://www.priv.gc.ca/en/privacy-topics/federal-government-privacy/privacy-impact-assessments/gd_exp_202003/)
 - [Amazon Bedrock regional availability](https://docs.aws.amazon.com/bedrock/latest/userguide/models-region-compatibility.html)
+- [Amazon RDS encryption](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Overview.Encryption.html) and [Amazon Aurora encryption](https://docs.aws.amazon.com/AmazonRDS/latest/AuroraUserGuide/Overview.Encryption.html)
 
 ## 1. Administrative Details
 
@@ -36,8 +37,10 @@ This PIA uses the reusable [Privacy Impact Assessment templates](privacy-impact-
 | AI inference | AI inference uses Amazon Bedrock in `ca-central-1` with an approved Anthropic Claude model that supports in-region inference. | Exact Bedrock model ID, region configuration, model access evidence. | Required before go-live |
 | Inference routing | Direct in-region inference only. Geo and global cross-region inference are not approved for PHI in this assessment. | Bedrock client configuration, CloudTrail/config review, operational runbook. | Required before go-live |
 | Model fallback | No automatic fallback may send PHI outside Canada. | Application configuration and incident/runbook review. | Required before go-live |
-| Database | PostgreSQL runs in AWS Canada Central with backups, snapshots, replicas, and KMS keys in Canada unless separately approved. | RDS/Aurora/Postgres configuration, backup configuration, KMS key region. | Required before go-live |
-| Object and log storage | Referral payloads, audit logs, traces, backups, and operational logs remain in Canadian AWS regions unless separately approved. | S3, CloudWatch, OpenTelemetry, error monitoring, backup, and export configuration. | Required before go-live |
+| Database | PostgreSQL runs in AWS Canada Central and is encrypted at rest. If the deployment uses Aurora, new clusters may be encrypted by default, but encryption status, key type, key region, backups, snapshots, and replicas must still be verified. | RDS/Aurora/Postgres configuration, `StorageEncrypted` or cluster encryption evidence, backup configuration, snapshot and replica encryption status, KMS key type, KMS key region. | Required before go-live |
+| Object and log storage | Audit logs, traces, backups, and operational logs remain in Canadian AWS regions, are encrypted at rest, and have defined retention unless separately approved. Full referral payloads and attachments are not stored for this deployment unless separately approved. | S3, CloudWatch, OpenTelemetry, error monitoring, backup, export, encryption, KMS, and retention configuration. | Required before go-live |
+| PHI storage posture | Store Ocean referral/event references and structured audit outcomes by default. Do not store health number, health card number, MRN, date of birth, contact details, full referral payloads, or attachments for this workflow unless separately justified and approved. | Schema/configuration review, logging review, test event inspection, tenant configuration. | Required before go-live |
+| eRequests archival | eRequests archival remains disabled unless North Toronto Medical Associates explicitly opts in after a separate review. | Tenant opt-in record, purpose and field review, retention/disposal plan, storage encryption evidence, access-control review. | Disabled for baseline |
 | Email/SMS | Escalation notifications use minimal content. Clinical detail is not included in email/SMS unless separately approved. | Notification templates, vendor/region configuration, payload review. | To confirm |
 | Attachments | Attachments are excluded from AI processing for the initial deployment unless the clinic separately approves attachment analysis. | Tenant configuration and rule review. | Recommended baseline |
 | Production data | Real patient/provider data is used only after PIA approval and tenant-specific configuration review. | Go-live checklist and approval record. | Required |
@@ -68,23 +71,24 @@ Processing is necessary because safety risk often depends on referral reason, ur
 
 | Data category | Examples | Source | Required? | Used by AI? | Stored? | Retention | Notes |
 | ------------- | -------- | ------ | --------- | ----------- | ------- | --------- | ----- |
-| Patient identifiers | Name, date of birth, Ocean referral ID, contact details, health card number if present | Ocean referral payload | Yes, minimum necessary for matching and follow-up | Avoid where practical; include only if needed to understand referral context | Yes, where needed for audit and action traceability | TBD: align to clinic/Ocean retention and minimize Autorouter retention | Use referral IDs in logs where possible. |
-| Referral metadata | Referral status, created/sent date, receiving listing, sender, urgency, elapsed days | Ocean referral payload | Yes | Yes | Yes | TBD | Core trigger data. |
-| Clinical referral content | Reason for referral, form answers, relevant history, symptoms, suspected diagnosis | Ocean referral payload | Yes, scoped | Yes | Limited, as needed for audit/state | TBD | Minimum necessary prompt construction required. |
+| Patient identifiers | Ocean referral/event reference; avoid name, date of birth, contact details, health number, health card number, and MRN | Ocean referral payload | Source reference required; direct identifiers not required for Autorouter storage | Avoid where practical; do not include health number in prompts | No direct identifier storage by default | Not applicable unless separately approved | Clinic staff should resolve patient identity in Ocean or the clinic record, not Autorouter. |
+| Referral metadata | Referral status, created/sent date, receiving listing, sender, urgency, elapsed days, Ocean referral/event reference | Ocean referral payload | Yes | Yes | Yes, limited metadata and references | TBD: recommend shortest operational/audit period approved by clinic | Core trigger data; avoid storing full payload. |
+| Clinical referral content | Reason for referral, form answers, relevant history, symptoms, suspected diagnosis | Ocean referral payload | Yes, scoped for AI assessment | Yes | No full-content storage by default; transient processing preferred | Not applicable unless storage separately approved | Minimum necessary prompt construction required. |
 | Attachments | PDFs, scanned reports, lab/imaging documents | Ocean documents | No for initial deployment | No | No | Not applicable | Exclude by default; separate approval required. |
 | Provider and site data | Referring clinician, clinic site, receiving provider/listing, contact metadata | Ocean directories/referral payload | Yes | Limited | Yes | TBD | Needed for escalation and follow-up. |
 | Rule configuration | Delay threshold, clinical safety criteria, escalation target | Autorouter tenant config | Yes | Yes, as instructions | Yes | Until rule replaced plus audit retention | May reveal clinic operational practices. |
-| AI inputs and outputs | Prompt, classification, explanation, confidence/uncertainty | Autorouter/Bedrock | Yes for processing | Yes | Prefer not to store full prompt/completion; store structured outcome and rationale only where approved | TBD | Confirm logging and retention before go-live. |
-| Audit logs | Rule ID, referral event reference, model ID, timestamp, action, actor/system | Autorouter | Yes | No | Yes | TBD | Required for accountability and incident review. |
+| AI inputs and outputs | Prompt, classification, explanation, confidence/uncertainty | Autorouter/Bedrock | Yes for processing | Yes | Do not store full prompt/completion by default; store structured outcome and minimal rationale only if approved | TBD | Confirm logging and retention before go-live. |
+| Audit logs | Rule ID, referral event reference, model ID, timestamp, action, actor/system | Autorouter | Yes | No | Yes | TBD: define operational/audit retention and disposal | Required for accountability and incident review without storing direct identifiers. |
 | Escalation notifications | Minimal referral reference, queue/task message, recipient | Autorouter/Ocean/email/SMS if enabled | Yes if escalation enabled | No | Yes, in destination system and audit logs | TBD | Avoid clinical detail in email/SMS. |
 | Operational telemetry | Logs, metrics, traces, errors | Infrastructure | Yes for operations | No | Yes | TBD | Redact PHI where feasible; restrict access. |
+| eRequests archival | Stored eRequest payloads and blobs | Ocean eRequest data | No for baseline | No for baseline | No unless explicitly opted in | Not applicable unless separately approved | Higher-retention PHI pathway; if enabled, requires separate retention, encryption, access, and disposal approval. |
 
 ## 6. Data Flow Map
 
 | Step | Sender | Receiver | Data elements | Purpose | Region | Security control | Evidence |
 | ---- | ------ | -------- | ------------- | ------- | ------ | ---------------- | -------- |
 | 1 | Ocean platform | Autorouter | Outbound referral event and status data | Trigger monitoring and rule evaluation | Canada/TBD | TLS, API authentication, least privilege | Ocean integration configuration |
-| 2 | Autorouter | PostgreSQL | Tenant config, processing state, audit records | Persistence and accountability | AWS Canada Central | Encryption at rest, IAM, network controls | Database configuration |
+| 2 | Autorouter | PostgreSQL | Tenant config, limited processing state, audit records, source-system references | Persistence and accountability without storing direct patient identifiers by default | AWS Canada Central | Verified encryption at rest, IAM, network controls | Database configuration |
 | 3 | Autorouter | Amazon Bedrock | Minimum necessary referral content and rule prompt | Safety concern classification | `ca-central-1` only | TLS, IAM, approved model ID, no cross-region routing | Bedrock configuration |
 | 4 | Autorouter | Ocean platform or clinic workflow | Escalation action, referral reference, minimal rationale | Prompt authorized human review | Canada/TBD | API auth, RBAC, audit | Action configuration |
 | 5 | Autorouter | Email/SMS service, if enabled | Minimal notification metadata | Notify authorized staff | Canada or approved exception | Payload minimization, approved vendor | Template and vendor review |
@@ -94,7 +98,9 @@ Processing is necessary because safety risk often depends on referral reason, ur
 
 - Tenant-specific enablement is required before real PHI processing.
 - Access to Autorouter configuration, audit logs, and escalations is restricted to authorized Ocean Labs/OceanMD operators and clinic-designated users.
-- PHI is encrypted in transit and at rest; KMS keys for production data should remain in Canada.
+- Database storage, backups, snapshots, replicas, object storage, and logs are encrypted at rest; KMS keys for production data should remain in Canada.
+- Patient identifiers, including health number, health card number, MRN, date of birth, and contact details, are not stored by default. Store Ocean referral/event references and structured audit outcomes instead.
+- eRequests archival is disabled for the baseline deployment and may be enabled only through explicit tenant opt-in with a separate PHI storage, retention, access, and encryption review.
 - Bedrock access is limited to approved direct in-region model IDs in `ca-central-1`.
 - Prompts include only the fields required to assess delayed referral safety risk.
 - Attachments are excluded by default.
@@ -113,6 +119,7 @@ Authorized clinic users should receive a clear admin notice before enabling the 
 - processing uses Ocean Labs/OceanMD AWS infrastructure and Amazon Bedrock in Canada under the approved configuration;
 - output is advisory and requires human review before clinical action;
 - attachments are excluded unless separately enabled and approved;
+- direct patient identifiers and full referral payloads are not stored by default;
 - logs and audit records are retained for accountability.
 
 Patient access, correction, and complaint requests should be handled by North Toronto Medical Associates using Ocean and clinic source records as the source of truth, with Autorouter audit records available to explain whether and when a rule evaluated or escalated a referral.
@@ -151,9 +158,9 @@ Before production, the clinic should test the rule against synthetic or privacy-
 | Exact model ID | TBD before go-live |
 | Endpoint region | `ca-central-1` |
 | Inference routing | Direct in-region only |
-| Prompt data categories | Referral age/status, urgency, reason for referral, relevant form answers, limited clinical context, receiving listing/specialty |
+| Prompt data categories | Referral age/status, urgency, reason for referral, relevant form answers, limited clinical context, receiving listing/specialty; exclude health number and avoid direct identifiers unless clinically necessary |
 | Output data categories | Safety concern classification, short rationale, escalation recommendation, uncertainty flag |
-| Prompt/completion retention | Prefer no full prompt/completion storage; retain structured outcome and minimal rationale only if approved |
+| Prompt/completion retention | No full prompt/completion storage by default; retain structured outcome and minimal rationale only if approved |
 | Bedrock logging enabled? | TBD; if enabled, logs must remain in Canada and be PHI-approved |
 | Model training on customer prompts? | Not approved |
 | Human review required? | Yes for safety concern and uncertain classifications |
@@ -171,6 +178,8 @@ Before production, the clinic should test the rule against synthetic or privacy-
 | NTMA-006 | Attachments are processed without separate approval. | High | Low/Medium | High | Disable attachment processing; enforce tenant opt-in and warning if added later. | Ocean Labs/OceanMD technical owner | Before go-live | Low | Do not approve initially |
 | NTMA-007 | Support/admin access exceeds least privilege. | High | Medium | High | RBAC, support procedures, audit logs, periodic access review, just-in-time access where available. | Ocean Labs/OceanMD security owner | Before go-live | Medium | Conditional |
 | NTMA-008 | Model or prompt changes alter accuracy or privacy posture. | Medium/High | Medium | Medium/High | Treat model ID, region, prompt, and action changes as material changes requiring test and approval. | Product owner and clinic privacy officer | Ongoing | Low/Medium | Conditional |
+| NTMA-009 | Health number, patient identifiers, full referral payloads, or eRequest blobs are stored without need. | High | Medium | High | Store source-system references and structured outcomes only; keep eRequests archival disabled unless separately approved with retention, access, encryption, and disposal evidence. | Ocean Labs/OceanMD technical owner and clinic privacy officer | Before go-live | Low/Medium | Conditional |
+| NTMA-010 | Database, backups, snapshots, replicas, object storage, or logs are not encrypted at rest. | High | Low/Medium until verified | High | Verify RDS/Aurora encryption, KMS key region/type, backup/snapshot encryption, S3/CloudWatch encryption, and access controls before go-live. | Ocean Labs/OceanMD security owner | Before go-live | Low | Not accepted until verified |
 
 ## 13. Decision Log
 
@@ -180,14 +189,18 @@ Before production, the clinic should test the rule against synthetic or privacy-
 | 2026-05-29 | Use direct in-region Bedrock inference only for PHI. | Avoids cross-region processing for referral PHI. | Draft assumption | Confirm exact model ID and routing configuration. |
 | 2026-05-29 | Exclude attachments from initial AI processing. | Attachments have high PHI exposure and cannot be reliably redacted. | Draft recommendation | Separate PIA update if attachment analysis is needed. |
 | 2026-05-29 | Require human review before clinical action. | AI classification errors could affect patient safety and referral follow-up. | Draft recommendation | Define clinic escalation SOP. |
+| 2026-05-29 | Avoid storing direct patient identifiers and health numbers. | Reduces PHI storage and breach impact; Ocean and clinic records remain the source of truth. | Draft recommendation | Confirm schema, logs, prompts, and notifications follow reference-only pattern. |
+| 2026-05-29 | Keep eRequests archival disabled for baseline. | eRequests archival can store PHI and should remain opt-in. | Draft recommendation | Separate approval if North Toronto Medical Associates needs archival. |
 
 ## 14. Go-Live Checklist
 
 - Confirm accountable clinic executive, privacy officer, clinical owner, and escalation queue owner.
 - Confirm Ocean Labs/OceanMD contractual role and service-provider obligations.
-- Confirm AWS region for app, database, backups, logs, object storage, KMS keys, and monitoring.
+- Confirm AWS region and encryption-at-rest status for app storage, database, backups, snapshots, replicas, logs, object storage, KMS keys, and monitoring.
 - Confirm exact Amazon Bedrock model ID and direct in-region routing in `ca-central-1`.
 - Confirm full prompt/completion logging is disabled or explicitly approved with Canadian storage and retention.
+- Confirm health number, health card number, MRN, date of birth, contact details, full referral payloads, and attachments are not stored for this baseline workflow.
+- Confirm eRequests archival is disabled, or complete separate opt-in approval with retention, access, encryption, and disposal evidence.
 - Confirm attachment processing is disabled.
 - Confirm escalation destination, notification templates, recipients, and after-hours coverage.
 - Define retention for Autorouter processing state, structured AI outputs, audit logs, operational logs, and backups.
@@ -206,3 +219,4 @@ These items should be answered before this draft is treated as complete:
 5. What retention periods should apply to Autorouter audit logs, structured AI outputs, operational logs, and backups?
 6. Does the clinic want the rule to escalate `uncertain` cases by default? This draft recommends yes for patient safety.
 7. Who approves future model, prompt, threshold, attachment, or notification changes?
+8. Does North Toronto Medical Associates need eRequests archival at all for this workflow? This draft assumes no.

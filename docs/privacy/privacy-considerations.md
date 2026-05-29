@@ -19,6 +19,7 @@ Before using the Autorouter with real patient data, the organization should docu
 - intended use case and clinical/administrative benefit;
 - AI provider and model choice;
 - hosting location and data residency;
+- data minimization, especially whether patient identifiers are stored or only processed transiently;
 - contractual and vendor obligations;
 - retention, logging, and audit behavior;
 - patient transparency and opt-out approach, where appropriate;
@@ -27,6 +28,14 @@ Before using the Autorouter with real patient data, the organization should docu
 Use [privacy-impact-assessment-templates.md](privacy-impact-assessment-templates.md) as the starting point for PHIPA, PIPEDA, and province-specific PIA reviews.
 
 The health information custodian or responsible organization should decide whether the use fits its privacy posture. Project maintainers should make sure the software does not silently enable higher-risk AI behavior just because code has been deployed.
+
+## Data Retention and PHI Minimization
+
+The default Autorouter posture should avoid storing patient identifiers and clinical content unless storage is required for a specific approved workflow. In particular, health card number, health number, MRN, date of birth, contact details, and full referral payloads should not be stored by default for AI routing or safety-monitoring workflows. Prefer storing tenant ID, rule ID, model ID, timestamps, action outcome, and Ocean referral or event references that let authorized users return to Ocean as the system of record.
+
+The eRequests module is a higher-retention pathway because it can archive referral payloads and related blobs. It must remain explicitly opt-in and should be enabled only after a tenant-specific review of purpose, minimum necessary fields, retention period, disposal process, access controls, and storage encryption.
+
+For AWS-hosted deployments, encryption at rest should be treated as a required control and verified during go-live. Amazon Aurora encrypts new clusters at rest by default for clusters created on or after February 18, 2026, but the deployment should still record the database type, encryption status, KMS key type, key region, backups, snapshots, replicas, and log storage controls.
 
 ## Attachment Summarization
 

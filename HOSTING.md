@@ -44,6 +44,8 @@ AI, Email, and SMS infrastructure is configured at the application tenant level 
 
 A hosting provider can still provision these services and have its own tenant point to them. For example, an AWS-hosted deployment can use AWS-provisioned LLM, SMS, and email services for that tenant.
 
+Review [docs/privacy-considerations.md](docs/privacy-considerations.md) before configuring AI processing for real patient data, especially if rules analyze referral attachments.
+
 ### AWS Deployment
 
 For AWS deployments, use the CDK guide in this repository:

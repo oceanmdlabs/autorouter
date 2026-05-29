@@ -18,7 +18,7 @@ export type RoutingToolHandler<T extends RoutingToolName> = (
   eventContext: RoutingEventContext,
   cxt: ApplicationContext,
   ruleName?: string
-) => Promise<void>;
+) => Promise<string | void>;
 
 export type RoutingToolDefinition<
   T extends RoutingToolName,

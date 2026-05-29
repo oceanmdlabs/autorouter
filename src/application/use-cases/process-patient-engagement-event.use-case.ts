@@ -34,6 +34,7 @@ export async function processPatientEngagementEventUseCase(
   }
   event.message.note.ptUpdate.completedForms;
 
+  const actionResults = new Map<string, string>();
   for (const result of evaluationResults) {
     cxt.logger.info(
       `Processing rule ${
@@ -44,9 +45,10 @@ export async function processPatientEngagementEventUseCase(
       }: ${result.evaluation.actions.map((a) => a.tool).join(", ")}`
     );
     try {
-      await cxt
+      const results = await cxt
         .getRoutingToolActionService()
         .executeActions(result.evaluation.actions, event, result.ruleName);
+      results.forEach((v, k) => actionResults.set(k, v));
     } catch (e) {
       cxt.logger.error(
         `Error executing actions for patient engagement event ${getPatientEngagementEventContextDescription(
@@ -66,7 +68,13 @@ export async function processPatientEngagementEventUseCase(
       ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
       ...(r.evaluation.reasoning ? { reasoning: r.evaluation.reasoning } : {}),
       ...(r.evaluation.triggered && r.evaluation.actions.length > 0
-        ? { actions: r.evaluation.actions.map((a) => ({ tool: a.tool, input: a.input })) }
+        ? {
+            actions: r.evaluation.actions.map((a) => ({
+              tool: a.tool,
+              input: a.input,
+              ...(actionResults.has(a.id) ? { result: actionResults.get(a.id) } : {}),
+            })),
+          }
         : {}),
     }));
     details = JSON.stringify({ rules: rulesSummary });

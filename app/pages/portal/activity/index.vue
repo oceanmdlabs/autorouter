@@ -52,7 +52,7 @@ const getOceanHost = () => {
   return getOceanServerUrl('ocean');
 };
 
-type RuleAction = { tool: string; input: Record<string, any> } | string;
+type RuleAction = { tool: string; input: Record<string, any>; result?: string } | string;
 
 type StructuredDetails = {
   rules: {
@@ -71,9 +71,9 @@ function describeAction(action: RuleAction): { type: string; taken: string } {
   }
   const tool = clientRoutingToolRegistry[action.tool as RoutingToolName];
   if (tool?.actionType && tool?.getActionTaken) {
-    return { type: tool.actionType, taken: tool.getActionTaken(action.input) };
+    return { type: tool.actionType, taken: tool.getActionTaken(action.input, action.result) };
   }
-  return { type: action.tool, taken: 'Action taken' };
+  return { type: action.tool, taken: action.result ?? 'Action taken' };
 }
 
 function parseStructuredDetails(details: string | null | undefined): StructuredDetails | null {

@@ -75,6 +75,7 @@ export const routingRules = pgTable(
       .$type<string[]>()
       .notNull()
       .default([]),
+    summarizeAttachmentsAcknowledged: boolean("summarize_attachments_acknowledged").notNull().default(false),
   },
   (table) => ({
     tenantIdx: index("idx_routing_rules_tenant_id").on(table.tenantId),
@@ -247,6 +248,7 @@ export const aiProviderEnum = pgEnum("ai_provider", [
   "openai",
   "google",
   "cohere",
+  "bedrock",
 ]);
 
 export const erequestStorageProviderEnum = pgEnum(

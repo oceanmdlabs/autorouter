@@ -75,11 +75,7 @@ export default defineNuxtConfig({
     namePrefix: "Icon",
   },
 
-  app: {
-    // https://nuxt.com/docs/getting-started/transitions#page-transitions
-    pageTransition: { name: "page", mode: "out-in" },
-    layoutTransition: { name: "layout", mode: "out-in" },
-  },
+  app: {},
 
   nitro: {
     serveStatic: "inline",
@@ -102,6 +98,16 @@ export default defineNuxtConfig({
 
   vite: {
     plugins: [tailwindcss() as any],
+     resolve: {
+      dedupe: ["vue", "@vue/runtime-core", "@vue/runtime-dom", "@vue/reactivity", "vue-router"],
+      alias: {
+        vue: join(currentDir, "node_modules/vue"),
+        "vue-router": join(currentDir, "node_modules/vue-router"),
+        "@vue/runtime-core": join(currentDir, "node_modules/@vue/runtime-core"),
+        "@vue/runtime-dom": join(currentDir, "node_modules/@vue/runtime-dom"),
+        "@vue/reactivity": join(currentDir, "node_modules/@vue/reactivity"),
+      },
+    },
      server: {
       allowedHosts: [".ngrok-free.app", ".ngrok-free.dev", ".trycloudflare.com",".oceanmdlabs.com"]
     }

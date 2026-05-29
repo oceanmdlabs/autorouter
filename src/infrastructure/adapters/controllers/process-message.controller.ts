@@ -42,10 +42,7 @@ export async function processMessageController(
   }
 
   const bundle = data?.body as unknown as Bundle;
-  const eventContext = await extractServiceRequestContextFromMessageBundle(
-    bundle,
-    cxt
-  );
+  const eventContext = await extractServiceRequestContextFromMessageBundle(bundle);
   if (eventContext instanceof Error) {
     return {
       status: 400,
@@ -102,30 +99,48 @@ async function loadAttachmentsIfIndicated(
     eventContext.triggeringEvent === "request_received" ||
     eventContext.triggeringEvent === "request_message"
   ) {
-    // for efficiency, only load attachments for events where we expect attachments
-    if (process.env.FETCH_ATTACHMENTS !== "false") {
-      cxt.logger.info(
-        `Loading attachments for referral: ${
-          eventContext.referralRef || "unknown"
-        }`
-      );
-      eventContext.attachments = await loadAttachments(
-        bundle,
-        cxt,
-        eventContext.referralRef
-      );
-    } else {
-      // skip fetching attachments in production due to runtime performance constraints with Netlify's free tier
+    if (process.env.FETCH_ATTACHMENTS === "false") {
       cxt.logger.info(
         `Skipping attachments loading (FETCH_ATTACHMENTS is false)`
       );
+      return;
     }
+
+    // Only fetch attachments when at least one active rule for this event type
+    // has summarizeAttachments enabled — attachment binaries contain PHI and
+    // should not be retrieved unless they will actually be used.
+    const rules = await cxt.getRoutingRulesRepository().getAllAtTenant();
+    const hasAttachmentRule = rules.some(
+      (rule) =>
+        rule.active &&
+        rule.triggeringEvent === eventContext.triggeringEvent &&
+        rule.enabledTools.includes("summarizeAttachments")
+    );
+
+    console.log("[loadAttachmentsIfIndicated] hasAttachmentRule:", hasAttachmentRule, "| event:", eventContext.triggeringEvent, "| rules checked:", rules.length);
+
+    if (!hasAttachmentRule) {
+      cxt.logger.info(
+        `Skipping attachment fetch: no active rule with summarizeAttachments enabled for event ${eventContext.triggeringEvent}`
+      );
+      return;
+    }
+
+    cxt.logger.info(
+      `Loading attachments for referral: ${
+        eventContext.referralRef || "unknown"
+      }`
+    );
+    eventContext.attachments = await loadAttachments(
+      bundle,
+      cxt,
+      eventContext.referralRef
+    );
   }
 }
 
 async function extractServiceRequestContextFromMessageBundle(
-  bundle: Bundle,
-  cxt: ApplicationContext
+  bundle: Bundle
 ): Promise<ServiceRequestEventContext | Error> {
   try {
     const resources =

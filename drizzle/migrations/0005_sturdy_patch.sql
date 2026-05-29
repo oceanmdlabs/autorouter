@@ -1,0 +1,1 @@
+ALTER TABLE "routing_rules" ADD COLUMN "summarize_attachments_acknowledged" boolean DEFAULT false NOT NULL;

@@ -66,18 +66,26 @@ export const createActivityLogEntriesRepository = ({
 
     async create(record: NewActivityLogEntry) {
       const searchText = buildSearchText(record);
-
+      const prepared = dbService.initMetadataAndTenant(record);
       await dbService.insert(table, {
-        ...dbService.initMetadataAndTenant(record),
+        ...prepared,
         searchText,
+        triggeringEvent: prepared.triggeringEvent
+          ? sql`${prepared.triggeringEvent}::triggering_event`
+          : null,
       });
     },
 
     async update(record) {
       const searchText = buildSearchText(record);
-
       dbService.updateMetadata(record);
-      await dbService.update(table, { ...record, searchText }, eq(table.id, record.id));
+      await dbService.update(table, {
+        ...record,
+        searchText,
+        triggeringEvent: record.triggeringEvent
+          ? sql`${record.triggeringEvent}::triggering_event`
+          : null,
+      }, eq(table.id, record.id));
     },
 
     async remove(id) {

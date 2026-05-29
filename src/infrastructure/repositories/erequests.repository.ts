@@ -33,6 +33,10 @@ export function createErequestsRepository({
     return sql`${value}::erequest_blob_download_status`;
   }
 
+  function mapTriggeringEvent(value: string) {
+    return sql`${value}::triggering_event`;
+  }
+
   function buildWhere(options?: ErequestSearchOptions) {
     const tenantId = cxt.getNonEmptyTenantId();
     const clauses = [eq(erequests.tenantId, tenantId)];
@@ -106,6 +110,7 @@ export function createErequestsRepository({
       const insertRecord = {
         ...dbService.initMetadataAndTenant(record),
         storageStatus: mapStorageStatus(record.storageStatus),
+        ...(record.triggeringEvent && { triggeringEvent: mapTriggeringEvent(record.triggeringEvent) }),
       };
       await db
         .insert(erequests)
@@ -120,6 +125,9 @@ export function createErequestsRepository({
       const updateRecord: Record<string, unknown> = { ...record };
       if (record.storageStatus) {
         updateRecord.storageStatus = mapStorageStatus(record.storageStatus);
+      }
+      if (record.triggeringEvent) {
+        updateRecord.triggeringEvent = mapTriggeringEvent(record.triggeringEvent);
       }
       dbService.updateMetadata(updateRecord);
       await db.update(erequests).set(updateRecord).where(

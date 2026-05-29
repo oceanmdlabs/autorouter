@@ -1,8 +1,10 @@
 import {
   Duration,
+  RemovalPolicy,
   aws_ec2 as ec2,
   aws_iam as iam,
   aws_lambda as lambda,
+  aws_s3 as s3,
   aws_apigatewayv2 as apigwv2,
   aws_apigatewayv2_integrations as apigwv2Integrations,
 } from "aws-cdk-lib";
@@ -74,12 +76,29 @@ export class AppConstruct extends Construct {
       );
     }
 
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
+        resources: ["*"],
+      })
+    );
+
+    const erequestsBucket = new s3.Bucket(this, "ErequestsBucket", {
+      bucketName: `${props.namePrefix}-erequests`,
+      removalPolicy: RemovalPolicy.RETAIN,
+      blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
+    });
+
+    erequestsBucket.grantReadWrite(role);
+
     const baseEnv: Record<string, string> = {
       ...props.env,
       ...props.secretEnv,
       DB_URL: props.dbUrl,
       URL: props.publicUrl ?? "",
       DEPLOY_URL: props.publicUrl ?? "",
+      EREQUEST_S3_BUCKET: erequestsBucket.bucketName,
     };
 
     if (

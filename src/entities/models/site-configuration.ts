@@ -9,7 +9,7 @@ import {
 const OceanServerEnum = z.enum(["ocean", "test", "staging", "local"]);
 export type OceanServer = z.infer<typeof OceanServerEnum>;
 
-const AiProviderEnum = z.enum(["openai", "google", "cohere"]);
+const AiProviderEnum = z.enum(["openai", "google", "cohere", "bedrock"]);
 export type AiProvider = z.infer<typeof AiProviderEnum>;
 
 const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({

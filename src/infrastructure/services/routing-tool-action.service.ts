@@ -21,17 +21,20 @@ export const createRoutingToolActionService = (
     actions: RoutingToolAction<RoutingToolName>[],
     eventContext: RoutingEventContext,
     ruleName?: string
-  ) {
+  ): Promise<Map<string, string>> {
+    const results = new Map<string, string>();
     for (const action of actions) {
-      await executeAction(action, eventContext, ruleName);
+      const result = await executeAction(action, eventContext, ruleName);
+      if (result) results.set(action.id, result);
     }
+    return results;
   }
 
   async function executeAction(
     action: RoutingToolAction<RoutingToolName>,
     eventContext: RoutingEventContext,
     ruleName?: string
-  ): Promise<void> {
+  ): Promise<string | undefined> {
     // Log the action being executed
     cxt.logger.info(
       `Executing routing tool action with id ${action.id}: ${
@@ -51,9 +54,10 @@ export const createRoutingToolActionService = (
       eventContext: RoutingEventContext,
       cxt: ApplicationContext,
       ruleName?: string
-    ) => Promise<void>;
+    ) => Promise<string | void>;
     try {
-      await handler(action, eventContext, cxt, ruleName);
+      const result = await handler(action, eventContext, cxt, ruleName);
+      return result ?? undefined;
     } catch (e) {
       cxt.logger.error(e);
     }

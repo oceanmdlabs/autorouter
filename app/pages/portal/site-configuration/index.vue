@@ -1190,8 +1190,7 @@ function isMaskedSecretValue(value: string | null | undefined) {
             </AccordionTrigger>
             <AccordionContent class="pb-6">
               <p class="text-sm text-gray-600 mt-2 leading-relaxed">
-                Configure your email settings for sending notifications using
-                SMTP2GO.
+                Configure your email settings for sending notifications.
               </p>
               <div class="space-y-4 bg-gray-50 p-4 rounded-lg">
                 <div class="space-y-2">
@@ -1205,6 +1204,7 @@ function isMaskedSecretValue(value: string | null | undefined) {
                       <SelectValue placeholder="Select an email provider" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="ses">Amazon SES</SelectItem>
                       <SelectItem value="smtp2go">SMTP2GO</SelectItem>
                     </SelectContent>
                   </Select>
@@ -1229,7 +1229,12 @@ function isMaskedSecretValue(value: string | null | undefined) {
                     {{ errors.emailFromAddress }}
                   </p>
                 </div>
-                <div class="space-y-2">
+                <div v-if="formValues.emailProvider === 'ses'" class="space-y-2">
+                  <p class="text-sm text-gray-600">
+                    Amazon SES uses the IAM role attached to the service. No API key is required.
+                  </p>
+                </div>
+                <div v-if="formValues.emailProvider !== 'ses'" class="space-y-2">
                   <Label for="emailApiKey">SMTP2GO API Key</Label>
                   <div class="flex items-center gap-2">
                     <Input
@@ -1304,7 +1309,7 @@ function isMaskedSecretValue(value: string | null | undefined) {
                         isTestingEmail ||
                         !formValues.emailProvider ||
                         !formValues.emailFromAddress ||
-                        !formValues.emailApiKey ||
+                        (formValues.emailProvider !== 'ses' && !formValues.emailApiKey) ||
                         !testEmailTo.trim()
                       "
                     >

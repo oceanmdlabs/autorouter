@@ -8,6 +8,8 @@ export interface EmailService {
 
   sendTemplatedEmail(params: {
     to: string;
+    cc?: string;
+    bcc?: string;
     subject: string;
     message: string;
     referralLink?: string;
@@ -18,5 +20,5 @@ export interface EmailConfig {
   provider: string;
   fromAddress: string;
   fromName?: string;
-  apiKey: string;
+  apiKey?: string;
 }

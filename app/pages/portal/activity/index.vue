@@ -47,9 +47,8 @@ const { data: siteConfig } = useAsyncData('site-config', async () => {
   }
 });
 
-// Function to get the Ocean host URL
 const getOceanHost = () => {
-  return getOceanServerUrl('ocean');
+  return getOceanServerUrl(siteConfig.value?.siteConfig?.oceanServer ?? 'ocean');
 };
 
 type RuleAction = { tool: string; input: Record<string, any>; result?: string } | string;

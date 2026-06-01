@@ -38,7 +38,8 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
   ) {
     referralLink = getReferralUrl(
       eventContext.referralRef,
-      siteConfig.oceanSiteNum
+      siteConfig.oceanSiteNum,
+      siteConfig.oceanServer ?? "ocean"
     );
   }
 

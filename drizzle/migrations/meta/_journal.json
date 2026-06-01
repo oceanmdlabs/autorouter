@@ -43,6 +43,13 @@
       "when": 1779995657267,
       "tag": "0005_sturdy_patch",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1748736000000,
+      "tag": "0006_ses_email",
+      "breakpoints": true
     }
   ]
 }

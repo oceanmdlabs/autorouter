@@ -427,6 +427,8 @@ export const siteConfig = pgTable(
     emailApiKeyEncrypted: text("email_api_key_encrypted"),
     emailFromAddress: text("email_from_address"),
     emailFromName: text("email_from_name"),
+    emailDailySentCount: integer("email_daily_sent_count"),
+    emailDailySentDate: text("email_daily_sent_date"),
     // Open API Credentials - Optional connection for Ocean patient engagement
     siteKeyEncrypted: text("site_key_encrypted"),
     siteCredentialEncrypted: text("site_credential_encrypted"),

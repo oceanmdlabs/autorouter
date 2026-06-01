@@ -12,6 +12,9 @@ export type OceanServer = z.infer<typeof OceanServerEnum>;
 const AiProviderEnum = z.enum(["openai", "google", "cohere", "bedrock"]);
 export type AiProvider = z.infer<typeof AiProviderEnum>;
 
+const EmailProviderEnum = z.enum(["smtp2go", "ses"]);
+export type EmailProvider = z.infer<typeof EmailProviderEnum>;
+
 const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   name: z
     .string()
@@ -50,7 +53,7 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   aiProvider: AiProviderEnum.optional().nullable(),
   aiApiKey: z.string().trim().max(255).optional().nullable(),
   aiModel: z.string().trim().max(255).optional().nullable(),
-  emailProvider: z.string().trim().max(255).optional().nullable(),
+  emailProvider: EmailProviderEnum.optional().nullable(),
   emailFromAddress: z
     .string()
     .email("Invalid email address")
@@ -58,6 +61,8 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
     .nullable(),
   emailFromName: z.string().trim().max(255).optional().nullable(),
   emailApiKey: z.string().trim().max(255).optional().nullable(),
+  emailDailySentCount: z.number().int().nonnegative().optional().nullable(),
+  emailDailySentDate: z.string().optional().nullable(),
   // Open API Credentials - Optional connection for Ocean patient engagement
   siteKey: z.string().trim().max(255).optional().nullable(),
   siteCredential: z.string().trim().max(255).optional().nullable(),

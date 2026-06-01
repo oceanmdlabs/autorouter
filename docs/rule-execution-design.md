@@ -6,6 +6,7 @@ This note covers the design direction for:
 - [#8](https://github.com/oceanmdlabs/autorouter/issues/8): dry-run payload preview and optional sandbox execution
 - [#12](https://github.com/oceanmdlabs/autorouter/issues/12): duplicate and conflict detection for messaging tools
 - [#14](https://github.com/oceanmdlabs/autorouter/issues/14): LLM decision and tool execution audit UI
+- [#42](https://github.com/oceanmdlabs/autorouter/issues/42): intake questionnaire rules linked to archived inbound eRequests
 
 The current system evaluates all tenant rules in repository order, then executes every returned tool action. That is simple, but it gives administrators no first-class way to reason about order, intentional short-circuiting, skipped rules, or conflicting actions.
 
@@ -82,6 +83,31 @@ Recommended first version:
 - Do not feed prior outcomes into LLM prompts by default.
 - Stop later evaluations when a matched rule has `stopProcessingOnMatch`.
 - Consider prior-outcome prompt context later, after there is a concrete use case that cannot be solved with rule order plus stop-processing.
+
+## Cross-Event Intake And Referral Context
+
+Some workflows need a rule to evaluate information from two related Ocean events rather than only the event currently being delivered. A concrete example is an intake questionnaire completed through Patient Engagement after an inbound eReferral or eConsult has already been received and archived.
+
+Recommended design:
+
+- Add a dedicated `intake_questionnaire_completed` routing event.
+- Trigger it from the Patient Engagement forms-completion webhook after the completed questionnaire and patient note are fetched.
+- Match the PE patient to archived inbound eRequests within the same tenant.
+- Prefer exact health number plus date-of-birth matching.
+- If health number matching is unavailable or does not find a candidate, fall back to normalized first name, surname, and date-of-birth.
+- If more than one archived inbound eRequest matches, select the most recent inbound referral by `receivedAt`.
+- Surface the "most recent matching inbound referral" heuristic clearly in rule configuration so administrators know that multiple matching referrals can be resolved by recency.
+- Always write an Activity Log entry that records whether the intake event found no archived referral, found one referral, or found multiple referrals and selected the most recent one.
+
+The enriched rule context should include both sides of the workflow:
+
+- The completed intake questionnaire and Patient Engagement note.
+- The matched archived eRequest metadata.
+- The matched eRequest FHIR bundle from `erequests.rawBundle`, exposed to routing tools as the service request bundle when an outbound Ocean action targets that referral.
+
+The feature should require eRequest archival to be enabled before the intake questionnaire is completed. If no archived eRequest can be matched, the system should not run `intake_questionnaire_completed` rules because there is no referral target for Ocean service-request actions.
+
+The retained `rawBundle` is expected to be enough to construct most existing outbound Ocean messages because the current message builders derive status changes, forwarding, booking instructions, category updates, and communications from a `serviceRequestBundle`. Attachment-dependent tools need additional design because archived attachment blobs are stored separately from the in-memory `attachments` field used during live request processing.
 
 ## Conflict Detection
 

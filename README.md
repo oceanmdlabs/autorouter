@@ -76,6 +76,7 @@ npm run test
 This repository is an intentionally practical reference implementation, not a complete clinical routing platform.
 
 - Rules evaluate the referral event payload, the rule prompt, and any tool-specific inputs available at evaluation time. They do not natively query external EMRs, scheduling systems, or live Ocean operational data during rule evaluation.
+- Cross-event rules that combine Patient Engagement intake questionnaires with inbound eRequests require eRequest archival. When multiple archived referrals match the same patient, the planned rule-engine heuristic is to select the most recent inbound referral and record the match outcome in the Activity Log.
 - The Testing UI simulates rule evaluation and shows the actions that would be triggered, but it does not execute those actions against external systems.
 - Rule collisions are still possible when multiple rules apply to the same event. Rules are evaluated and executed sequentially today, but there is no explicit rule priority model yet.
 - Forwarding currently targets a single named listing per tool call. Ranked alternatives and criteria-based fallback routing are future enhancements rather than current behavior.

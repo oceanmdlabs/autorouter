@@ -30,6 +30,41 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
     return;
   }
 
+  // Allowlist enforcement — every To and CC recipient must be explicitly approved
+  const allowlist = (siteConfig.emailSendAllowlist ?? []).map((e) =>
+    e.toLowerCase()
+  );
+  const toAddresses = to.split(",").map((e) => e.trim().toLowerCase());
+  const ccAddresses = cc
+    ? cc.split(",").map((e) => e.trim().toLowerCase())
+    : [];
+  const allRecipients = [...toAddresses, ...ccAddresses];
+
+  if (allowlist.length === 0) {
+    cxt.logger.warn(`Email allowlist is empty — all agent sends are blocked`);
+    await cxt.getActivityLogEntriesRepository().create({
+      ...eventContext,
+      tool: TOOL_NAME,
+      error: `${rulePrefix}Email send blocked: no approved recipients are configured (allowlist is empty)`,
+    });
+    return;
+  }
+
+  const blockedRecipients = allRecipients.filter(
+    (addr) => !allowlist.includes(addr)
+  );
+  if (blockedRecipients.length > 0) {
+    cxt.logger.warn(
+      `Email send blocked — recipients not in allowlist: ${blockedRecipients.join(", ")}`
+    );
+    await cxt.getActivityLogEntriesRepository().create({
+      ...eventContext,
+      tool: TOOL_NAME,
+      error: `${rulePrefix}Email send blocked: recipient(s) not in approved allowlist: ${blockedRecipients.join(", ")}`,
+    });
+    return;
+  }
+
   // Daily sending limit guard
   const today = new Date().toISOString().slice(0, 10);
   const currentCount =

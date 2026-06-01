@@ -31,6 +31,7 @@ const siteConfigurationCategoryFields = {
     "emailFromAddress",
     "emailFromName",
     "emailApiKey",
+    "emailSendAllowlist",
   ],
   "OpenAPI settings": [
     "siteKey",

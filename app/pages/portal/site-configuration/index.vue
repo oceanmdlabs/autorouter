@@ -55,7 +55,7 @@ const panelFields = {
   inbound: ["clientSecret"],
   sms: ["twilioAccountSid", "twilioAuthToken", "twilioPhoneNumber"],
   ai: ["aiProvider", "aiApiKey", "aiModel"],
-  email: ["emailProvider", "emailFromAddress", "emailApiKey", "emailFromName"],
+  email: ["emailProvider", "emailFromAddress", "emailApiKey", "emailFromName", "emailSendAllowlist"],
   openApi: ["siteKey", "siteCredential", "sharedEncryptionKey"],
   erequests: [
     "erequestArchivalEnabled",
@@ -75,6 +75,36 @@ const savingPanels = ref<Record<SettingsPanel, boolean>>({
   openApi: false,
   erequests: false,
 });
+
+// Email allowlist management
+const newAllowlistEmail = ref("")
+const allowlistEmailError = ref("")
+
+function addAllowlistEmail() {
+  const email = newAllowlistEmail.value.trim().toLowerCase()
+  if (!email) return
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  if (!emailRegex.test(email)) {
+    allowlistEmailError.value = "Enter a valid email address"
+    return
+  }
+  const current = formValues.value?.emailSendAllowlist ?? []
+  if (current.map(e => e.toLowerCase()).includes(email)) {
+    allowlistEmailError.value = "Address is already in the allowlist"
+    return
+  }
+  if (formValues.value) {
+    formValues.value.emailSendAllowlist = [...current, email]
+  }
+  newAllowlistEmail.value = ""
+  allowlistEmailError.value = ""
+}
+
+function removeAllowlistEmail(email: string) {
+  if (formValues.value) {
+    formValues.value.emailSendAllowlist = (formValues.value.emailSendAllowlist ?? []).filter(e => e !== email)
+  }
+}
 
 // Test email and SMS variables
 const isTestingEmail = ref(false);
@@ -156,6 +186,7 @@ watch(
         emailFromAddress: site.emailFromAddress ?? "",
         emailApiKey: site.emailApiKey ?? "",
         emailFromName: site.emailFromName ?? "",
+        emailSendAllowlist: site.emailSendAllowlist ?? [],
         siteKey: site.siteKey ?? "",
         siteCredential: site.siteCredential ?? "",
         sharedEncryptionKey: site.sharedEncryptionKey ?? "",
@@ -1272,6 +1303,46 @@ function isMaskedSecretValue(value: string | null | undefined) {
                   >
                     {{ errors.emailFromName }}
                   </p>
+                </div>
+
+                <!-- Email Send Allowlist -->
+                <div class="space-y-2">
+                  <Label>Approved Send-to Addresses</Label>
+                  <p class="text-sm text-gray-600">
+                    Agent email sends are blocked unless every To and CC recipient is in this list.
+                    An empty list blocks all agent email sends.
+                  </p>
+                  <div
+                    v-if="(formValues.emailSendAllowlist ?? []).length === 0"
+                    class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                  >
+                    No approved addresses — all agent email sends are currently blocked.
+                  </div>
+                  <div v-else class="space-y-1">
+                    <div
+                      v-for="email in formValues.emailSendAllowlist"
+                      :key="email"
+                      class="flex items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
+                    >
+                      <span class="font-mono text-slate-800">{{ email }}</span>
+                      <button
+                        type="button"
+                        class="ml-2 text-slate-400 hover:text-red-600"
+                        @click="removeAllowlistEmail(email)"
+                        aria-label="Remove"
+                      >✕</button>
+                    </div>
+                  </div>
+                  <div class="flex gap-2">
+                    <Input
+                      v-model="newAllowlistEmail"
+                      placeholder="doctor@example.com"
+                      class="flex-1"
+                      @keydown.enter.prevent="addAllowlistEmail"
+                    />
+                    <Button type="button" variant="outline" @click="addAllowlistEmail">Add</Button>
+                  </div>
+                  <p v-if="allowlistEmailError" class="text-sm text-destructive">{{ allowlistEmailError }}</p>
                 </div>
               </div>
 

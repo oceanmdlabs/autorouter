@@ -45,6 +45,7 @@ function makeSiteConfig(overrides: Partial<SiteConfiguration> = {}): SiteConfigu
     emailProvider: "smtp2go",
     emailFromAddress: "no-reply@example.com",
     emailApiKey: "smtp2go-api-key",
+    emailSendAllowlist: ["doc@example.com"],
     ...overrides,
   } as SiteConfiguration;
 }

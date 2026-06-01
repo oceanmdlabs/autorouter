@@ -63,6 +63,7 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   emailApiKey: z.string().trim().max(255).optional().nullable(),
   emailDailySentCount: z.number().int().nonnegative().optional().nullable(),
   emailDailySentDate: z.string().optional().nullable(),
+  emailSendAllowlist: z.array(z.string().email()).optional().nullable(),
   // Open API Credentials - Optional connection for Ocean patient engagement
   siteKey: z.string().trim().max(255).optional().nullable(),
   siteCredential: z.string().trim().max(255).optional().nullable(),

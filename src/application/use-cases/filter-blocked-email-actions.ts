@@ -7,10 +7,12 @@ export function filterBlockedEmailActions(
   const allowlistLower = (allowlist ?? []).map((e) => e.toLowerCase());
 
   return results.map((result) => {
+    const blockedNotes: string[] = [];
+
     const filteredActions = result.evaluation.actions.filter((action) => {
       if (action.tool !== "sendEmail") return true;
 
-      const input = action.input as { to?: string; cc?: string };
+      const input = action.input as { to?: string; cc?: string; subject?: string };
       const toAddresses = (input.to ?? "")
         .split(",")
         .map((e) => e.trim().toLowerCase())
@@ -20,16 +22,33 @@ export function filterBlockedEmailActions(
         : [];
       const allRecipients = [...toAddresses, ...ccAddresses];
 
-      // Empty allowlist blocks all sends; otherwise every recipient must be listed
-      return (
-        allowlistLower.length > 0 &&
-        allRecipients.every((addr) => allowlistLower.includes(addr))
+      if (allowlistLower.length === 0) {
+        blockedNotes.push(
+          `Attempted to send email to ${input.to ?? "unknown"} but no approved recipients are configured (allowlist is empty).`
+        );
+        return false;
+      }
+
+      const blockedAddresses = allRecipients.filter(
+        (addr) => !allowlistLower.includes(addr)
       );
+      if (blockedAddresses.length > 0) {
+        blockedNotes.push(
+          `Attempted to send email to ${input.to ?? "unknown"} but ${blockedAddresses.join(", ")} ${blockedAddresses.length === 1 ? "is" : "are"} not on the allowlist.`
+        );
+        return false;
+      }
+
+      return true;
     });
 
-    if (filteredActions.length === result.evaluation.actions.length) {
+    if (blockedNotes.length === 0) {
       return result;
     }
+
+    const existingComment = result.evaluation.comment
+      ? `${result.evaluation.comment} `
+      : "";
 
     return {
       ...result,
@@ -37,9 +56,7 @@ export function filterBlockedEmailActions(
         ...result.evaluation,
         actions: filteredActions,
         triggered: filteredActions.length > 0,
-        ...(filteredActions.length === 0 && result.evaluation.triggered
-          ? { comment: "Email action(s) blocked: recipient not in approved allowlist." }
-          : {}),
+        comment: `${existingComment}${blockedNotes.join(" ")}`,
       },
     };
   });

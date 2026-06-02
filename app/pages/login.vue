@@ -153,6 +153,10 @@ onBeforeUnmount(() => {
       <div class="text-center">
         <img src="/ocean-labs-logo.svg" alt="Ocean Labs Logo" class="h-12 w-auto mx-auto mb-4" />
         <h2 class="mt-6 text-3xl font-extrabold text-gray-900">Autorouter</h2>
+        <p class="mt-2 text-sm font-semibold text-gray-700">Free Community Edition</p>
+        <p class="mt-1 text-xs leading-5 text-gray-500">
+          A pro bono version from OceanMD with community-level support and usage expectations.
+        </p>
       </div>
       <div class="rounded-lg border px-4 py-3" :class="warmupCopy.tone">
         <p class="text-sm font-semibold">{{ warmupCopy.title }}</p>

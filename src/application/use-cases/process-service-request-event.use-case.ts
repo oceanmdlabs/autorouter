@@ -2,6 +2,7 @@ import { ApplicationContext } from "@/src/entities/models/application-context";
 import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluate-rule.service";
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
 import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
+import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
 export interface ProcessServiceRequestEventOutput {
   message: string;
 }
@@ -39,8 +40,14 @@ export async function processServiceRequestEventUseCase(
       }
     }
 
+    const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
+    const filteredResults = filterBlockedEmailActions(
+      evaluationResults,
+      siteConfig?.emailSendAllowlist
+    );
+
     const actionResults = new Map<string, string>();
-    for (const result of evaluationResults) {
+    for (const result of filteredResults) {
       cxt.logger.info(
         `Processing rule ${result.ruleName} evaluation actions for ${
           event.referralRef
@@ -59,10 +66,10 @@ export async function processServiceRequestEventUseCase(
       }
     }
 
-    if (evaluationResults.length === 0) {
+    if (filteredResults.length === 0) {
       details = details || "No actions taken.";
     } else {
-      const rulesSummary = evaluationResults.map((r) => ({
+      const rulesSummary = filteredResults.map((r) => ({
         ruleName: r.ruleName,
         triggered: r.evaluation.triggered ?? false,
         ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
@@ -79,7 +86,7 @@ export async function processServiceRequestEventUseCase(
       }));
       details = JSON.stringify({ rules: rulesSummary });
     }
-    error = evaluationResults
+    error = filteredResults
       .map((r) => r.evaluation.error)
       .filter(Boolean)
       .join("\n");

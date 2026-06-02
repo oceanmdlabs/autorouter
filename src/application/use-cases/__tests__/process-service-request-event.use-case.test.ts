@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import type { IActivityLogEntriesRepository } from "@/src/application/repositories/activity-log-entries.repository.interface";
 import type { IRoutingRulesRepository } from "@/src/application/repositories/routing-rules.repository.interface";
+import type { ISiteConfigurationRepository } from "@/src/application/repositories/site-configuration.repository.interface";
 import type { IAiService } from "@/src/application/services/ai.service.interface";
 import { ApplicationContext } from "@/src/entities/models/application-context";
 import type { RoutingRule } from "@/src/entities/models/routing-rule";
@@ -13,7 +14,15 @@ class TestApplicationContext extends ApplicationContext {
   constructor(
     public routingRulesRepo: IRoutingRulesRepository,
     public aiSvc: IAiService,
-    public activityLogRepo: IActivityLogEntriesRepository
+    public activityLogRepo: IActivityLogEntriesRepository,
+    public siteConfigRepo: ISiteConfigurationRepository = {
+      getForTenant: vi.fn().mockResolvedValue(null),
+      getAll: vi.fn(),
+      findByClientId: vi.fn(),
+      recordSuccessfulConnection: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+    }
   ) {
     super({
       info: vi.fn(),
@@ -33,6 +42,10 @@ class TestApplicationContext extends ApplicationContext {
 
   override getActivityLogEntriesRepository(): IActivityLogEntriesRepository {
     return this.activityLogRepo;
+  }
+
+  override getSiteConfigurationRepository(): ISiteConfigurationRepository {
+    return this.siteConfigRepo;
   }
 }
 

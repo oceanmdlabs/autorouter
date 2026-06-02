@@ -4,6 +4,7 @@ import { type RoutingEventType } from "@/src/entities/models/routing-event-type"
 import { startSpan } from "@sentry/node";
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
 import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluate-rule.service";
+import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
 
 export const testServiceRequestUseCase =
   (cxt: ApplicationContext) =>
@@ -34,6 +35,7 @@ export const testServiceRequestUseCase =
           })
         );
       }
-      return evaluationResults;
+      const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
+      return filterBlockedEmailActions(evaluationResults, siteConfig?.emailSendAllowlist);
     });
   };

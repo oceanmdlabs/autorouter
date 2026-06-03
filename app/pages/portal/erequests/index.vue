@@ -60,7 +60,7 @@ const activeSearchParams = computed(() =>
 );
 const submittedSearchParams = ref<Record<string, string | undefined>>({});
 
-const { data: siteConfig } = useAsyncData("erequest-site-config", async () => {
+const { data: siteConfig } = useAsyncData("site-config", async () => {
   try {
     return await requestFetch<{
       siteConfig: SiteConfiguration | null;

@@ -28,11 +28,18 @@ const baseFields = baseResourceSchema.merge(tenantConfinedSchema).extend({
   active: z.boolean().default(true),
   enabledTools: z.array(z.string() as z.ZodType<RoutingToolName>).default([]),
   summarizeAttachmentsAcknowledged: z.boolean().default(false),
+  priority: z.number().int().positive(),
 });
 
 const schema = baseFields.superRefine(requireSummarizeAcknowledgement);
-const newSchema = baseFields.merge(newBaseResourceSchema).superRefine(requireSummarizeAcknowledgement);
-const updateSchema = baseFields.merge(updateBaseResourceSchema).superRefine(requireSummarizeAcknowledgement);
+const newSchema = baseFields
+  .merge(newBaseResourceSchema)
+  .extend({ priority: z.number().int().positive().optional() })
+  .superRefine(requireSummarizeAcknowledgement);
+const updateSchema = baseFields
+  .merge(updateBaseResourceSchema)
+  .extend({ priority: z.number().int().positive().optional() })
+  .superRefine(requireSummarizeAcknowledgement);
 
 export const routingRuleSchema = schema;
 export const newRoutingRuleSchema = newSchema;

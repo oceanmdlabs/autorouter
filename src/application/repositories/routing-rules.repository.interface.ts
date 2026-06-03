@@ -9,4 +9,5 @@ export interface IRoutingRulesRepository {
   create(service: NewRoutingRule): Promise<void>;
   update(service: Partial<RoutingRule> & { id: string }): Promise<void>;
   remove(id: string): Promise<void>;
+  reorder(orderedIds: string[]): Promise<void>;
 }

@@ -1,477 +1,98 @@
 <script setup lang="ts">
-import {
-  AlertCircle,
-  AlertTriangle,
-  CheckCircle,
-  Copy,
-} from "lucide-vue-next";
-import { toast } from "vue-sonner";
-import { handleMissingActiveTenantError } from "@/app/lib/active-tenant";
-import { formatTimestampWithMinutePrecision } from "@/shared/lib/utils";
-import { getOceanServerUrl } from "@/src/application/services/ocean-server.utils";
-import type {
-  NewSiteConfiguration,
-  SiteConfiguration,
-} from "@/src/entities/models/site-configuration";
-import { uuid } from "@/src/entities/models/uuid";
-const requestFetch = useRequestFetch();
-const errors = ref<Record<string, string>>({});
-const formValues = ref<NewSiteConfiguration | null>(null);
-const isNewConfig = ref(false);
-const showEmptyState = ref(false);
-const lastSuccessfulConnection = ref<Date | null>(null);
-const { user } = useUserSession();
-const memberships = computed(() => user.value?.memberships ?? []);
-const activeTenantId = computed(
-  () => user.value?.activeTenantId ?? user.value?.tenantId ?? null,
-);
-const activeMembership = computed(() =>
-  memberships.value.find(
-    (membership) => membership.tenantId === activeTenantId.value,
-  ),
-);
-const canManageTenant = computed(
-  () =>
-    user.value?.roles?.admin === "system" ||
-    activeMembership.value?.role === "admin",
-);
-const hadPreviousConfig = ref(false);
-const isTestingConnection = ref(false);
-const testConnectionResult = ref<{ success: boolean; error?: string } | null>(
-  null,
-);
+import { AlertTriangle } from "lucide-vue-next";
 
-const SECRET_MASK_CHARACTER = "•";
+const {
+  errors,
+  formValues,
+  isNewConfig,
+  showEmptyState,
+  lastSuccessfulConnection,
+  hadPreviousConfig,
+  savingPanels,
+  status,
+  canManageTenant,
+  oceanServerUrl,
+  tokenEndpoint,
+  apiEndpoint,
+  cdsHookEndpoint,
+  isRecentSuccessfulInboundConnection,
+  user,
+  panelHasChanges,
+  savePanel,
+  handleCreateConfig,
+  copyToClipboard,
+  isMaskedSecretValue,
+} = useSiteConfigurationForm();
 
-const panelFields = {
-  connection: [
-    "name",
-    "clientId",
-    "oceanServer",
-    "oceanSiteNum",
-    "oceanClientId",
-    "oceanClientSecret",
-  ],
-  inbound: ["clientSecret"],
-  sms: ["twilioAccountSid", "twilioAuthToken", "twilioPhoneNumber"],
-  ai: ["aiProvider", "aiApiKey", "aiModel"],
-  email: ["emailProvider", "emailFromAddress", "emailApiKey", "emailFromName", "emailSendAllowlist"],
-  openApi: ["siteKey", "siteCredential", "sharedEncryptionKey"],
-  erequests: [
-    "erequestArchivalEnabled",
-    "erequestEnabledConfirmedAt",
-    "erequestDisabledConfirmedAt",
-  ],
-} as const;
-
-type SettingsPanel = keyof typeof panelFields;
-
-const savingPanels = ref<Record<SettingsPanel, boolean>>({
-  connection: false,
-  inbound: false,
-  sms: false,
-  ai: false,
-  email: false,
-  openApi: false,
-  erequests: false,
-});
-
-// Email allowlist management
-const newAllowlistEmail = ref("")
-const allowlistEmailError = ref("")
-
-function addAllowlistEmail() {
-  const email = newAllowlistEmail.value.trim().toLowerCase()
-  if (!email) return
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  if (!emailRegex.test(email)) {
-    allowlistEmailError.value = "Enter a valid email address"
-    return
-  }
-  const current = formValues.value?.emailSendAllowlist ?? []
-  if (current.map(e => e.toLowerCase()).includes(email)) {
-    allowlistEmailError.value = "Address is already in the allowlist"
-    return
-  }
-  if (formValues.value) {
-    formValues.value.emailSendAllowlist = [...current, email]
-  }
-  newAllowlistEmail.value = ""
-  allowlistEmailError.value = ""
+// Connection panel slice
+const connectionSlice = computed(() => ({
+  name: formValues.value?.name ?? "",
+  oceanServer: formValues.value?.oceanServer ?? "ocean",
+  oceanSiteNum: formValues.value?.oceanSiteNum ?? "",
+  oceanClientId: formValues.value?.oceanClientId ?? "",
+  oceanClientSecret: formValues.value?.oceanClientSecret ?? "",
+}));
+function updateConnectionSlice(v: typeof connectionSlice.value) {
+  if (formValues.value) Object.assign(formValues.value, v);
 }
 
-function removeAllowlistEmail(email: string) {
-  if (formValues.value) {
-    formValues.value.emailSendAllowlist = (formValues.value.emailSendAllowlist ?? []).filter(e => e !== email)
-  }
+// Inbound panel slice
+const inboundSlice = computed(() => ({
+  clientId: formValues.value?.clientId ?? "",
+  clientSecret: formValues.value?.clientSecret ?? "",
+}));
+function updateInboundSlice(v: typeof inboundSlice.value) {
+  if (formValues.value) Object.assign(formValues.value, v);
 }
 
-// Test email and SMS variables
-const isTestingEmail = ref(false);
-const testEmailResult = ref<{ success: boolean; error?: string } | null>(null);
-const testEmailTo = ref("");
-const testEmailSubject = ref("Test Email from Ocean Autorouter");
-const testEmailMessage = ref(
-  "This is a test email to verify your email configuration is working correctly.",
-);
-
-const isTestingSms = ref(false);
-const testSmsResult = ref<{ success: boolean; error?: string } | null>(null);
-const testSmsTo = ref("");
-const testSmsMessage = ref(
-  "This is a test SMS to verify your SMS configuration is working correctly.",
-);
-
-// Check localStorage on component mount
-onMounted(() => {
-  const hasHadConfig = localStorage.getItem("hadSiteConfiguration") === "true";
-  hadPreviousConfig.value = hasHadConfig;
-});
-const host = useRequestURL().host;
-const tokenEndpoint = computed(() => {
-  return `${host}/api/oauth2/token`;
-});
-const apiEndpoint = computed(() => {
-  return `${host}/api/fhir/$process-message`;
-});
-const cdsHookEndpoint = computed(() => {
-  return `${host}/api/cds`;
-});
-const { data: loadedData, status } = useAsyncData("site", async () => {
-  return await requestFetch<{
-    siteConfig: SiteConfiguration | null;
-  }>(`/api/site-configuration`);
-});
-
-watch(
-  () => loadedData.value,
-  (data) => {
-    if (status.value === "pending") return;
-    const site = data?.siteConfig;
-    if (!site) {
-      formValues.value = {
-        id: uuid(),
-        name: "",
-        clientId: uuid(),
-        clientSecret: uuid(),
-        oceanServer: "ocean",
-        oceanSiteNum: "",
-        oceanClientId: "",
-        oceanClientSecret: "",
-        erequestArchivalEnabled: false,
-      };
-      isNewConfig.value = true;
-      showEmptyState.value = true;
-    } else {
-      // Store the fact that we've had a configuration
-      localStorage.setItem("hadSiteConfiguration", "true");
-      hadPreviousConfig.value = true;
-      lastSuccessfulConnection.value = site.lastSuccessfulConnection ?? null;
-      formValues.value = {
-        id: site.id,
-        name: site.name,
-        clientId: site.clientId,
-        clientSecret: site.clientSecret,
-        oceanServer: site.oceanServer,
-        oceanSiteNum: site.oceanSiteNum,
-        oceanClientId: site.oceanClientId,
-        oceanClientSecret: site.oceanClientSecret,
-        twilioAccountSid: site.twilioAccountSid ?? "",
-        twilioAuthToken: site.twilioAuthToken ?? "",
-        twilioPhoneNumber: site.twilioPhoneNumber ?? "",
-        aiProvider: site.aiProvider ?? "openai",
-        aiApiKey: site.aiApiKey,
-        aiModel: site.aiModel,
-        emailProvider: site.emailProvider ?? "smtp2go",
-        emailFromAddress: site.emailFromAddress ?? "",
-        emailApiKey: site.emailApiKey ?? "",
-        emailFromName: site.emailFromName ?? "",
-        emailSendAllowlist: site.emailSendAllowlist ?? [],
-        siteKey: site.siteKey ?? "",
-        siteCredential: site.siteCredential ?? "",
-        sharedEncryptionKey: site.sharedEncryptionKey ?? "",
-        erequestArchivalEnabled: site.erequestArchivalEnabled ?? false,
-        erequestEnabledConfirmedAt: site.erequestEnabledConfirmedAt ?? null,
-        erequestDisabledConfirmedAt: site.erequestDisabledConfirmedAt ?? null,
-      };
-      showEmptyState.value = false;
-    }
-  },
-  { immediate: true },
-);
-
-const oceanServerUrl = computed(() => {
-  return getOceanServerUrl(formValues.value?.oceanServer ?? "ocean");
-});
-
-const BEDROCK_PRESET_MODELS = [
-  "mistral.mistral-large-2402-v1:0",
-  "anthropic.claude-3-haiku-20240307-v1:0",
-  "anthropic.claude-3-sonnet-20240229-v1:0",
-];
-
-const bedrockModelIsPreset = computed(() => {
-  const model = formValues.value?.aiModel;
-  return model == null || BEDROCK_PRESET_MODELS.includes(model);
-});
-
-function onBedrockModelSelect(value: unknown) {
-  if (!formValues.value || typeof value !== "string") return;
-  if (value === "custom") {
-    formValues.value.aiModel = "";
-  } else {
-    formValues.value.aiModel = value;
-  }
+// SMS panel slice
+const smsSlice = computed(() => ({
+  twilioAccountSid: formValues.value?.twilioAccountSid ?? "",
+  twilioAuthToken: formValues.value?.twilioAuthToken ?? "",
+  twilioPhoneNumber: formValues.value?.twilioPhoneNumber ?? "",
+}));
+function updateSmsSlice(v: typeof smsSlice.value) {
+  if (formValues.value) Object.assign(formValues.value, v);
 }
 
-const isRecentSuccessfulInboundConnection = computed(() => {
-  if (!lastSuccessfulConnection.value) return false;
-  return (
-    new Date().getTime() - new Date(lastSuccessfulConnection.value).getTime() <=
-    24 * 60 * 60 * 1000
-  );
-});
-
-function clearPanelErrors(panel: SettingsPanel) {
-  for (const field of panelFields[panel]) {
-    delete errors.value[field];
-  }
+// AI panel slice
+const aiSlice = computed(() => ({
+  aiProvider: formValues.value?.aiProvider ?? null,
+  aiApiKey: formValues.value?.aiApiKey ?? null,
+  aiModel: formValues.value?.aiModel ?? null,
+}));
+function updateAiSlice(v: typeof aiSlice.value) {
+  if (formValues.value) Object.assign(formValues.value, v);
 }
 
-function mapValidationErrors(error: any) {
-  if (
-    error.data?.data?.name === "ZodError" &&
-    Array.isArray(error.data.data.issues)
-  ) {
-    error.data.data.issues.forEach(
-      (issue: { path: string[]; message: string }) => {
-        const fieldName = issue.path[issue.path.length - 1];
-        if (fieldName) {
-          errors.value[fieldName] = issue.message;
-        }
-      },
-    );
-    return true;
-  }
-  return false;
+// Email panel slice
+const emailSlice = computed(() => ({
+  emailProvider: formValues.value?.emailProvider ?? null,
+  emailFromAddress: formValues.value?.emailFromAddress ?? null,
+  emailApiKey: formValues.value?.emailApiKey ?? null,
+  emailFromName: formValues.value?.emailFromName ?? null,
+  emailSendAllowlist: formValues.value?.emailSendAllowlist ?? null,
+}));
+function updateEmailSlice(v: typeof emailSlice.value) {
+  if (formValues.value) Object.assign(formValues.value, v);
 }
 
-function panelHasChanges(panel: SettingsPanel) {
-  if (!formValues.value) return false;
-  const loadedSite = loadedData.value?.siteConfig;
-  if (!loadedSite) return panel === "connection";
-
-  return panelFields[panel].some((field) => {
-    return (
-      loadedSite[field as keyof SiteConfiguration] !== formValues.value?.[field]
-    );
-  });
+// OpenAPI panel slice
+const openApiSlice = computed(() => ({
+  siteKey: formValues.value?.siteKey ?? null,
+  siteCredential: formValues.value?.siteCredential ?? null,
+  sharedEncryptionKey: formValues.value?.sharedEncryptionKey ?? null,
+}));
+function updateOpenApiSlice(v: typeof openApiSlice.value) {
+  if (formValues.value) Object.assign(formValues.value, v);
 }
 
-function panelPayload(panel: SettingsPanel) {
-  if (!formValues.value) return null;
-  if (isNewConfig.value) {
-    return formValues.value;
-  }
-
-  const payload: Record<string, unknown> = { id: formValues.value.id };
-  for (const field of panelFields[panel]) {
-    payload[field] = formValues.value[field];
-  }
-
-  if (panel === "erequests") {
-    if (formValues.value.erequestArchivalEnabled) {
-      payload.erequestEnabledConfirmedAt = new Date();
-      payload.erequestDisabledConfirmedAt = null;
-    } else {
-      payload.erequestDisabledConfirmedAt = new Date();
-    }
-  }
-  return payload;
-}
-
-async function savePanel(panel: SettingsPanel) {
-  if (!canManageTenant.value) {
-    errors.value.general =
-      "Only tenant admins can update site configuration settings.";
-    return;
-  }
-
-  const payload = panelPayload(panel);
-  if (!payload) return;
-
-  savingPanels.value[panel] = true;
-  clearPanelErrors(panel);
-  delete errors.value.general;
-
-  try {
-    loadedData.value = {
-      siteConfig: await requestFetch<SiteConfiguration>("/api/site-configuration", {
-        method: "POST",
-        body: payload,
-      }),
-    };
-    isNewConfig.value = false;
-    toast.success("Settings saved");
-  } catch (error: any) {
-    console.error("Failed to save site configuration:", error);
-    if (await handleMissingActiveTenantError(error)) {
-      return;
-    }
-    if (error?.status === 403 || error?.data?.statusCode === 403) {
-      errors.value.general =
-        "Only tenant admins can update site configuration settings.";
-      return;
-    }
-    const hasValidationErrors = mapValidationErrors(error);
-    if (!hasValidationErrors) {
-      errors.value.general = "Failed to save site configuration";
-    }
-  } finally {
-    savingPanels.value[panel] = false;
-  }
-}
-
-function handleCreateConfig() {
-  showEmptyState.value = false;
-}
-
-async function handleTestConnection() {
-  if (!formValues.value) return;
-
-  isTestingConnection.value = true;
-  testConnectionResult.value = null;
-
-  try {
-    const response = await requestFetch<{ success: boolean; error?: string }>(
-      "/api/site-configuration/test-connection",
-      {
-        method: "POST",
-        body: {
-          oceanServer: formValues.value.oceanServer.trim(),
-          oceanClientId: formValues.value.oceanClientId.trim(),
-          oceanClientSecret: formValues.value.oceanClientSecret.trim(),
-        },
-      },
-    );
-    testConnectionResult.value = response;
-  } catch (error: any) {
-    if (await handleMissingActiveTenantError(error)) {
-      return;
-    }
-    testConnectionResult.value = {
-      success: false,
-      error: error.data?.error || "Failed to test connection",
-    };
-  } finally {
-    isTestingConnection.value = false;
-  }
-}
-
-async function handleTestEmail() {
-  // Validate that email address is provided
-  if (!testEmailTo.value.trim()) {
-    toast.error("Email address required", {
-      description: "Please enter an email address to send the test email to.",
-    });
-    return;
-  }
-
-  isTestingEmail.value = true;
-  testEmailResult.value = null;
-
-  try {
-    const response = await requestFetch<{ success: boolean; error?: string }>(
-      "/api/site-configuration/test-email",
-      {
-        method: "POST",
-        body: {
-          to: testEmailTo.value,
-          subject: testEmailSubject.value,
-          message: testEmailMessage.value,
-        },
-      },
-    );
-    testEmailResult.value = response;
-    if (response.success) {
-      toast.success("Test email sent successfully", {
-        description: `Email sent to ${testEmailTo.value}`,
-      });
-    }
-  } catch (error: any) {
-    if (await handleMissingActiveTenantError(error)) {
-      return;
-    }
-    testEmailResult.value = {
-      success: false,
-      error: error.data?.error || "Failed to send test email",
-    };
-    toast.error("Failed to send test email", {
-      description: error.data?.error || "Failed to send test email",
-    });
-  } finally {
-    isTestingEmail.value = false;
-  }
-}
-
-async function handleTestSms() {
-  // Validate that phone number is provided
-  if (!testSmsTo.value.trim()) {
-    toast.error("Phone number required", {
-      description: "Please enter a phone number to send the test SMS to.",
-    });
-    return;
-  }
-
-  isTestingSms.value = true;
-  testSmsResult.value = null;
-
-  try {
-    const response = await requestFetch<{ success: boolean; error?: string }>(
-      "/api/site-configuration/test-sms",
-      {
-        method: "POST",
-        body: {
-          to: testSmsTo.value,
-          message: testSmsMessage.value,
-        },
-      },
-    );
-    testSmsResult.value = response;
-    if (response.success) {
-      toast.success("Test SMS sent successfully", {
-        description: `SMS sent to ${testSmsTo.value}`,
-      });
-    }
-  } catch (error: any) {
-    if (await handleMissingActiveTenantError(error)) {
-      return;
-    }
-    testSmsResult.value = {
-      success: false,
-      error: error.data?.error || "Failed to send test SMS",
-    };
-    toast.error("Failed to send test SMS", {
-      description: error.data?.error || "Failed to send test SMS",
-    });
-  } finally {
-    isTestingSms.value = false;
-  }
-}
-
-function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text);
-  toast.success("Copied to clipboard", {
-    description: "The value has been copied to your clipboard",
-  });
-}
-
-function isMaskedSecretValue(value: string | null | undefined) {
-  return (
-    typeof value === "string" &&
-    value.length > 0 &&
-    [...value].every((character) => character === SECRET_MASK_CHARACTER)
-  );
+// eRequest archival panel slice
+const erequestSlice = computed(() => ({
+  erequestArchivalEnabled: formValues.value?.erequestArchivalEnabled ?? false,
+}));
+function updateErequestSlice(v: typeof erequestSlice.value) {
+  if (formValues.value) Object.assign(formValues.value, v);
 }
 </script>
 
@@ -530,1076 +151,91 @@ function isMaskedSecretValue(value: string | null | undefined) {
         </div>
 
         <Accordion type="multiple" class="space-y-4">
-          <AccordionItem
-            value="autorouter-to-ocean"
-            class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
-          >
-            <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <span class="flex flex-col gap-1 text-left">
-                <span class="text-base font-semibold text-gray-900">
-                  Connecting the Autorouter to Ocean
-                </span>
-                <span class="text-sm font-normal text-gray-600">
-                  Ocean site settings, OAuth credentials, and connection test
-                </span>
-              </span>
-            </AccordionTrigger>
-            <AccordionContent class="pb-6">
-              <div class="space-y-4">
-                <div class="space-y-2">
-                  <Label for="oceanServer">Server</Label>
-                  <Select
-                    id="oceanServer"
-                    v-model="formValues.oceanServer"
-                    :aria-invalid="errors.oceanServer ? 'true' : undefined"
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a server" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ocean"
-                        >Ocean Production (ocean.cognisantmd.com)
-                      </SelectItem>
-                      <SelectItem value="test"
-                        >Test (test.cognisantmd.com)</SelectItem
-                      >
-                      <SelectItem value="staging"
-                        >Staging (staging.cognisantmd.com)</SelectItem
-                      >
-                      <SelectItem value="local"
-                        >Local (localhost:8080)</SelectItem
-                      >
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div class="space-y-2">
-                  <Label for="oceanSiteNum">Ocean Site Number</Label>
-                  <Input
-                    id="oceanSiteNum"
-                    v-model="formValues.oceanSiteNum"
-                    :aria-invalid="errors.oceanSiteNum ? 'true' : undefined"
-                  />
-                  <p
-                    v-if="errors.oceanSiteNum"
-                    class="text-sm text-destructive"
-                  >
-                    {{ errors.oceanSiteNum }}
-                  </p>
-                </div>
-                <p class="text-sm text-gray-600 mb-6 leading-relaxed">
-                  Obtain the following credentials in the
-                  <a
-                    :href="`${oceanServerUrl}/ocean/portal.html${formValues.oceanSiteNum ? `?siteNum=${formValues.oceanSiteNum}` : ''}#/admin/credentials/`"
-                    target="_blank"
-                    class="text-blue-600 font-medium hover:underline"
-                    >Ocean Site Admin → Manage Credentials</a
-                  >:
-                </p>
-                <div class="space-y-2">
-                  <Label for="oceanClientId">Ocean's OAuth Client ID</Label>
-                  <Input
-                    id="oceanClientId"
-                    v-model="formValues.oceanClientId"
-                    :aria-invalid="errors.oceanClientId ? 'true' : undefined"
-                  />
-                  <p
-                    v-if="errors.oceanClientId"
-                    class="text-sm text-destructive"
-                  >
-                    {{ errors.oceanClientId }}
-                  </p>
-                </div>
-                <div class="space-y-2">
-                  <Label for="oceanClientSecret"
-                    >Ocean's OAuth Client Secret</Label
-                  >
-                  <div class="flex items-center gap-2">
-                    <Input
-                      id="oceanClientSecret"
-                      v-model="formValues.oceanClientSecret"
-                      type="password"
-                      :aria-invalid="
-                        errors.oceanClientSecret ? 'true' : undefined
-                      "
-                      class="flex-1"
-                    />
-                  </div>
-                  <p
-                    v-if="errors.oceanClientSecret"
-                    class="text-sm text-destructive"
-                  >
-                    {{ errors.oceanClientSecret }}
-                  </p>
-                </div>
+          <SiteConfigurationOceanConnectionPanel
+            :model-value="connectionSlice"
+            @update:model-value="updateConnectionSlice"
+            :errors="errors"
+            :can-manage-tenant="canManageTenant"
+            :saving="savingPanels.connection"
+            :has-changes="panelHasChanges('connection')"
+            :ocean-server-url="oceanServerUrl"
+            :is-new-config="isNewConfig"
+            @save="savePanel('connection')"
+          />
 
-                <div v-if="formValues" class="space-y-4">
-                  <div class="flex items-center justify-between">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      @click="handleTestConnection"
-                      :disabled="
-                        isTestingConnection ||
-                        !formValues.oceanClientId ||
-                        !formValues.oceanClientSecret
-                      "
-                    >
-                      <template v-if="isTestingConnection"
-                        >Testing Connection...</template
-                      >
-                      <template v-else>Test Connection to Ocean</template>
-                    </Button>
-                  </div>
-
-                  <Alert
-                    v-if="testConnectionResult"
-                    :variant="
-                      testConnectionResult.success ? 'success' : 'destructive'
-                    "
-                    class="mt-2"
-                  >
-                    <AlertTitle
-                      >{{
-                        testConnectionResult.success
-                          ? "Successfully connected to Ocean"
-                          : "Connection to Ocean Failed"
-                      }}
-                    </AlertTitle>
-                    <p v-if="testConnectionResult.error" class="mt-2 text-sm">
-                      {{ testConnectionResult.error }}
-                    </p>
-                  </Alert>
-                </div>
-
-                <div class="flex justify-end pt-2">
-                  <Button
-                    type="button"
-                    @click="savePanel('connection')"
-                    :disabled="
-                      !canManageTenant ||
-                      savingPanels.connection ||
-                      (!isNewConfig && !panelHasChanges('connection'))
-                    "
-                  >
-                    {{
-                      savingPanels.connection
-                        ? "Saving..."
-                        : "Save Connection Settings"
-                    }}
-                  </Button>
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-          <AccordionItem
+          <SiteConfigurationInboundApiPanel
             v-if="!isNewConfig"
-            value="ocean-to-autorouter"
-            class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
-          >
-            <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <span class="flex flex-col gap-1 text-left">
-                <span class="text-base font-semibold text-gray-900">
-                  Connecting Ocean to the Autorouter
-                </span>
-                <span class="text-sm font-normal text-gray-600">
-                  Inbound integration URLs, OAuth2 credentials, and connection
-                  status
-                </span>
-              </span>
-            </AccordionTrigger>
-            <AccordionContent class="pb-6">
-              <div class="space-y-6">
-                <p class="text-sm text-gray-600 mt-2 leading-relaxed">
-                  Use the provided credentials when setting up a new integration
-                  in the
-                  <a
-                    :href="`${oceanServerUrl}/ocean/portal.html#/admin/integrations/`"
-                    target="_blank"
-                    class="text-primary hover:underline"
-                    >Ocean Site Admin → Integrations</a
-                  >.
-                </p>
+            :model-value="inboundSlice"
+            @update:model-value="updateInboundSlice"
+            :errors="errors"
+            :can-manage-tenant="canManageTenant"
+            :saving="savingPanels.inbound"
+            :has-changes="panelHasChanges('inbound')"
+            :token-endpoint="tokenEndpoint"
+            :api-endpoint="apiEndpoint"
+            :cds-hook-endpoint="cdsHookEndpoint"
+            :last-successful-connection="lastSuccessfulConnection"
+            :is-recent-successful-inbound-connection="isRecentSuccessfulInboundConnection"
+            :is-masked-secret-value="isMaskedSecretValue"
+            :ocean-server-url="oceanServerUrl"
+            @save="savePanel('inbound')"
+            @copy="copyToClipboard"
+          />
 
-                <Tabs default-value="fhir" class="w-full">
-                  <TabsList class="grid w-full grid-cols-2">
-                    <TabsTrigger value="fhir"
-                      >eReferral-eConsult FHIR Integration</TabsTrigger
-                    >
-                    <TabsTrigger value="cds">CDS Hook Integration</TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="fhir" class="space-y-4">
-                    <div class="space-y-4 bg-gray-50 p-4 rounded-lg">
-                      <div class="space-y-2">
-                        <Label class="text-sm font-medium"
-                          >Referral Integration Webhook Endpoint Request
-                          URL</Label
-                        >
-                        <div class="flex items-center gap-2">
-                          <Input
-                            v-model="apiEndpoint"
-                            readonly
-                            class="bg-gray-50"
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            @click="copyToClipboard(apiEndpoint)"
-                          >
-                            <Copy class="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <p class="text-xs text-gray-600">
-                          Use this URL for an Ocean
-                          <strong>eReferrals</strong>
-                          integration (<strong>FHIR v0.11</strong>).
-                        </p>
-                        <p class="text-xs text-gray-600 mt-2">
-                          This integration is required to receive and respond to
-                          inbound eReferrals and eConsults.
-                        </p>
-                        <p class="text-xs text-gray-600 mt-2">
-                          <strong>Important:</strong> You must configure
-                          <strong>each directory listing</strong>
-                          to point to this integration in the "Enablement" tab
-                          in the
-                          <a
-                            :href="`${oceanServerUrl}/ocean/portal.html#/admin/directory-listings/`"
-                            target="_blank"
-                            class="text-blue-600 hover:underline"
-                            >Directory Listings</a
-                          >
-                          section.
-                        </p>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  <TabsContent value="cds" class="space-y-4">
-                    <div class="space-y-4 bg-gray-50 p-4 rounded-lg">
-                      <div class="space-y-2">
-                        <Label class="text-sm font-medium"
-                          >CDS Hook Base URL</Label
-                        >
-                        <div class="flex items-center gap-2">
-                          <Input
-                            v-model="cdsHookEndpoint"
-                            readonly
-                            class="bg-gray-50"
-                          />
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            @click="copyToClipboard(cdsHookEndpoint)"
-                          >
-                            <Copy class="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <p class="text-xs text-gray-600">
-                          Use this URL for an Ocean
-                          <strong>External CDS Hook</strong>
-                          integration.
-                        </p>
-                        <p class="text-xs text-gray-600 mt-2">
-                          This integration is required to provide advice,
-                          warnings or errors to the sender at the time of
-                          submission.
-                        </p>
-                      </div>
-                    </div>
-                  </TabsContent>
-                </Tabs>
-
-                <div class="space-y-4 bg-blue-50 p-4 rounded-lg">
-                  <h4 class="text-sm font-medium text-gray-900 mb-3">
-                    OAuth2 Authentication
-                  </h4>
-                  <div class="space-y-4">
-                    <div class="space-y-2">
-                      <Label class="text-sm font-medium">Token Endpoint</Label>
-                      <div class="flex items-center gap-2">
-                        <Input
-                          v-model="tokenEndpoint"
-                          readonly
-                          class="bg-gray-50"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          @click="copyToClipboard(tokenEndpoint)"
-                        >
-                          <Copy class="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div class="space-y-2">
-                      <Label for="clientId">Your Autorouter Client ID</Label>
-                      <div class="flex items-center gap-2">
-                        <Input
-                          id="clientId"
-                          v-model="formValues.clientId"
-                          readonly
-                          class="bg-gray-50"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          @click="copyToClipboard(formValues.clientId)"
-                        >
-                          <Copy class="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div class="space-y-2">
-                      <Label for="clientSecret"
-                        >Your Autorouter Client Secret</Label
-                      >
-                      <div class="flex items-center gap-2">
-                        <Input
-                          id="clientSecret"
-                          v-model="formValues.clientSecret"
-                          type="password"
-                          :aria-invalid="
-                            errors.clientSecret ? 'true' : undefined
-                          "
-                          class="flex-1"
-                        />
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          @click="copyToClipboard(formValues.clientSecret)"
-                          :disabled="isMaskedSecretValue(formValues.clientSecret)"
-                        >
-                          <Copy class="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <p
-                        v-if="errors.clientSecret"
-                        class="text-sm text-destructive"
-                      >
-                        {{ errors.clientSecret }}
-                      </p>
-                    </div>
-
-                    <p class="text-sm text-gray-600 mt-2 leading-relaxed">
-                      You can leave the "Scope" blank.
-                    </p>
-                  </div>
-                </div>
-
-                <div class="space-y-2">
-                  <div
-                    v-if="lastSuccessfulConnection"
-                    :class="[
-                      'inline-flex items-center gap-2 px-3 py-1.5 rounded-md',
-                      isRecentSuccessfulInboundConnection
-                        ? 'bg-green-50 text-green-700'
-                        : 'bg-gray-50 text-gray-700',
-                    ]"
-                  >
-                    <CheckCircle
-                      v-if="isRecentSuccessfulInboundConnection"
-                      class="h-4 w-4"
-                    />
-                    <span class="text-sm"
-                      >Last successful connection:
-                      {{
-                        formatTimestampWithMinutePrecision(
-                          lastSuccessfulConnection,
-                        )
-                      }}</span
-                    >
-                  </div>
-                  <div
-                    v-else
-                    class="inline-flex items-center gap-2 px-3 py-1.5 bg-yellow-50 text-yellow-700 rounded-md"
-                  >
-                    <AlertCircle class="h-4 w-4" />
-                    <span class="text-sm"
-                      >No successful connection has yet been made.</span
-                    >
-                  </div>
-                </div>
-
-                <div class="flex justify-end pt-2">
-                  <Button
-                    type="button"
-                    @click="savePanel('inbound')"
-                    :disabled="
-                      !canManageTenant ||
-                      savingPanels.inbound ||
-                      !panelHasChanges('inbound')
-                    "
-                  >
-                    {{
-                      savingPanels.inbound ? "Saving..." : "Save OAuth Settings"
-                    }}
-                  </Button>
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem
+          <SiteConfigurationSmsSettingsPanel
             v-if="!isNewConfig"
-            value="sms-configuration"
-            class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
-          >
-            <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <span class="flex flex-col gap-1 text-left">
-                <span class="text-base font-semibold text-gray-900">
-                  SMS Configuration
-                </span>
-                <span class="text-sm font-normal text-gray-600">
-                  Twilio credentials and outbound SMS testing
-                </span>
-              </span>
-            </AccordionTrigger>
-            <AccordionContent class="pb-6">
-              <p class="text-sm text-gray-600 mt-2 leading-relaxed">
-                Enter your Twilio account credentials to enable outbound SMS
-                notifications.
-              </p>
-              <div class="space-y-4 bg-gray-50 p-4 rounded-lg">
-                <div class="space-y-2">
-                  <Label for="twilioAccountSid">Twilio Account SID</Label>
-                  <Input
-                    id="twilioAccountSid"
-                    v-model="formValues.twilioAccountSid"
-                    :aria-invalid="errors.twilioAccountSid ? 'true' : undefined"
-                  />
-                  <p
-                    v-if="errors.twilioAccountSid"
-                    class="text-sm text-destructive"
-                  >
-                    {{ errors.twilioAccountSid }}
-                  </p>
-                </div>
-                <div class="space-y-2">
-                  <Label for="twilioAuthToken">Twilio Auth Token</Label>
-                  <div class="flex items-center gap-2">
-                    <Input
-                      id="twilioAuthToken"
-                      v-model="formValues.twilioAuthToken"
-                      type="password"
-                      :aria-invalid="
-                        errors.twilioAuthToken ? 'true' : undefined
-                      "
-                      class="flex-1"
-                    />
-                  </div>
-                  <p
-                    v-if="errors.twilioAuthToken"
-                    class="text-sm text-destructive"
-                  >
-                    {{ errors.twilioAuthToken }}
-                  </p>
-                </div>
-                <div class="space-y-2">
-                  <Label for="twilioPhoneNumber">Twilio Phone Number</Label>
-                  <Input
-                    id="twilioPhoneNumber"
-                    v-model="formValues.twilioPhoneNumber"
-                    :aria-invalid="
-                      errors.twilioPhoneNumber ? 'true' : undefined
-                    "
-                  />
-                  <p
-                    v-if="errors.twilioPhoneNumber"
-                    class="text-sm text-destructive"
-                  >
-                    {{ errors.twilioPhoneNumber }}
-                  </p>
-                </div>
-              </div>
+            :model-value="smsSlice"
+            @update:model-value="updateSmsSlice"
+            :errors="errors"
+            :can-manage-tenant="canManageTenant"
+            :saving="savingPanels.sms"
+            :has-changes="panelHasChanges('sms')"
+            @save="savePanel('sms')"
+          />
 
-              <!-- Test SMS Section -->
-              <div class="mt-6 space-y-4">
-                <h4 class="text-sm font-medium text-gray-900">
-                  Test SMS Configuration
-                </h4>
-                <div class="space-y-4 bg-blue-50 p-4 rounded-lg">
-                  <div class="space-y-2">
-                    <Label for="testSmsTo">Phone Number to Test *</Label>
-                    <Input
-                      id="testSmsTo"
-                      v-model="testSmsTo"
-                      placeholder="+1234567890"
-                    />
-                    <p class="text-xs text-gray-600">
-                      Enter a valid phone number to test SMS delivery
-                    </p>
-                  </div>
-                  <div class="space-y-2">
-                    <Label for="testSmsMessage">Test Message</Label>
-                    <Input id="testSmsMessage" v-model="testSmsMessage" />
-                  </div>
-                  <div class="flex items-center justify-between">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      @click="handleTestSms"
-                      :disabled="
-                        isTestingSms ||
-                        !formValues.twilioAccountSid ||
-                        !formValues.twilioAuthToken ||
-                        !formValues.twilioPhoneNumber ||
-                        !testSmsTo.trim()
-                      "
-                    >
-                      <template v-if="isTestingSms"
-                        >Sending Test SMS...</template
-                      >
-                      <template v-else>Send Test SMS</template>
-                    </Button>
-                  </div>
-
-                  <Alert
-                    v-if="testSmsResult"
-                    :variant="testSmsResult.success ? 'success' : 'destructive'"
-                    class="mt-2"
-                  >
-                    <AlertTitle
-                      >{{
-                        testSmsResult.success
-                          ? "SMS sent successfully"
-                          : "SMS delivery failed"
-                      }}
-                    </AlertTitle>
-                    <p v-if="testSmsResult.error" class="mt-2 text-sm">
-                      {{ testSmsResult.error }}
-                    </p>
-                  </Alert>
-                </div>
-
-                <div class="flex justify-end pt-2">
-                  <Button
-                    type="button"
-                    @click="savePanel('sms')"
-                    :disabled="
-                      !canManageTenant ||
-                      savingPanels.sms ||
-                      !panelHasChanges('sms')
-                    "
-                  >
-                    {{ savingPanels.sms ? "Saving..." : "Save SMS Settings" }}
-                  </Button>
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem
+          <SiteConfigurationAiSettingsPanel
             v-if="!isNewConfig"
-            value="ai-configuration"
-            class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
-          >
-            <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <span class="flex flex-col gap-1 text-left">
-                <span class="text-base font-semibold text-gray-900">
-                  AI Configuration
-                </span>
-                <span class="text-sm font-normal text-gray-600">
-                  Provider, API key, and model selection
-                </span>
-              </span>
-            </AccordionTrigger>
-            <AccordionContent class="pb-6">
-              <p class="text-sm text-gray-600 mt-2 leading-relaxed">
-                Configure your AI provider settings for enhanced routing
-                capabilities.
-              </p>
-              <div class="space-y-2">
-                <Label for="aiProvider">AI Provider</Label>
-                <Select
-                  id="aiProvider"
-                  v-model="formValues.aiProvider"
-                  :aria-invalid="errors.aiProvider ? 'true' : undefined"
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an AI provider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="openai">OpenAI</SelectItem>
-                    <SelectItem value="google">Google</SelectItem>
-                    <SelectItem value="cohere">Cohere</SelectItem>
-                    <SelectItem value="bedrock">AWS Bedrock</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p v-if="errors.aiProvider" class="text-sm text-destructive">
-                  {{ errors.aiProvider }}
-                </p>
-              </div>
-              <div v-if="formValues.aiProvider !== 'bedrock'" class="space-y-2">
-                <Label for="aiApiKey">API Key</Label>
-                <div class="flex items-center gap-2">
-                  <Input
-                    id="aiApiKey"
-                    v-model="formValues.aiApiKey"
-                    type="password"
-                    :aria-invalid="errors.aiApiKey ? 'true' : undefined"
-                    class="flex-1"
-                  />
-                </div>
-                <p v-if="errors.aiApiKey" class="text-sm text-destructive">
-                  {{ errors.aiApiKey }}
-                </p>
-              </div>
-              <div v-if="formValues.aiProvider === 'bedrock'" class="space-y-2">
-                <Label for="aiModel">Model</Label>
-                <Select
-                  id="aiModel"
-                  :model-value="bedrockModelIsPreset ? (formValues.aiModel ?? '') : 'custom'"
-                  @update:model-value="onBedrockModelSelect"
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select a model" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="mistral.mistral-large-2402-v1:0">Mistral Large</SelectItem>
-                    <SelectItem value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku</SelectItem>
-                    <SelectItem value="anthropic.claude-3-sonnet-20240229-v1:0">Claude 3 Sonnet</SelectItem>
-                    <SelectItem value="custom">Custom model ID...</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  v-if="!bedrockModelIsPreset"
-                  v-model="formValues.aiModel"
-                  placeholder="e.g. anthropic.claude-3-5-sonnet-20241022-v2:0"
-                  :aria-invalid="errors.aiModel ? 'true' : undefined"
-                />
-                <p class="text-xs text-muted-foreground">Uses the IAM role attached to the service. No API key required.</p>
-                <p v-if="errors.aiModel" class="text-sm text-destructive">
-                  {{ errors.aiModel }}
-                </p>
-              </div>
-              <div v-else class="space-y-2">
-                <Label for="aiModel">Model</Label>
-                <Input
-                  id="aiModel"
-                  v-model="formValues.aiModel"
-                  :aria-invalid="errors.aiModel ? 'true' : undefined"
-                  placeholder="(leave blank for default)"
-                />
-                <p v-if="errors.aiModel" class="text-sm text-destructive">
-                  {{ errors.aiModel }}
-                </p>
-              </div>
+            :model-value="aiSlice"
+            @update:model-value="updateAiSlice"
+            :errors="errors"
+            :can-manage-tenant="canManageTenant"
+            :saving="savingPanels.ai"
+            :has-changes="panelHasChanges('ai')"
+            @save="savePanel('ai')"
+          />
 
-              <div class="flex justify-end pt-2">
-                <Button
-                  type="button"
-                  @click="savePanel('ai')"
-                  :disabled="
-                    !canManageTenant ||
-                    savingPanels.ai ||
-                    !panelHasChanges('ai')
-                  "
-                >
-                  {{ savingPanels.ai ? "Saving..." : "Save AI Settings" }}
-                </Button>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem
+          <SiteConfigurationEmailSettingsPanel
             v-if="!isNewConfig"
-            value="email-configuration"
-            class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
-          >
-            <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <span class="flex flex-col gap-1 text-left">
-                <span class="text-base font-semibold text-gray-900">
-                  Email Configuration
-                </span>
-                <span class="text-sm font-normal text-gray-600">
-                  SMTP2GO credentials and outbound email testing
-                </span>
-              </span>
-            </AccordionTrigger>
-            <AccordionContent class="pb-6">
-              <p class="text-sm text-gray-600 mt-2 leading-relaxed">
-                Configure your email settings for sending notifications.
-              </p>
-              <div class="space-y-4 bg-gray-50 p-4 rounded-lg">
-                <div class="space-y-2">
-                  <Label for="emailProvider">Email Provider</Label>
-                  <Select
-                    id="emailProvider"
-                    v-model="formValues.emailProvider"
-                    :aria-invalid="errors.emailProvider ? 'true' : undefined"
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select an email provider" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ses">Amazon SES</SelectItem>
-                      <SelectItem value="smtp2go">SMTP2GO</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <p
-                    v-if="errors.emailProvider"
-                    class="text-sm text-destructive"
-                  >
-                    {{ errors.emailProvider }}
-                  </p>
-                </div>
-                <div class="space-y-2">
-                  <Label for="emailFromAddress">From Email Address</Label>
-                  <Input
-                    id="emailFromAddress"
-                    v-model="formValues.emailFromAddress"
-                    :aria-invalid="errors.emailFromAddress ? 'true' : undefined"
-                  />
-                  <p
-                    v-if="errors.emailFromAddress"
-                    class="text-sm text-destructive"
-                  >
-                    {{ errors.emailFromAddress }}
-                  </p>
-                </div>
-                <div v-if="formValues.emailProvider === 'ses'" class="space-y-2">
-                  <p class="text-sm text-gray-600">
-                    Amazon SES uses the IAM role attached to the service. No API key is required.
-                  </p>
-                </div>
-                <div v-if="formValues.emailProvider !== 'ses'" class="space-y-2">
-                  <Label for="emailApiKey">SMTP2GO API Key</Label>
-                  <div class="flex items-center gap-2">
-                    <Input
-                      id="emailApiKey"
-                      v-model="formValues.emailApiKey"
-                      type="password"
-                      :aria-invalid="errors.emailApiKey ? 'true' : undefined"
-                      class="flex-1"
-                    />
-                  </div>
-                  <p class="text-sm text-gray-600">
-                    Get your API key from the
-                    <a
-                      href="https://app.smtp2go.com/settings/api_keys"
-                      target="_blank"
-                      class="text-blue-600 hover:underline"
-                      >SMTP2GO dashboard</a
-                    >
-                  </p>
-                  <p v-if="errors.emailApiKey" class="text-sm text-destructive">
-                    {{ errors.emailApiKey }}
-                  </p>
-                </div>
-                <div class="space-y-2">
-                  <Label for="emailFromName">From Name</Label>
-                  <Input
-                    id="emailFromName"
-                    v-model="formValues.emailFromName"
-                    :aria-invalid="errors.emailFromName ? 'true' : undefined"
-                    placeholder="(leave blank to use email address)"
-                  />
-                  <p
-                    v-if="errors.emailFromName"
-                    class="text-sm text-destructive"
-                  >
-                    {{ errors.emailFromName }}
-                  </p>
-                </div>
+            :model-value="emailSlice"
+            @update:model-value="updateEmailSlice"
+            :errors="errors"
+            :can-manage-tenant="canManageTenant"
+            :saving="savingPanels.email"
+            :has-changes="panelHasChanges('email')"
+            @save="savePanel('email')"
+          />
 
-                <!-- Email Send Allowlist -->
-                <div class="space-y-2">
-                  <Label>Approved Send-to Addresses</Label>
-                  <p class="text-sm text-gray-600">
-                    Agent email sends are blocked unless every To and CC recipient is in this list.
-                    An empty list blocks all agent email sends.
-                  </p>
-                  <div
-                    v-if="(formValues.emailSendAllowlist ?? []).length === 0"
-                    class="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
-                  >
-                    No approved addresses — all agent email sends are currently blocked.
-                  </div>
-                  <div v-else class="space-y-1">
-                    <div
-                      v-for="email in formValues.emailSendAllowlist"
-                      :key="email"
-                      class="flex items-center justify-between rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
-                    >
-                      <span class="font-mono text-slate-800">{{ email }}</span>
-                      <button
-                        type="button"
-                        class="ml-2 text-slate-400 hover:text-red-600"
-                        @click="removeAllowlistEmail(email)"
-                        aria-label="Remove"
-                      >✕</button>
-                    </div>
-                  </div>
-                  <div class="flex gap-2">
-                    <Input
-                      v-model="newAllowlistEmail"
-                      placeholder="doctor@example.com"
-                      class="flex-1"
-                      @keydown.enter.prevent="addAllowlistEmail"
-                    />
-                    <Button type="button" variant="outline" @click="addAllowlistEmail">Add</Button>
-                  </div>
-                  <p v-if="allowlistEmailError" class="text-sm text-destructive">{{ allowlistEmailError }}</p>
-                </div>
-              </div>
-
-              <!-- Test Email Section -->
-              <div class="mt-6 space-y-4">
-                <h4 class="text-sm font-medium text-gray-900">
-                  Test Email Configuration
-                </h4>
-                <div class="space-y-4 bg-blue-50 p-4 rounded-lg">
-                  <div class="space-y-2">
-                    <Label for="testEmailTo">Email Address to Test *</Label>
-                    <Input
-                      id="testEmailTo"
-                      v-model="testEmailTo"
-                      placeholder="test@example.com"
-                    />
-                    <p class="text-xs text-gray-600">
-                      Enter a valid email address to test email delivery
-                    </p>
-                  </div>
-                  <div class="space-y-2">
-                    <Label for="testEmailSubject">Test Subject</Label>
-                    <Input id="testEmailSubject" v-model="testEmailSubject" />
-                  </div>
-                  <div class="space-y-2">
-                    <Label for="testEmailMessage">Test Message</Label>
-                    <Input id="testEmailMessage" v-model="testEmailMessage" />
-                  </div>
-                  <div class="flex items-center justify-between">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      @click="handleTestEmail"
-                      :disabled="
-                        isTestingEmail ||
-                        !formValues.emailProvider ||
-                        !formValues.emailFromAddress ||
-                        (formValues.emailProvider !== 'ses' && !formValues.emailApiKey) ||
-                        !testEmailTo.trim()
-                      "
-                    >
-                      <template v-if="isTestingEmail"
-                        >Sending Test Email...</template
-                      >
-                      <template v-else>Send Test Email</template>
-                    </Button>
-                  </div>
-
-                  <Alert
-                    v-if="testEmailResult"
-                    :variant="
-                      testEmailResult.success ? 'success' : 'destructive'
-                    "
-                    class="mt-2"
-                  >
-                    <AlertTitle
-                      >{{
-                        testEmailResult.success
-                          ? "Email sent successfully"
-                          : "Email delivery failed"
-                      }}
-                    </AlertTitle>
-                    <p v-if="testEmailResult.error" class="mt-2 text-sm">
-                      {{ testEmailResult.error }}
-                    </p>
-                  </Alert>
-                </div>
-
-                <div class="flex justify-end pt-2">
-                  <Button
-                    type="button"
-                    @click="savePanel('email')"
-                    :disabled="
-                      !canManageTenant ||
-                      savingPanels.email ||
-                      !panelHasChanges('email')
-                    "
-                  >
-                    {{
-                      savingPanels.email ? "Saving..." : "Save Email Settings"
-                    }}
-                  </Button>
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem
+          <SiteConfigurationOpenApiPanel
             v-if="!isNewConfig"
-            value="ocean-open-api"
-            class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
-          >
-            <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <span class="flex flex-col gap-1 text-left">
-                <span class="text-base font-semibold text-gray-900">
-                  Ocean Patient Engagement Credentials
-                </span>
-                <span class="text-sm font-normal text-gray-600">
-                  Optional patient engagement credentials and encryption
-                  settings
-                </span>
-              </span>
-            </AccordionTrigger>
-            <AccordionContent class="pb-6">
-              <p class="text-sm text-gray-600 mt-2 leading-relaxed">
-                Configure your Ocean Open API credentials for patient engagement
-                use cases, such as patient messaging and forms completion. This
-                is an optional connection that enables advanced patient
-                interaction features.
-              </p>
-              <div class="space-y-4 bg-gray-50 p-4 rounded-lg">
-                <div class="space-y-2">
-                  <Label for="siteKey">Site Key</Label>
-                  <div class="flex items-center gap-2">
-                    <Input
-                      id="siteKey"
-                      v-model="formValues.siteKey"
-                      type="password"
-                      :aria-invalid="errors.siteKey ? 'true' : undefined"
-                      class="flex-1"
-                    />
-                  </div>
-                  <p v-if="errors.siteKey" class="text-sm text-destructive">
-                    {{ errors.siteKey }}
-                  </p>
-                </div>
-                <div class="space-y-2">
-                  <Label for="siteCredential">Site Credential</Label>
-                  <div class="flex items-center gap-2">
-                    <Input
-                      id="siteCredential"
-                      v-model="formValues.siteCredential"
-                      type="password"
-                      :aria-invalid="errors.siteCredential ? 'true' : undefined"
-                      class="flex-1"
-                    />
-                  </div>
-                  <p
-                    v-if="errors.siteCredential"
-                    class="text-sm text-destructive"
-                  >
-                    {{ errors.siteCredential }}
-                  </p>
-                </div>
-                <div class="space-y-2">
-                  <Label for="sharedEncryptionKey">Shared Encryption Key</Label>
-                  <div class="flex items-center gap-2">
-                    <Input
-                      id="sharedEncryptionKey"
-                      v-model="formValues.sharedEncryptionKey"
-                      type="password"
-                      :aria-invalid="
-                        errors.sharedEncryptionKey ? 'true' : undefined
-                      "
-                      class="flex-1"
-                    />
-                  </div>
-                  <p
-                    v-if="errors.sharedEncryptionKey"
-                    class="text-sm text-destructive"
-                  >
-                    {{ errors.sharedEncryptionKey }}
-                  </p>
-                </div>
-                <p class="text-sm text-gray-600 mt-4">
-                  These credentials are used for secure communication with
-                  Ocean's Open API for patient engagement features.
-                </p>
-              </div>
+            :model-value="openApiSlice"
+            @update:model-value="updateOpenApiSlice"
+            :errors="errors"
+            :can-manage-tenant="canManageTenant"
+            :saving="savingPanels.openApi"
+            :has-changes="panelHasChanges('openApi')"
+            @save="savePanel('openApi')"
+          />
 
-              <div class="flex justify-end pt-2">
-                <Button
-                  type="button"
-                  @click="savePanel('openApi')"
-                  :disabled="
-                    !canManageTenant ||
-                    savingPanels.openApi ||
-                    !panelHasChanges('openApi')
-                  "
-                >
-                  {{
-                    savingPanels.openApi
-                      ? "Saving..."
-                      : "Save Open API Settings"
-                  }}
-                </Button>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-
-          <AccordionItem
+          <SiteConfigurationErequestArchivalPanel
             v-if="!isNewConfig"
-            value="erequest-archival"
-            class="rounded-lg border bg-white px-6 shadow-sm last:border-b"
-          >
-            <AccordionTrigger type="button" class="py-5 hover:no-underline">
-              <span class="flex flex-col gap-1 text-left">
-                <span class="text-base font-semibold text-gray-900">
-                  eRequest Storage and Retrieval
-                </span>
-                <span class="text-sm font-normal text-gray-600">
-                  Retain inbound eRequests and archived documents for later
-                  access
-                </span>
-              </span>
-            </AccordionTrigger>
-            <AccordionContent class="pb-6">
-              <div class="space-y-6">
-                <div
-                  class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"
-                >
-                  Enabling this feature permits the Autorouter to store
-                  inbound eRequest data, documents, and PDFs that may include
-                  PHI. Your site is responsible for secure retention, access
-                  controls, and lifecycle management in accordance with PIPEDA
-                  and applicable provincial privacy laws.
-                </div>
-
-                <div
-                  class="flex items-center justify-between rounded-lg border bg-gray-50 p-4"
-                >
-                  <div class="space-y-1 pr-4">
-                    <Label for="erequestArchivalEnabled"
-                      >Enable eRequest storage and retrieval</Label
-                    >
-                    <p class="text-sm text-gray-600">
-                      Turning this off stops retention of future inbound
-                      eRequests but does not delete previously retained records.
-                    </p>
-                  </div>
-                  <Switch
-                    id="erequestArchivalEnabled"
-                    v-model="formValues.erequestArchivalEnabled"
-                    :disabled="!canManageTenant"
-                  />
-                </div>
-
-                <div class="flex justify-end pt-2">
-                  <Button
-                    type="button"
-                    @click="savePanel('erequests')"
-                    :disabled="
-                      !canManageTenant ||
-                      savingPanels.erequests ||
-                      !panelHasChanges('erequests')
-                    "
-                  >
-                    {{
-                      savingPanels.erequests
-                        ? "Saving..."
-                        : "Save eRequest Settings"
-                    }}
-                  </Button>
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
+            :model-value="erequestSlice"
+            @update:model-value="updateErequestSlice"
+            :errors="errors"
+            :can-manage-tenant="canManageTenant"
+            :saving="savingPanels.erequests"
+            :has-changes="panelHasChanges('erequests')"
+            @save="savePanel('erequests')"
+          />
         </Accordion>
 
         <div

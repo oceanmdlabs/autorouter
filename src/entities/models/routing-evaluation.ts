@@ -16,6 +16,8 @@ export type RuleEvaluationResult = {
   ruleId: string;
   ruleName: string;
   evaluation: RuleEvaluation;
+  stoppedByRuleId?: string;
+  stoppedByRuleName?: string;
 };
 
 export type ServiceRequestEventMessage = Bundle;

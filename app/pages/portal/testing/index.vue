@@ -149,10 +149,20 @@ async function handleSubmit(event: Event) {
 								listed.</p>
 							<div class="py-2 space-y-2">
 								<div v-for="result in results" :key="result.ruleId"
-									class="rounded-lg border space-y-2 p-4 shadow-sm">
+									class="rounded-lg border space-y-2 p-4 shadow-sm"
+									:class="result.stoppedByRuleId ? 'opacity-50 bg-gray-50' : ''">
 									<!-- List each rule's evaluation result -->
-									<h3 class="text-lg font-semibold mb-2">{{ result.ruleName }}</h3>
-									<div class="space-y-2">
+									<div class="flex items-center gap-2">
+										<h3 class="text-lg font-semibold">{{ result.ruleName }}</h3>
+										<span v-if="result.stoppedByRuleId"
+											class="text-xs font-medium text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full">
+											Skipped
+										</span>
+									</div>
+									<p v-if="result.stoppedByRuleId" class="text-sm text-muted-foreground italic">
+										Not evaluated — "{{ result.stoppedByRuleName }}" stopped processing.
+									</p>
+									<div v-else class="space-y-2">
 										<template v-if="result.evaluation.actions.length > 0" class="space-y-2">
 											<div v-for="(action, index) in result.evaluation.actions" :key="index"
 												class="flex items-start gap-2 text-sm">
@@ -175,13 +185,13 @@ async function handleSubmit(event: Event) {
 												({{ result.evaluation.comment }})</span>
 										</span>
 									</div>
-									<template v-if="result.evaluation.reasoning">
+									<template v-if="!result.stoppedByRuleId && result.evaluation.reasoning">
 										<div class="mt-3 rounded-md bg-gray-50 border p-3">
 											<p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">AI Reasoning</p>
 											<p class="text-sm text-gray-700 whitespace-pre-wrap">{{ result.evaluation.reasoning }}</p>
 										</div>
 									</template>
-									<template v-if="result.evaluation.prompt">
+									<template v-if="!result.stoppedByRuleId && result.evaluation.prompt">
 										<Collapsible class="mt-2">
 											<CollapsibleTrigger
 												class="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700">

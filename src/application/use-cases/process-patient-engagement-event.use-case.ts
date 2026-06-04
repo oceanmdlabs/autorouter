@@ -6,6 +6,7 @@ import {
 import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluate-rule.service";
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
 import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
+import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
 
 export interface ProcessPEEventOutput {
   message: string;
@@ -20,19 +21,15 @@ export async function processPatientEngagementEventUseCase(
   let error = null;
 
   const rules = await cxt.getRoutingRulesRepository().getAllAtTenant();
-  const evaluationResults: RuleEvaluationResult[] = [];
   const evaluateRuleService = createEvaluateRuleService({ cxt });
   const requestDescription = "peEvent_" + event.message.patient.ref;
-  for (const rule of rules) {
-    evaluationResults.push(
-      await evaluateRuleService.evaluateRule({
-        rule,
-        routingEventMessage: event.message,
-        eventType: event.triggeringEvent,
-        requestDescription,
-      })
-    );
-  }
+  const evaluationResults: RuleEvaluationResult[] = await evaluateRulesInOrder({
+    rules,
+    evaluateRule: evaluateRuleService.evaluateRule,
+    routingEventMessage: event.message,
+    eventType: event.triggeringEvent,
+    requestDescription,
+  });
   event.message.note.ptUpdate.completedForms;
 
   const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
@@ -43,6 +40,7 @@ export async function processPatientEngagementEventUseCase(
 
   const actionResults = new Map<string, string>();
   for (const result of filteredResults) {
+    if (result.stoppedByRuleId) continue;
     cxt.logger.info(
       `Processing rule ${
         result.ruleName
@@ -72,6 +70,7 @@ export async function processPatientEngagementEventUseCase(
     const rulesSummary = filteredResults.map((r) => ({
       ruleName: r.ruleName,
       triggered: r.evaluation.triggered ?? false,
+      ...(r.stoppedByRuleId ? { skipped: true, skippedByRule: r.stoppedByRuleName } : {}),
       ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
       ...(r.evaluation.reasoning ? { reasoning: r.evaluation.reasoning } : {}),
       ...(r.evaluation.triggered && r.evaluation.actions.length > 0
@@ -87,6 +86,7 @@ export async function processPatientEngagementEventUseCase(
     details = JSON.stringify({ rules: rulesSummary });
   }
   error = filteredResults
+    .filter((r) => !r.stoppedByRuleId)
     .map((r) => r.evaluation.error)
     .filter(Boolean)
     .join("\n");

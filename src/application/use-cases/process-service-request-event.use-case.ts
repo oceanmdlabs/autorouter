@@ -3,6 +3,7 @@ import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluat
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
 import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
 import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
+import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
 export interface ProcessServiceRequestEventOutput {
   message: string;
 }
@@ -19,8 +20,8 @@ export async function processServiceRequestEventUseCase(
 
   if (event.triggeringEvent) {
     const rules = await cxt.getRoutingRulesRepository().getAllAtTenant();
-    const evaluationResults: RuleEvaluationResult[] = [];
     const evaluateRuleService = createEvaluateRuleService({ cxt });
+    let evaluationResults: RuleEvaluationResult[] = [];
     if (
       evaluateRuleService.avoidProcessingDueToPatientOptOut(
         event.serviceRequestBundle
@@ -28,16 +29,13 @@ export async function processServiceRequestEventUseCase(
     ) {
       details = "Patient has opted out of AI processing.";
     } else {
-      for (const rule of rules) {
-        evaluationResults.push(
-          await evaluateRuleService.evaluateRule({
-            rule,
-            routingEventMessage: event.serviceRequestBundle,
-            eventType: event.triggeringEvent,
-            requestDescription: event.referralRef || "pendingServiceRequest",
-          })
-        );
-      }
+      evaluationResults = await evaluateRulesInOrder({
+        rules,
+        evaluateRule: evaluateRuleService.evaluateRule,
+        routingEventMessage: event.serviceRequestBundle,
+        eventType: event.triggeringEvent,
+        requestDescription: event.referralRef || "pendingServiceRequest",
+      });
     }
 
     const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
@@ -48,6 +46,7 @@ export async function processServiceRequestEventUseCase(
 
     const actionResults = new Map<string, string>();
     for (const result of filteredResults) {
+      if (result.stoppedByRuleId) continue;
       cxt.logger.info(
         `Processing rule ${result.ruleName} evaluation actions for ${
           event.referralRef
@@ -72,6 +71,7 @@ export async function processServiceRequestEventUseCase(
       const rulesSummary = filteredResults.map((r) => ({
         ruleName: r.ruleName,
         triggered: r.evaluation.triggered ?? false,
+        ...(r.stoppedByRuleId ? { skipped: true, skippedByRule: r.stoppedByRuleName } : {}),
         ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
         ...(r.evaluation.reasoning ? { reasoning: r.evaluation.reasoning } : {}),
         ...(r.evaluation.triggered && r.evaluation.actions.length > 0
@@ -87,6 +87,7 @@ export async function processServiceRequestEventUseCase(
       details = JSON.stringify({ rules: rulesSummary });
     }
     error = filteredResults
+      .filter((r) => !r.stoppedByRuleId)
       .map((r) => r.evaluation.error)
       .filter(Boolean)
       .join("\n");

@@ -20,6 +20,7 @@ const formValues = ref<NewRoutingRule>({
 	active: true,
 	enabledTools: [],
 	summarizeAttachmentsAcknowledged: false,
+	stopProcessingOnMatch: false,
 })
 
 // Warning dialog state
@@ -54,6 +55,7 @@ watch(() => loadedData.value, (newData) => {
 			active: newData.active,
 			enabledTools: newData.enabledTools || [],
 			summarizeAttachmentsAcknowledged: newData.summarizeAttachmentsAcknowledged ?? false,
+			stopProcessingOnMatch: newData.stopProcessingOnMatch ?? false,
 		};
 		// Initialize toolStates from loaded data
 		routingToolNames.forEach(toolName => {
@@ -236,6 +238,16 @@ onMounted(() => {
 							<Switch id="active" v-model="formValues.active" />
 							<Label for="active"
 								:class="formValues.active ? 'text-green-600' : 'text-gray-600'">Active</Label>
+						</div>
+					</div>
+
+					<div class="space-y-2">
+						<div class="flex items-start space-x-2">
+							<Switch id="stopProcessingOnMatch" v-model="formValues.stopProcessingOnMatch" class="mt-0.5" />
+							<div>
+								<Label for="stopProcessingOnMatch">Stop subsequent rule evaluations after this rule matches</Label>
+								<p class="text-sm text-muted-foreground mt-0.5">When this rule triggers and produces at least one action, later rules will not be evaluated.</p>
+							</div>
 						</div>
 					</div>
 

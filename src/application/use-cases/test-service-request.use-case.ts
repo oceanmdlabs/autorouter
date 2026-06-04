@@ -5,6 +5,7 @@ import { startSpan } from "@sentry/node";
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
 import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluate-rule.service";
 import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
+import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
 
 export const testServiceRequestUseCase =
   (cxt: ApplicationContext) =>
@@ -24,17 +25,13 @@ export const testServiceRequestUseCase =
       }
       const rules = await cxt.getRoutingRulesRepository().getAllAtTenant();
       const evaluateRuleService = createEvaluateRuleService({ cxt });
-      const evaluationResults: RuleEvaluationResult[] = [];
-      for (const rule of rules) {
-        evaluationResults.push(
-          await evaluateRuleService.evaluateRule({
-            rule,
-            routingEventMessage: testServiceRequest.content,
-            eventType,
-            requestDescription: "testServiceRequest",
-          })
-        );
-      }
+      const evaluationResults: RuleEvaluationResult[] = await evaluateRulesInOrder({
+        rules,
+        evaluateRule: evaluateRuleService.evaluateRule,
+        routingEventMessage: testServiceRequest.content,
+        eventType,
+        requestDescription: "testServiceRequest",
+      });
       const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
       return filterBlockedEmailActions(evaluationResults, siteConfig?.emailSendAllowlist);
     });

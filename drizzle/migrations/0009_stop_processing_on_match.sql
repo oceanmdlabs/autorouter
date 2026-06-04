@@ -1,0 +1,1 @@
+ALTER TABLE "routing_rules" ADD COLUMN "stop_processing_on_match" boolean DEFAULT false NOT NULL;

@@ -77,6 +77,7 @@ export const routingRules = pgTable(
       .default([]),
     summarizeAttachmentsAcknowledged: boolean("summarize_attachments_acknowledged").notNull().default(false),
     priority: integer("priority").notNull(),
+    stopProcessingOnMatch: boolean("stop_processing_on_match").notNull().default(false),
   },
   (table) => ({
     tenantIdx: index("idx_routing_rules_tenant_id").on(table.tenantId),

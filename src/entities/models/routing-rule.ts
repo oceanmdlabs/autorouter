@@ -29,6 +29,7 @@ const baseFields = baseResourceSchema.merge(tenantConfinedSchema).extend({
   enabledTools: z.array(z.string() as z.ZodType<RoutingToolName>).default([]),
   summarizeAttachmentsAcknowledged: z.boolean().default(false),
   priority: z.number().int().positive(),
+  stopProcessingOnMatch: z.boolean().default(false),
 });
 
 const schema = baseFields.superRefine(requireSummarizeAcknowledgement);

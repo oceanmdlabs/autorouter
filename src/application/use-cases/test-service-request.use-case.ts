@@ -3,10 +3,16 @@ import { ApplicationContext } from "@/src/entities/models/application-context";
 import { type RoutingEventType } from "@/src/entities/models/routing-event-type";
 import { startSpan } from "@sentry/node";
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
+import { analyzeActionConflicts, type ActionConflict } from "@/src/entities/models/conflict-analysis";
 import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluate-rule.service";
 import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
 import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
 import { routingToolRegistry } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
+
+export type TestServiceRequestResult = {
+  results: RuleEvaluationResult[];
+  conflicts: ActionConflict[];
+};
 
 export const testServiceRequestUseCase =
   (cxt: ApplicationContext) =>
@@ -18,7 +24,7 @@ export const testServiceRequestUseCase =
     testServiceRequestId: string;
     eventType: RoutingEventType;
     mode?: "evaluate" | "dry-run";
-  }): Promise<RuleEvaluationResult[]> => {
+  }): Promise<TestServiceRequestResult> => {
     return startSpan({ name: "testServiceRequestUseCase" }, async () => {
       const testServiceRequest = await cxt
         .getTestServiceRequestsRepository()
@@ -63,6 +69,8 @@ export const testServiceRequestUseCase =
         }
       }
 
-      return filtered;
+      const conflicts = analyzeActionConflicts(filtered);
+
+      return { results: filtered, conflicts };
     });
   };

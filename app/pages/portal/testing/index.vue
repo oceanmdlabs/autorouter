@@ -7,6 +7,8 @@ import type { RuleEvaluationResult } from '@/src/entities/models/routing-evaluat
 import type { DryRunPayload } from '@/src/entities/models/routing-tool';
 import { clientRoutingToolRegistry } from '@/src/entities/models/routing-tool-client';
 import type { RoutingToolName } from '@/src/infrastructure/services/routing-tools/routing-tool-registry';
+import type { ActionConflict } from '@/src/entities/models/conflict-analysis';
+import type { TestServiceRequestResult } from '@/src/application/use-cases/test-service-request.use-case';
 
 function describeAction(action: { tool: string; input: Record<string, any> }): { type: string; taken: string } {
 	const tool = clientRoutingToolRegistry[action.tool as RoutingToolName];
@@ -26,7 +28,9 @@ const selectedRequest = ref('')
 const selectedEvent = ref('')
 const mode = ref<'evaluate' | 'dry-run'>('evaluate')
 const isLoading = ref(false)
-const results = ref<RuleEvaluationResult[] | null>(null)
+const simulationResult = ref<TestServiceRequestResult | null>(null)
+const results = computed(() => simulationResult.value?.results ?? null)
+const conflicts = computed(() => simulationResult.value?.conflicts ?? [])
 const requestFetch = useRequestFetch()
 
 // Get test service requests
@@ -44,10 +48,10 @@ const { data: testServiceRequests } = useAsyncData('testServiceRequests', async 
 // Form submission
 async function handleSubmit(event: Event) {
 	isLoading.value = true
-	results.value = null
+	simulationResult.value = null
 
 	try {
-		results.value = await requestFetch<RuleEvaluationResult[]>('/api/test-service-requests/simulate', {
+		simulationResult.value = await requestFetch<TestServiceRequestResult>('/api/test-service-requests/simulate', {
 			method: 'POST',
 			body: {
 				testServiceRequestId: selectedRequest.value,
@@ -175,9 +179,43 @@ function payloadTypeLabel(payloadType: DryRunPayload['payloadType']): string {
 							</p>
 						</template>
 					</form>
-					<div v-if="results" class="mt-8 space-y-6">
+					<div v-if="simulationResult" class="mt-8 space-y-6">
+						<!-- Conflict analysis -->
+						<div v-if="conflicts.length > 0" class="space-y-2">
+							<h2 class="text-lg font-semibold">Conflict Analysis</h2>
+							<div
+								v-for="(conflict, i) in conflicts"
+								:key="i"
+								class="flex gap-3 rounded-lg border p-4"
+								:class="conflict.severity === 'blocking' ? 'border-red-300 bg-red-50' : 'border-yellow-300 bg-yellow-50'"
+							>
+								<Icon
+									:name="conflict.severity === 'blocking' ? 'lucide:x-circle' : 'lucide:triangle-alert'"
+									class="mt-0.5 h-4 w-4 shrink-0"
+									:class="conflict.severity === 'blocking' ? 'text-red-600' : 'text-yellow-600'"
+								/>
+								<div class="space-y-1">
+									<p
+										class="text-sm font-medium"
+										:class="conflict.severity === 'blocking' ? 'text-red-800' : 'text-yellow-800'"
+									>
+										{{ conflict.severity === 'blocking' ? 'Blocking conflict' : 'Warning' }}
+									</p>
+									<p
+										class="text-sm"
+										:class="conflict.severity === 'blocking' ? 'text-red-700' : 'text-yellow-700'"
+									>
+										{{ conflict.description }}
+									</p>
+									<p class="text-xs text-muted-foreground">
+										Rules involved: {{ conflict.ruleNames.join(', ') }}
+									</p>
+								</div>
+							</div>
+						</div>
+
 						<h2 class="text-lg font-semibold mb-2">Rule Evaluations</h2>
-						<div v-if="results.length === 0" class="text-sm text-gray-500 italic">
+						<div v-if="results!.length === 0" class="text-sm text-gray-500 italic">
 							No rules found.
 						</div>
 						<div v-else>

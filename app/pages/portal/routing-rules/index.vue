@@ -4,6 +4,7 @@ import type { RoutingRule } from '@/src/entities/models/routing-rule';
 import { getRoutingEventTypeDescription } from "@/src/entities/models/routing-event-type";
 import { ref, computed } from 'vue';
 import { toast } from 'vue-sonner';
+import { clientRoutingToolRegistry } from '@/src/entities/models/routing-tool-client';
 
 const router = useRouter();
 const requestFetch = useRequestFetch();
@@ -83,6 +84,61 @@ const saveOrder = async () => {
 		isSaving.value = false;
 	}
 };
+
+// Static conflict hint: active rules sharing tools from the same blocking conflict group
+// for the same event type. This is a coarse signal — use Testing to see actual conflicts.
+const BLOCKING_CONFLICT_GROUPS = new Set(['referral-status', 'referral-destination']);
+
+type StaticConflictHint = {
+	eventTypeLabel: string;
+	groupLabel: string;
+	ruleNames: string[];
+};
+
+const staticConflictHints = computed<StaticConflictHint[]>(() => {
+	const activeRules = (rules.value ?? []).filter((r) => r.active);
+	const hints: StaticConflictHint[] = [];
+
+	// Group active rules by event type
+	const byEvent = new Map<string, RoutingRule[]>();
+	for (const rule of activeRules) {
+		const list = byEvent.get(rule.triggeringEvent) ?? [];
+		list.push(rule);
+		byEvent.set(rule.triggeringEvent, list);
+	}
+
+	for (const [event, eventRules] of byEvent.entries()) {
+		if (eventRules.length < 2) continue;
+
+		// Find which blocking conflict groups have more than one rule with that tool enabled
+		const groupToRules = new Map<string, RoutingRule[]>();
+		for (const rule of eventRules) {
+			for (const toolName of rule.enabledTools) {
+				const toolDef = clientRoutingToolRegistry[toolName];
+				if (!toolDef?.conflictGroup || !BLOCKING_CONFLICT_GROUPS.has(toolDef.conflictGroup)) continue;
+				const list = groupToRules.get(toolDef.conflictGroup) ?? [];
+				if (!list.includes(rule)) list.push(rule);
+				groupToRules.set(toolDef.conflictGroup, list);
+			}
+		}
+
+		const groupLabels: Record<string, string> = {
+			'referral-status': 'change referral status',
+			'referral-destination': 'route the referral to a destination',
+		};
+
+		for (const [group, matchedRules] of groupToRules.entries()) {
+			if (matchedRules.length < 2) continue;
+			hints.push({
+				eventTypeLabel: getRoutingEventTypeDescription(event as any),
+				groupLabel: groupLabels[group] ?? group,
+				ruleNames: matchedRules.map((r) => r.name),
+			});
+		}
+	}
+
+	return hints;
+});
 </script>
 
 <template>
@@ -94,6 +150,21 @@ const saveOrder = async () => {
 					The directives below determine how the Autorouter handles incoming events.
 					Rules are evaluated in the order shown.
 				</p>
+			</div>
+
+			<!-- Static conflict hints -->
+			<div v-if="staticConflictHints.length > 0 && !isReordering" class="space-y-2">
+				<div
+					v-for="(hint, i) in staticConflictHints"
+					:key="i"
+					class="flex gap-3 rounded-lg border border-yellow-300 bg-yellow-50 px-4 py-3"
+				>
+					<Icon name="lucide:triangle-alert" class="mt-0.5 h-4 w-4 shrink-0 text-yellow-600" />
+					<p class="text-sm text-yellow-800">
+						<span class="font-medium">Potential conflict:</span>
+						{{ hint.ruleNames.map(n => `"${n}"`).join(' and ') }} both have tools that can {{ hint.groupLabel }} for the <span class="font-medium">{{ hint.eventTypeLabel }}</span> event. Use the <NuxtLink to="/portal/testing" class="underline hover:text-yellow-600">Testing page</NuxtLink> to simulate these rules together and see the conflict analysis.
+					</p>
+				</div>
 			</div>
 
 			<!-- Normal view -->

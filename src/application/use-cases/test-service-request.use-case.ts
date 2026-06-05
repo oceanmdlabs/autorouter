@@ -6,15 +6,18 @@ import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluat
 import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluate-rule.service";
 import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
 import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
+import { routingToolRegistry } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
 
 export const testServiceRequestUseCase =
   (cxt: ApplicationContext) =>
   ({
     testServiceRequestId,
     eventType,
+    mode = "evaluate",
   }: {
     testServiceRequestId: string;
     eventType: RoutingEventType;
+    mode?: "evaluate" | "dry-run";
   }): Promise<RuleEvaluationResult[]> => {
     return startSpan({ name: "testServiceRequestUseCase" }, async () => {
       const testServiceRequest = await cxt
@@ -33,6 +36,33 @@ export const testServiceRequestUseCase =
         requestDescription: "testServiceRequest",
       });
       const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
-      return filterBlockedEmailActions(evaluationResults, siteConfig?.emailSendAllowlist);
+      const filtered = filterBlockedEmailActions(evaluationResults, siteConfig?.emailSendAllowlist);
+
+      if (mode === "dry-run") {
+        const eventContext = {
+          serviceRequestBundle: testServiceRequest.content,
+          triggeringEvent: eventType,
+        };
+        for (const result of filtered) {
+          if (result.stoppedByRuleId) continue;
+          for (const action of result.evaluation.actions) {
+            const toolDef = routingToolRegistry[action.tool];
+            if (toolDef?.dryRun) {
+              try {
+                action.dryRunPayload = await (toolDef.dryRun as any)(action, eventContext, cxt);
+              } catch (e) {
+                action.dryRunPayload = {
+                  payloadType: "internal",
+                  summary: "Error generating payload",
+                  payload: {},
+                  error: (e as Error).message,
+                };
+              }
+            }
+          }
+        }
+      }
+
+      return filtered;
     });
   };

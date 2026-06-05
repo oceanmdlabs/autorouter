@@ -8,6 +8,7 @@ import { generateObject, generateText, tool, type LanguageModel } from "ai";
 import type { z } from "zod";
 import type {
   IAiService,
+  ToolCall,
   ToolCallResult,
   ToolSet,
 } from "@/src/application/services/ai.service.interface";
@@ -92,14 +93,33 @@ export const createAiService = (deps: Dependencies): IAiService => {
       tools: sdkTools,
       toolChoice: "auto",
     });
+    cxt.logger.info("AI raw response", {
+      toolCallCount: response.toolCalls.length,
+      toolCalls: response.toolCalls.map((tc) => ({ name: tc.toolName, args: tc.args })),
+      textLength: response.text?.length ?? 0,
+      text: response.text?.slice(0, 500),
+    });
+
+    // Some models (e.g. Mistral on Bedrock) write multiple tool calls as JSON text
+    // rather than returning them as structured tool calls. Parse them as a fallback.
+    const structuredToolCalls: ToolCall[] = response.toolCalls.length > 0
+      ? response.toolCalls.map((toolCall) => ({
+          tool: toolCall.toolName,
+          input: toolCall.args as z.infer<RoutingToolRegistry[RoutingToolName]["input"]>,
+        }))
+      : parseTextToolCalls(response.text ?? "", Object.keys(tools)) as ToolCall[];
+
+    if (response.toolCalls.length === 0 && structuredToolCalls.length > 0) {
+      cxt.logger.info("Parsed tool calls from text response", {
+        toolCalls: structuredToolCalls.map((tc) => tc.tool),
+      });
+    }
+
+    const reasoning = extractReasoning(response.text ?? "", structuredToolCalls.length > 0 && response.toolCalls.length === 0);
+
     return {
-      toolCalls: response.toolCalls.map((toolCall) => ({
-        tool: toolCall.toolName,
-        input: toolCall.args as z.infer<
-          RoutingToolRegistry[RoutingToolName]["input"]
-        >,
-      })),
-      reasoning: response.text || undefined,
+      toolCalls: structuredToolCalls,
+      reasoning: reasoning || undefined,
     };
   }
 
@@ -143,6 +163,46 @@ export const createAiService = (deps: Dependencies): IAiService => {
     summarizeAttachments,
   };
 };
+
+// Parses tool calls written as JSON text by models that don't support structured
+// tool calling for multiple simultaneous calls (e.g. Mistral on Bedrock).
+// Format: [{"name": "toolName", "arguments": {...}}] — one per line.
+function parseTextToolCalls(
+  text: string,
+  availableTools: string[]
+): Array<{ tool: string; input: Record<string, unknown> }> {
+  const results: Array<{ tool: string; input: Record<string, unknown> }> = [];
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("[{")) continue;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) continue;
+      for (const item of parsed) {
+        if (
+          typeof item.name === "string" &&
+          item.arguments !== null &&
+          typeof item.arguments === "object" &&
+          availableTools.includes(item.name)
+        ) {
+          results.push({ tool: item.name, input: item.arguments });
+        }
+      }
+    } catch {}
+  }
+  return results;
+}
+
+// When tool calls are parsed from text, strip the JSON lines from the reasoning
+// so only the human-readable explanation is shown.
+function extractReasoning(text: string, toolCallsFromText: boolean): string {
+  if (!toolCallsFromText) return text;
+  return text
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("[{"))
+    .join("\n")
+    .trim();
+}
 
 function getDefaultModel(provider: string): string | null | undefined {
   switch (provider) {

@@ -22,4 +22,12 @@ export const sendEmailTool: RoutingToolDefinition<
     const { sendEmailHandler } = await import("./handlers/send-email-handler");
     return await sendEmailHandler(action, eventContext, cxt, ruleName);
   },
+  dryRun: async (action) => {
+    const { to, cc, bcc, subject, message } = action.input;
+    return {
+      payloadType: "email",
+      summary: `Email to ${to}: "${subject}"`,
+      payload: { to, ...(cc ? { cc } : {}), ...(bcc ? { bcc } : {}), subject, message },
+    };
+  },
 };

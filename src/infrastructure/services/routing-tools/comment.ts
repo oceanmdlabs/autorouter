@@ -18,4 +18,9 @@ export const commentTool: RoutingToolDefinition<
     const { commentHandler } = await import("./handlers/comment-handler");
     await commentHandler(action, eventContext, cxt, ruleName);
   },
+  dryRun: async (action) => ({
+    payloadType: "internal",
+    summary: "Add comment",
+    payload: { comment: action.input.comment },
+  }),
 };

@@ -4,6 +4,7 @@ import type { TestServiceRequest } from '@/src/entities/models/test-service-requ
 import { routingEventTypeSchema, getRoutingEventTypeDescription } from '@/src/entities/models/routing-event-type';
 import type { Bundle } from 'fhir/r4';
 import type { RuleEvaluationResult } from '@/src/entities/models/routing-evaluation';
+import type { DryRunPayload } from '@/src/entities/models/routing-tool';
 import { clientRoutingToolRegistry } from '@/src/entities/models/routing-tool-client';
 import type { RoutingToolName } from '@/src/infrastructure/services/routing-tools/routing-tool-registry';
 
@@ -23,6 +24,7 @@ const EVENT_TYPES = routingEventTypeSchema.options.map((event) => ({
 // State
 const selectedRequest = ref('')
 const selectedEvent = ref('')
+const mode = ref<'evaluate' | 'dry-run'>('evaluate')
 const isLoading = ref(false)
 const results = ref<RuleEvaluationResult[] | null>(null)
 const requestFetch = useRequestFetch()
@@ -50,6 +52,7 @@ async function handleSubmit(event: Event) {
 			body: {
 				testServiceRequestId: selectedRequest.value,
 				eventType: selectedEvent.value,
+				mode: mode.value,
 			}
 		});
 	} catch (error: any) {
@@ -60,6 +63,17 @@ async function handleSubmit(event: Event) {
 	} finally {
 		isLoading.value = false;
 	}
+}
+
+function payloadTypeLabel(payloadType: DryRunPayload['payloadType']): string {
+	const labels: Record<DryRunPayload['payloadType'], string> = {
+		'ocean-fhir-message': 'Ocean API (FHIR)',
+		'email': 'Email',
+		'sms': 'SMS',
+		'internal': 'Internal',
+		'cds-card': 'CDS Card',
+	};
+	return labels[payloadType] ?? payloadType;
 }
 </script>
 
@@ -132,10 +146,33 @@ async function handleSubmit(event: Event) {
 								</Select>
 							</div>
 
-							<Button type="submit" :disabled="!selectedRequest || !selectedEvent || isLoading"
-								:loading="isLoading">
-								Simulate Event
-							</Button>
+							<div class="flex items-center gap-4">
+								<div class="flex rounded-md border overflow-hidden text-sm">
+									<button
+										type="button"
+										class="px-3 py-1.5 transition-colors"
+										:class="mode === 'evaluate' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'"
+										@click="mode = 'evaluate'"
+									>
+										Evaluate
+									</button>
+									<button
+										type="button"
+										class="px-3 py-1.5 border-l transition-colors"
+										:class="mode === 'dry-run' ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:bg-muted'"
+										@click="mode = 'dry-run'"
+									>
+										Dry Run
+									</button>
+								</div>
+								<Button type="submit" :disabled="!selectedRequest || !selectedEvent || isLoading"
+									:loading="isLoading">
+									{{ mode === 'dry-run' ? 'Preview Payloads' : 'Simulate Event' }}
+								</Button>
+							</div>
+							<p v-if="mode === 'dry-run'" class="text-xs text-muted-foreground">
+								Dry run renders the exact outbound payloads that would be sent — no actions are executed.
+							</p>
 						</template>
 					</form>
 					<div v-if="results" class="mt-8 space-y-6">
@@ -165,13 +202,67 @@ async function handleSubmit(event: Event) {
 									<div v-else class="space-y-2">
 										<template v-if="result.evaluation.actions.length > 0" class="space-y-2">
 											<div v-for="(action, index) in result.evaluation.actions" :key="index"
-												class="flex items-start gap-2 text-sm">
-												<Icon name="lucide:check" class="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
-												<div class="text-muted-foreground whitespace-pre-wrap">
-													<template v-if="describeAction(action).type">
-														<span class="font-medium text-foreground">Action Type:</span> {{ describeAction(action).type }}<br/>
+												class="space-y-2">
+												<div class="flex items-start gap-2 text-sm">
+													<Icon name="lucide:check" class="h-4 w-4 text-green-500 mt-0.5 shrink-0" />
+													<div class="text-muted-foreground whitespace-pre-wrap">
+														<template v-if="describeAction(action).type">
+															<span class="font-medium text-foreground">Action Type:</span> {{ describeAction(action).type }}<br/>
+														</template>
+														<span class="font-medium text-foreground">Action Taken:</span> {{ describeAction(action).taken }}
+													</div>
+												</div>
+												<!-- Dry run payload -->
+												<div v-if="(action as any).dryRunPayload" class="ml-6">
+													<div v-if="(action as any).dryRunPayload.error" class="rounded-md bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+														<span class="font-medium">Payload error:</span> {{ (action as any).dryRunPayload.error }}
+													</div>
+													<template v-else>
+														<Collapsible>
+															<CollapsibleTrigger class="flex items-center gap-1.5 text-xs text-blue-600 hover:text-blue-800">
+																<Icon name="lucide:chevron-down" class="h-3 w-3 transition-transform duration-200" />
+																View {{ payloadTypeLabel((action as any).dryRunPayload.payloadType) }} payload
+															</CollapsibleTrigger>
+															<CollapsibleContent>
+																<div class="mt-2 rounded-md border bg-gray-50 p-3 text-xs">
+																	<!-- Email payload -->
+																	<template v-if="(action as any).dryRunPayload.payloadType === 'email'">
+																		<div class="space-y-1 font-mono">
+																			<div><span class="font-semibold text-gray-600">To:</span> {{ (action as any).dryRunPayload.payload.to }}</div>
+																			<div v-if="(action as any).dryRunPayload.payload.cc"><span class="font-semibold text-gray-600">CC:</span> {{ (action as any).dryRunPayload.payload.cc }}</div>
+																			<div v-if="(action as any).dryRunPayload.payload.bcc"><span class="font-semibold text-gray-600">BCC:</span> {{ (action as any).dryRunPayload.payload.bcc }}</div>
+																			<div><span class="font-semibold text-gray-600">Subject:</span> {{ (action as any).dryRunPayload.payload.subject }}</div>
+																			<hr class="my-2 border-gray-200" />
+																			<div class="whitespace-pre-wrap text-gray-700">{{ (action as any).dryRunPayload.payload.message }}</div>
+																		</div>
+																	</template>
+																	<!-- SMS payload -->
+																	<template v-else-if="(action as any).dryRunPayload.payloadType === 'sms'">
+																		<div class="space-y-1 font-mono">
+																			<div><span class="font-semibold text-gray-600">To:</span> {{ (action as any).dryRunPayload.payload.to }}</div>
+																			<div><span class="font-semibold text-gray-600">Message:</span> {{ (action as any).dryRunPayload.payload.message }}</div>
+																		</div>
+																	</template>
+																	<!-- CDS card payload -->
+																	<template v-else-if="(action as any).dryRunPayload.payloadType === 'cds-card'">
+																		<div class="space-y-1">
+																			<div><span class="font-semibold text-gray-600">Severity:</span> {{ (action as any).dryRunPayload.payload.severity }}</div>
+																			<div><span class="font-semibold text-gray-600">Title:</span> {{ (action as any).dryRunPayload.payload.title }}</div>
+																			<div><span class="font-semibold text-gray-600">Message:</span> {{ (action as any).dryRunPayload.payload.message }}</div>
+																		</div>
+																	</template>
+																	<!-- Internal payload -->
+																	<template v-else-if="(action as any).dryRunPayload.payloadType === 'internal'">
+																		<pre class="whitespace-pre-wrap text-gray-700">{{ JSON.stringify((action as any).dryRunPayload.payload, null, 2) }}</pre>
+																	</template>
+																	<!-- FHIR payload -->
+																	<template v-else>
+																		<pre class="whitespace-pre-wrap text-gray-700 max-h-96 overflow-y-auto">{{ JSON.stringify((action as any).dryRunPayload.payload, null, 2) }}</pre>
+																	</template>
+																</div>
+															</CollapsibleContent>
+														</Collapsible>
 													</template>
-													<span class="font-medium text-foreground">Action Taken:</span> {{ describeAction(action).taken }}
 												</div>
 											</div>
 										</template>

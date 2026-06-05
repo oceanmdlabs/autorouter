@@ -18,4 +18,18 @@ export const forwardTool: RoutingToolDefinition<
     const { forwardHandler } = await import("./handlers/forward-handler");
     return forwardHandler(action, eventContext, cxt, ruleName);
   },
+  dryRun: async (action, eventContext, cxt) => {
+    const serviceRequestBundle = "serviceRequestBundle" in eventContext ? eventContext.serviceRequestBundle : null;
+    if (!serviceRequestBundle) {
+      return { payloadType: "ocean-fhir-message", summary: `Forward to: ${action.input.targetListingName}`, payload: {}, error: "No service request bundle available" };
+    }
+    const { targetListingName } = action.input;
+    const targetListing = await cxt.getHealthcareServicesRepository().searchByName(targetListingName);
+    if (!targetListing) {
+      return { payloadType: "ocean-fhir-message", summary: `Forward to: ${targetListingName}`, payload: {}, error: `Listing '${targetListingName}' not found` };
+    }
+    const { createForwardMessage } = await import("../ocean-message.service");
+    const message = createForwardMessage(serviceRequestBundle, { forwardToListingRef: targetListing.oceanReference });
+    return { payloadType: "ocean-fhir-message", summary: `Forward to listing: ${targetListingName}`, payload: message as unknown as Record<string, unknown> };
+  },
 };

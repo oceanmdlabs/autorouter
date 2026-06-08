@@ -147,7 +147,7 @@ async function handleDelete() {
 	}
 
 	try {
-		await requestFetch(`/api/routing-rules/${id}`, {
+		await $fetch(`/api/routing-rules/${id}` as string, {
 			method: 'DELETE'
 		})
 		router.push('/portal/routing-rules')

@@ -32,7 +32,7 @@ const connectionSlice = computed(() => ({
   oceanClientId: formValues.value?.oceanClientId ?? "",
   oceanClientSecret: formValues.value?.oceanClientSecret ?? "",
 }));
-function updateConnectionSlice(v: typeof connectionSlice.value) {
+function updateConnectionSlice(v: { name: string; oceanServer: string; oceanSiteNum: string; oceanClientId: string; oceanClientSecret: string }) {
   if (formValues.value) Object.assign(formValues.value, v);
 }
 
@@ -61,7 +61,7 @@ const aiSlice = computed(() => ({
   aiApiKey: formValues.value?.aiApiKey ?? null,
   aiModel: formValues.value?.aiModel ?? null,
 }));
-function updateAiSlice(v: typeof aiSlice.value) {
+function updateAiSlice(v: { aiProvider: string | null; aiApiKey: string | null; aiModel: string | null }) {
   if (formValues.value) Object.assign(formValues.value, v);
 }
 
@@ -73,7 +73,7 @@ const emailSlice = computed(() => ({
   emailFromName: formValues.value?.emailFromName ?? null,
   emailSendAllowlist: formValues.value?.emailSendAllowlist ?? null,
 }));
-function updateEmailSlice(v: typeof emailSlice.value) {
+function updateEmailSlice(v: { emailProvider: string | null; emailFromAddress: string | null; emailApiKey: string | null; emailFromName: string | null; emailSendAllowlist: string[] | null }) {
   if (formValues.value) Object.assign(formValues.value, v);
 }
 

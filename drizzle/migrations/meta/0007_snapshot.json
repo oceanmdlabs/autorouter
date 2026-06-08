@@ -1,6 +1,6 @@
 {
-  "id": "a280e666-7c0c-49b0-876e-c707487d4c46",
-  "prevId": "88786f7e-93bb-4c7c-8820-3d8047c905c3",
+  "id": "88786f7e-93bb-4c7c-8820-3d8047c905c3",
+  "prevId": "5face26c-fa5e-45c5-a1f4-66fef3dd5f78",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1411,12 +1411,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
-        },
-        "priority": {
-          "name": "priority",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
         }
       },
       "indexes": {

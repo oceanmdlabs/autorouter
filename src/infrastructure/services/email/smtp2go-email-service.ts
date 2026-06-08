@@ -36,7 +36,7 @@ export class Smtp2goEmailService implements EmailService {
       headers: {
         accept: "application/json",
         "Content-Type": "application/json",
-        "X-Smtp2go-Api-Key": this.config.apiKey,
+        ...(this.config.apiKey ? { "X-Smtp2go-Api-Key": this.config.apiKey } : {}),
       },
       body: JSON.stringify({
         sender: from,

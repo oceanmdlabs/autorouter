@@ -116,3 +116,6 @@ infrastructure/pulumi/**/node_modules/
 infrastructure/pulumi/**/.pulumi/
 infrastructure/pulumi/**/Pulumi.*.yaml
 infrastructure/cdk/**/cdk.out
+
+# Local data directory (PDFs and blobs stored at runtime)
+.data/

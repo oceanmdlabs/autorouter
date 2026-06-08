@@ -12,7 +12,7 @@ export function filterBlockedEmailActions(
     const filteredActions = result.evaluation.actions.filter((action) => {
       if (action.tool !== "sendEmail") return true;
 
-      const input = action.input as { to?: string; cc?: string; subject?: string };
+      const input = action.input as { to?: string; cc?: string; bcc?: string; subject?: string };
       const toAddresses = (input.to ?? "")
         .split(",")
         .map((e) => e.trim().toLowerCase())
@@ -20,7 +20,10 @@ export function filterBlockedEmailActions(
       const ccAddresses = input.cc
         ? input.cc.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
         : [];
-      const allRecipients = [...toAddresses, ...ccAddresses];
+      const bccAddresses = input.bcc
+        ? input.bcc.split(",").map((e) => e.trim().toLowerCase()).filter(Boolean)
+        : [];
+      const allRecipients = [...toAddresses, ...ccAddresses, ...bccAddresses];
 
       if (allowlistLower.length === 0) {
         blockedNotes.push(

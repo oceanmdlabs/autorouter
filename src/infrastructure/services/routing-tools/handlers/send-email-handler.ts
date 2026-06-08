@@ -38,7 +38,10 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
   const ccAddresses = cc
     ? cc.split(",").map((e) => e.trim().toLowerCase())
     : [];
-  const allRecipients = [...toAddresses, ...ccAddresses];
+  const bccAddresses = bcc
+    ? bcc.split(",").map((e) => e.trim().toLowerCase())
+    : [];
+  const allRecipients = [...toAddresses, ...ccAddresses, ...bccAddresses];
 
   if (allowlist.length === 0) {
     cxt.logger.warn(`Email allowlist is empty — all agent sends are blocked`);

@@ -1,6 +1,6 @@
 {
-  "id": "a280e666-7c0c-49b0-876e-c707487d4c46",
-  "prevId": "88786f7e-93bb-4c7c-8820-3d8047c905c3",
+  "id": "5face26c-fa5e-45c5-a1f4-66fef3dd5f78",
+  "prevId": "1e75dd41-2680-40d6-b508-46516234a8e7",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -1411,12 +1411,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
-        },
-        "priority": {
-          "name": "priority",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
         }
       },
       "indexes": {
@@ -1605,12 +1599,6 @@
         "email_daily_sent_date": {
           "name": "email_daily_sent_date",
           "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "email_send_allowlist": {
-          "name": "email_send_allowlist",
-          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },

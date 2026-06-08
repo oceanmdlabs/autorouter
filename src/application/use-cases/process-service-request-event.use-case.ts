@@ -4,6 +4,7 @@ import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluat
 import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
 import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
 import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
+import { writeDecisionAudits } from "./write-decision-audits";
 export interface ProcessServiceRequestEventOutput {
   message: string;
 }
@@ -91,6 +92,16 @@ export async function processServiceRequestEventUseCase(
       .map((r) => r.evaluation.error)
       .filter(Boolean)
       .join("\n");
+
+    if (siteConfig?.id && cxt.getTenantId()) {
+      await writeDecisionAudits(filteredResults, rules, {
+        tenantId: cxt.getTenantId()!,
+        siteId: siteConfig.id,
+        referralId: event.referralRef ?? "unknown",
+        actionResults,
+        cxt,
+      });
+    }
   }
 
   if (event.archivalMessage) {

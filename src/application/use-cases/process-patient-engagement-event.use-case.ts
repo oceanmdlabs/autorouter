@@ -7,6 +7,7 @@ import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluat
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
 import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
 import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
+import { writeDecisionAudits } from "./write-decision-audits";
 
 export interface ProcessPEEventOutput {
   message: string;
@@ -90,6 +91,16 @@ export async function processPatientEngagementEventUseCase(
     .map((r) => r.evaluation.error)
     .filter(Boolean)
     .join("\n");
+
+  if (siteConfig?.id && cxt.getTenantId()) {
+    await writeDecisionAudits(filteredResults, rules, {
+      tenantId: cxt.getTenantId()!,
+      siteId: siteConfig.id,
+      referralId: event.message.patient.ref ?? "unknown",
+      actionResults,
+      cxt,
+    });
+  }
 
   await cxt.getActivityLogEntriesRepository().create({
     ...event,

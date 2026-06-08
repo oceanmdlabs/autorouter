@@ -91,6 +91,7 @@ const navGroups = computed<NavGroup[]>(() => {
       items: [
         { to: '/portal/erequests', label: 'eRequests' },
         { to: '/portal/activity', label: 'Activity' },
+        { to: '/portal/audit', label: 'Decision Audit' },
       ],
     },
     {

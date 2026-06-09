@@ -35,6 +35,8 @@ The default Autorouter posture should avoid storing patient identifiers and clin
 
 The eRequests module is a higher-retention pathway because it can archive referral payloads and related blobs. It must remain explicitly opt-in and should be enabled only after a tenant-specific review of purpose, minimum necessary fields, retention period, disposal process, access controls, and storage encryption.
 
+Postal-code based routing should use the minimum location detail required for the rule. The preferred pattern is to expose only the first three characters of the postal code, such as `M2L`, and only when the tenant has authorized postal-code prefix use for a specific workflow such as catchment routing or central intake assignment.
+
 For AWS-hosted deployments, encryption at rest should be treated as a required control and verified during go-live. Amazon Aurora encrypts new clusters at rest by default for clusters created on or after February 18, 2026, but the deployment should still record the database type, encryption status, KMS key type, key region, backups, snapshots, replicas, and log storage controls.
 
 ## Attachment Summarization

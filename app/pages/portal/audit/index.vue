@@ -4,6 +4,8 @@ import { handleMissingActiveTenantError } from '@/app/lib/active-tenant';
 import type { DecisionAuditItem, ToolExecutionItem } from '@/src/entities/models/llm-audit-explorer';
 import type { PaginatedResult } from '@/src/entities/models/paginated-result';
 import { formatTimestampWithMinutePrecision } from '@/shared/lib/utils';
+import { clientRoutingToolRegistry } from '@/src/entities/models/routing-tool-client';
+import type { RoutingToolName } from '@/src/infrastructure/services/routing-tools/routing-tool-registry';
 
 const currentPage = ref(1);
 const itemsPerPage = ref(20);
@@ -34,9 +36,13 @@ watch([currentPage, itemsPerPage, filterReferralId], ([, , newFilter], [, , oldF
 });
 
 function describeAction(tool: ToolExecutionItem): { type: string; taken: string } {
-  const type = tool.actionType ?? tool.toolDisplayName ?? tool.toolName;
-  const taken = tool.toolResult ?? 'Action taken';
-  return { type, taken };
+  const registryEntry = clientRoutingToolRegistry[tool.toolName as RoutingToolName];
+  const type = registryEntry?.actionType ?? tool.actionType ?? tool.toolDisplayName ?? tool.toolName;
+  const input = (tool.toolInput ?? {}) as Record<string, any>;
+  if (registryEntry?.getActionTaken) {
+    return { type, taken: registryEntry.getActionTaken(input, tool.toolResult ?? undefined) };
+  }
+  return { type, taken: tool.toolResult ?? 'Executed' };
 }
 </script>
 

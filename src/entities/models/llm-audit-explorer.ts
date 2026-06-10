@@ -1,7 +1,4 @@
-import type {
-  LlmDecision,
-  LlmToolExecutionStatus,
-} from "./llm-rule-decision";
+import type { LlmDecision, LlmToolExecutionStatus } from "./llm-rule-decision";
 
 export type DecisionAuditFilters = {
   referralId?: string;
@@ -9,7 +6,6 @@ export type DecisionAuditFilters = {
   from?: Date;
   to?: Date;
   decision?: LlmDecision;
-  toolStatus?: LlmToolExecutionStatus;
   page?: number;
   pageSize?: number;
   sort?: "createdAt_asc" | "createdAt_desc";

@@ -104,7 +104,7 @@ export const createLlmRuleDecisionAuditRepository = ({
       if (filters.decision) {
         conditions.push(eq(llmRuleDecisionAudit.decision, filters.decision));
       }
-      const whereClause = and(...conditions);
+const whereClause = and(...conditions);
       const orderBy =
         filters.sort === "createdAt_asc"
           ? asc(llmRuleDecisionAudit.createdAt)
@@ -150,22 +150,7 @@ export const createLlmRuleDecisionAuditRepository = ({
         toolsByDecisionId.set(tool.decisionAuditId, existing);
       }
 
-      let filteredDecisionIds: Set<string> | null = null;
-      if (filters.toolStatus) {
-        filteredDecisionIds = new Set<string>();
-        for (const [decisionId, tools] of toolsByDecisionId) {
-          if (tools.some((tool) => tool.status === filters.toolStatus)) {
-            filteredDecisionIds.add(decisionId);
-          }
-        }
-      }
-
-      const items: DecisionAuditItem[] = decisions
-        .filter((decision) => {
-          if (!filteredDecisionIds) return true;
-          return decision.id ? filteredDecisionIds.has(decision.id) : false;
-        })
-        .map((decision) => {
+      const items: DecisionAuditItem[] = decisions.map((decision) => {
           const tools = decision.id
             ? toolsByDecisionId.get(decision.id) ?? []
             : [];
@@ -231,14 +216,12 @@ export const createLlmRuleDecisionAuditRepository = ({
           };
         });
 
-      const resultTotal = filteredDecisionIds ? items.length : total;
-
       return {
         items,
-        total: resultTotal,
+        total,
         page,
         pageSize,
-        totalPages: Math.ceil(resultTotal / pageSize),
+        totalPages: Math.ceil(total / pageSize),
       };
     },
 

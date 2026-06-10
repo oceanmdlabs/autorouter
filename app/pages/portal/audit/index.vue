@@ -10,6 +10,7 @@ import type { RoutingToolName } from '@/src/infrastructure/services/routing-tool
 const currentPage = ref(1);
 const itemsPerPage = ref(20);
 const filterReferralId = ref('');
+const filterDecision = ref('');
 const requestFetch = useRequestFetch();
 
 const { data: audits, refresh } = useAsyncData('llm-audits', async () => {
@@ -19,6 +20,7 @@ const { data: audits, refresh } = useAsyncData('llm-audits', async () => {
         page: currentPage.value,
         pageSize: itemsPerPage.value,
         referralId: filterReferralId.value || undefined,
+        decision: filterDecision.value === 'all' ? undefined : filterDecision.value || undefined,
         sort: 'createdAt_desc',
       },
     });
@@ -30,8 +32,8 @@ const { data: audits, refresh } = useAsyncData('llm-audits', async () => {
   }
 });
 
-watch([currentPage, itemsPerPage, filterReferralId], ([, , newFilter], [, , oldFilter]) => {
-  if (newFilter !== oldFilter) currentPage.value = 1;
+watch([currentPage, itemsPerPage, filterReferralId, filterDecision], (newVals, oldVals) => {
+  if (newVals[2] !== oldVals[2] || newVals[3] !== oldVals[3]) currentPage.value = 1;
   refresh();
 });
 
@@ -58,8 +60,19 @@ function describeAction(tool: ToolExecutionItem): { type: string; taken: string 
 
       <Card>
         <CardContent>
-          <div class="mb-4">
+          <div class="mb-4 flex gap-3">
             <Input v-model="filterReferralId" placeholder="Filter by referral ID..." class="max-w-sm" />
+            <Select v-model="filterDecision">
+              <SelectTrigger class="w-44">
+                <SelectValue placeholder="Decision" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All decisions</SelectItem>
+                <SelectItem value="EXECUTE">Triggered</SelectItem>
+                <SelectItem value="SKIP">Not triggered</SelectItem>
+                <SelectItem value="ERROR">Error</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           <Table>

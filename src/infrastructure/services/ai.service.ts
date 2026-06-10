@@ -137,24 +137,54 @@ export const createAiService = (deps: Dependencies): IAiService => {
     attachments: Attachment[]
   ): Promise<string> {
     const model = await getAiModel();
-    const result = await generateText({
-      model,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: instructions },
-            ...attachments.map((attachment) => ({
-              type: "file" as const,
-              mimeType: attachment.contentType,
-              data: attachment.data,
-            })),
-          ] as any,
-        },
-      ],
-    });
 
-    return result.text;
+    const buildContent = (atts: Attachment[]) => [
+      { type: "text" as const, text: instructions },
+      ...atts.map((attachment) => {
+        const mimeType = attachment.contentType ?? "application/pdf";
+        const isImage = mimeType.startsWith("image/");
+        return isImage
+          ? { type: "image" as const, mimeType, image: attachment.data }
+          : { type: "file" as const, mimeType, data: attachment.data };
+      }),
+    ];
+
+    try {
+      const result = await generateText({
+        model,
+        messages: [{ role: "user", content: buildContent(attachments) as any }],
+      });
+      return result.text;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const isImageError =
+        /image|vision|multimodal|content block/i.test(message);
+      const imageAttachments = attachments.filter((a) =>
+        (a.contentType ?? "").startsWith("image/")
+      );
+
+      if (!isImageError || imageAttachments.length === 0) throw err;
+
+      const nonImageAttachments = attachments.filter(
+        (a) => !(a.contentType ?? "").startsWith("image/")
+      );
+      const skippedNames = imageAttachments.map((a) => a.title).join(", ");
+
+      if (nonImageAttachments.length === 0) {
+        return `Note: The configured AI model does not support image analysis. Skipped image(s): ${skippedNames}.`;
+      }
+
+      const result = await generateText({
+        model,
+        messages: [
+          {
+            role: "user",
+            content: buildContent(nonImageAttachments) as any,
+          },
+        ],
+      });
+      return `${result.text}\n\nNote: The following image attachment(s) were skipped because the configured AI model does not support image analysis: ${skippedNames}.`;
+    }
   }
 
   return {

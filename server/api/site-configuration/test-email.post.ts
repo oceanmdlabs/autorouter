@@ -1,5 +1,5 @@
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
-import { Smtp2goEmailService } from "@/src/infrastructure/services/email/smtp2go-email-service";
+import { createEmailService } from "@/src/infrastructure/services/email/create-email-service";
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
@@ -23,7 +23,7 @@ export default defineEventHandler(async (event) => {
     if (
       !siteConfig?.emailProvider ||
       !siteConfig.emailFromAddress ||
-      !siteConfig.emailApiKey
+      (siteConfig.emailProvider !== "ses" && !siteConfig.emailApiKey)
     ) {
       return {
         success: false,
@@ -32,13 +32,7 @@ export default defineEventHandler(async (event) => {
       };
     }
 
-    // Create email service instance
-    const emailService = new Smtp2goEmailService({
-      provider: siteConfig.emailProvider,
-      fromAddress: siteConfig.emailFromAddress,
-      fromName: siteConfig.emailFromName ?? undefined,
-      apiKey: siteConfig.emailApiKey,
-    });
+    const emailService = createEmailService(siteConfig);
 
     // Send the test email
     await emailService.sendTemplatedEmail({

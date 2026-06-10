@@ -1,5 +1,9 @@
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
-import Twilio from "twilio";
+import {
+  createSmsService,
+  SmsConfigurationError,
+} from "@/src/infrastructure/services/sms/create-sms-service";
+import { normalizePhoneNumber } from "@/src/infrastructure/services/sms/phone-number";
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
@@ -7,52 +11,58 @@ export default defineEventHandler(async (event) => {
   const cxt = await toApplicationContext(event);
   const logger = cxt.logger;
 
-  // Validate required fields
   if (!to || !to.trim()) {
-    return {
-      success: false,
-      error: "Phone number is required",
-    };
+    return { success: false, error: "Phone number is required" };
   }
 
   try {
-    // Get site configuration to access SMS settings
     const siteConfig = await cxt
       .getSiteConfigurationRepository()
       .getForTenant();
-    if (
-      !siteConfig?.twilioAccountSid ||
-      !siteConfig.twilioAuthToken ||
-      !siteConfig.twilioPhoneNumber
-    ) {
+
+    if (!siteConfig?.smsProvider) {
       return {
         success: false,
-        error:
-          "SMS configuration is not set up. Please configure your Twilio settings first.",
+        error: "SMS provider is not configured. Please select a provider and save first.",
       };
     }
 
-    // Create Twilio client
-    const client = Twilio(
-      siteConfig.twilioAccountSid,
-      siteConfig.twilioAuthToken
-    );
+    const allowlist = siteConfig.smsSendAllowlist ?? [];
+    if (allowlist.length === 0) {
+      return {
+        success: false,
+        error: "No approved phone numbers configured. Add at least one number to the SMS allowlist before sending.",
+      };
+    }
 
-    // Send the test SMS
-    const twilioMessage = await client.messages.create({
-      body:
+    const normalizedTarget = normalizePhoneNumber(to.trim());
+    const allowlistNormalized = allowlist
+      .map((entry) => normalizePhoneNumber(entry.phoneNumber))
+      .filter((n): n is string => n !== null);
+
+    if (!normalizedTarget || !allowlistNormalized.includes(normalizedTarget)) {
+      return {
+        success: false,
+        error: `${to.trim()} is not in the approved phone number allowlist.`,
+      };
+    }
+
+    let smsService;
+    try {
+      smsService = createSmsService(siteConfig);
+    } catch (err) {
+      if (err instanceof SmsConfigurationError) {
+        return { success: false, error: err.message };
+      }
+      throw err;
+    }
+
+    await smsService.sendSms({
+      to: to.trim(),
+      message:
         message ||
         "This is a test SMS to verify your SMS configuration is working correctly.",
-      from: siteConfig.twilioPhoneNumber,
-      to: to.trim(),
     });
-
-    if (twilioMessage.status === "failed") {
-      return {
-        success: false,
-        error: twilioMessage.errorMessage || "SMS delivery failed",
-      };
-    }
 
     logger.info(`Successfully sent test SMS to ${to}`);
     return { success: true };

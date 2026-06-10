@@ -55,11 +55,13 @@ export const createSiteConfigurationRepository = ({
       sharedEncryptionKeyEncrypted,
       webhookKeyEncrypted,
       emailProvider,
+      smsProvider,
       ...rest
     } = dbRecord;
     return {
       ...rest,
       emailProvider: emailProvider as SiteConfiguration["emailProvider"],
+      smsProvider: smsProvider as SiteConfiguration["smsProvider"],
       clientSecret: decrypt(clientSecretEncrypted, "clientSecret"),
       oceanClientSecret: decrypt(
         oceanClientSecretEncrypted,

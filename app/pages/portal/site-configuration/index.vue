@@ -47,11 +47,13 @@ function updateInboundSlice(v: typeof inboundSlice.value) {
 
 // SMS panel slice
 const smsSlice = computed(() => ({
+  smsProvider: formValues.value?.smsProvider ?? null,
   twilioAccountSid: formValues.value?.twilioAccountSid ?? "",
   twilioAuthToken: formValues.value?.twilioAuthToken ?? "",
   twilioPhoneNumber: formValues.value?.twilioPhoneNumber ?? "",
+  smsSendAllowlist: formValues.value?.smsSendAllowlist ?? [],
 }));
-function updateSmsSlice(v: typeof smsSlice.value) {
+function updateSmsSlice(v: Omit<typeof smsSlice.value, "smsSendAllowlist"> & { smsSendAllowlist: { phoneNumber: string; label?: string }[] | null }) {
   if (formValues.value) Object.assign(formValues.value, v);
 }
 

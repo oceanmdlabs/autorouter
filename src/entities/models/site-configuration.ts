@@ -15,6 +15,15 @@ export type AiProvider = z.infer<typeof AiProviderEnum>;
 const EmailProviderEnum = z.enum(["smtp2go", "ses"]);
 export type EmailProvider = z.infer<typeof EmailProviderEnum>;
 
+const SmsProviderEnum = z.enum(["twilio", "aws"]);
+export type SmsProvider = z.infer<typeof SmsProviderEnum>;
+
+export const smsAllowlistEntrySchema = z.object({
+  phoneNumber: z.string().trim().min(1),
+  label: z.string().trim().max(100).optional(),
+});
+export type SmsAllowlistEntry = z.infer<typeof smsAllowlistEntrySchema>;
+
 const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   name: z
     .string()
@@ -50,6 +59,10 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   twilioAccountSid: z.string().trim().max(255).optional().nullable(),
   twilioAuthToken: z.string().trim().max(255).optional().nullable(),
   twilioPhoneNumber: z.string().trim().max(255).optional().nullable(),
+  smsProvider: SmsProviderEnum.optional().nullable(),
+  smsDailySentCount: z.number().int().nonnegative().optional().nullable(),
+  smsDailySentDate: z.string().optional().nullable(),
+  smsSendAllowlist: z.array(smsAllowlistEntrySchema).optional().nullable(),
   aiProvider: AiProviderEnum.optional().nullable(),
   aiApiKey: z.string().trim().max(255).optional().nullable(),
   aiModel: z.string().trim().max(255).optional().nullable(),

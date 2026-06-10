@@ -24,7 +24,7 @@ const siteConfigurationCategoryFields = {
     "oceanClientId",
   ],
   "inbound authentication settings": ["clientId", "clientSecret"],
-  "SMS settings": ["twilioAccountSid", "twilioAuthToken", "twilioPhoneNumber"],
+  "SMS settings": ["twilioAccountSid", "twilioAuthToken", "twilioPhoneNumber", "smsProvider", "smsSendAllowlist"],
   "AI settings": ["aiProvider", "aiApiKey", "aiModel"],
   "email settings": [
     "emailProvider",

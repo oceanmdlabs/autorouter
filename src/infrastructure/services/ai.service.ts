@@ -83,7 +83,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
     const sdkTools = Object.fromEntries(
       Object.entries(tools).map(([name, t]) => [
         name,
-        tool({ parameters: t.inputSchema, execute: t.execute }),
+        tool({ parameters: t.inputSchema, execute: async () => "scheduled" }),
       ])
     );
 
@@ -92,30 +92,37 @@ export const createAiService = (deps: Dependencies): IAiService => {
       prompt,
       tools: sdkTools,
       toolChoice: "auto",
+      maxSteps: 10,
     });
+    // With maxSteps > 1, response.toolCalls only covers the last step.
+    // Flatten across all steps to capture sequential multi-tool calls.
+    const allStepToolCalls = response.steps.flatMap((step) => step.toolCalls);
+    const allStepText = response.steps.map((step) => step.text).filter(Boolean).join("\n").trim();
+
     cxt.logger.info("AI raw response", {
-      toolCallCount: response.toolCalls.length,
-      toolCalls: response.toolCalls.map((tc) => ({ name: tc.toolName, args: tc.args })),
-      textLength: response.text?.length ?? 0,
-      text: response.text?.slice(0, 500),
+      toolCallCount: allStepToolCalls.length,
+      toolCalls: allStepToolCalls.map((tc) => ({ name: tc.toolName, args: tc.args })),
+      steps: response.steps.length,
+      textLength: allStepText.length,
+      text: allStepText.slice(0, 500),
     });
 
     // Some models (e.g. Mistral on Bedrock) write multiple tool calls as JSON text
     // rather than returning them as structured tool calls. Parse them as a fallback.
-    const structuredToolCalls: ToolCall[] = response.toolCalls.length > 0
-      ? response.toolCalls.map((toolCall) => ({
+    const structuredToolCalls: ToolCall[] = allStepToolCalls.length > 0
+      ? allStepToolCalls.map((toolCall) => ({
           tool: toolCall.toolName,
           input: toolCall.args as z.infer<RoutingToolRegistry[RoutingToolName]["input"]>,
         }))
-      : parseTextToolCalls(response.text ?? "", Object.keys(tools)) as ToolCall[];
+      : parseTextToolCalls(allStepText, Object.keys(tools)) as ToolCall[];
 
-    if (response.toolCalls.length === 0 && structuredToolCalls.length > 0) {
+    if (allStepToolCalls.length === 0 && structuredToolCalls.length > 0) {
       cxt.logger.info("Parsed tool calls from text response", {
         toolCalls: structuredToolCalls.map((tc) => tc.tool),
       });
     }
 
-    const reasoning = extractReasoning(response.text ?? "", structuredToolCalls.length > 0 && response.toolCalls.length === 0);
+    const reasoning = extractReasoning(allStepText, structuredToolCalls.length > 0 && allStepToolCalls.length === 0);
 
     return {
       toolCalls: structuredToolCalls,

@@ -99,14 +99,6 @@ export const createAiService = (deps: Dependencies): IAiService => {
     const allStepToolCalls = response.steps.flatMap((step) => step.toolCalls);
     const allStepText = response.steps.map((step) => step.text).filter(Boolean).join("\n").trim();
 
-    cxt.logger.info("AI raw response", {
-      toolCallCount: allStepToolCalls.length,
-      toolCalls: allStepToolCalls.map((tc) => ({ name: tc.toolName, args: tc.args })),
-      steps: response.steps.length,
-      textLength: allStepText.length,
-      text: allStepText.slice(0, 500),
-    });
-
     // Some models (e.g. Mistral on Bedrock) write multiple tool calls as JSON text
     // rather than returning them as structured tool calls. Parse them as a fallback.
     const structuredToolCalls: ToolCall[] = allStepToolCalls.length > 0

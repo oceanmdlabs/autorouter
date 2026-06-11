@@ -61,11 +61,11 @@ export function createErequestsRepository({
     }
 
     if (options?.healthNumber) {
-      clauses.push(ilike(erequests.patientHealthNumber, `%${options.healthNumber}%`));
+      clauses.push(ilike(erequests.patientHealthNumber, `${options.healthNumber}%`));
     }
     if (options?.medicalRecordNumber) {
       clauses.push(
-        ilike(erequests.patientMedicalRecordNumber, `%${options.medicalRecordNumber}%`)
+        ilike(erequests.patientMedicalRecordNumber, `${options.medicalRecordNumber}%`)
       );
     }
     if (options?.patientName) {
@@ -78,13 +78,13 @@ export function createErequestsRepository({
       clauses.push(ilike(erequests.receivingProvider, `%${options.receivingProvider}%`));
     }
     if (options?.referralRef) {
-      clauses.push(ilike(erequests.referralRef, `%${options.referralRef}%`));
+      clauses.push(ilike(erequests.referralRef, `${options.referralRef}%`));
     }
     if (options?.requestedListing) {
       clauses.push(
         or(
           ilike(erequests.requestedListingTitle, `%${options.requestedListing}%`),
-          ilike(erequests.requestedListingRef, `%${options.requestedListing}%`)
+          ilike(erequests.requestedListingRef, `${options.requestedListing}%`)
         )!
       );
     }

@@ -22,11 +22,9 @@ export class DocumentDownloadCache {
   fetchLetterData(letterUrl: string): Promise<Buffer> {
     const cached = this.downloads.get(letterUrl);
     if (cached) {
-      console.log(`[DocumentDownloadCache] cache HIT: ${letterUrl}`);
       return cached;
     }
 
-    console.log(`[DocumentDownloadCache] cache MISS — fetching: ${letterUrl}`);
     const promise = this.fetchCredentials().then((credentials) =>
       this.oceanClient.fetchLetterData({ letterUrl, credentials })
     ) as Promise<Buffer>;

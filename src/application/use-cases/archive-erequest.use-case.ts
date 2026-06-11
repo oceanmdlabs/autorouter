@@ -181,7 +181,13 @@ function extractErequestMetadata(
 ) {
   const resources =
     (bundle.entry
-      ?.map((entry) => entry.resource)
+      ?.map((entry) => {
+        if (!entry.resource) return undefined;
+        if (!entry.resource.id && entry.fullUrl) {
+          return { ...entry.resource, id: entry.fullUrl };
+        }
+        return entry.resource;
+      })
       .filter(Boolean) as Resource[]) ?? [];
   const serviceRequest = resources.find(
     (resource): resource is ServiceRequest =>
@@ -201,7 +207,7 @@ function extractErequestMetadata(
     patientHealthNumber:
       findIdentifierValue(
         patient?.identifier,
-        /health-number|health card|health card number|hin/i,
+        /health[ -]number|health card|hcn|hin/i,
       ) ?? null,
     patientMedicalRecordNumber:
       findIdentifierValue(patient?.identifier, /medical record|mrn|chart/i) ??

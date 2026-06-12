@@ -79,9 +79,21 @@ function normalizePhone(phone: string): string | null {
   return null;
 }
 
+function isCanadianAreaCode(normalized: string): boolean {
+  const canadianAreaCodes = new Set([
+    "403", "587", "780", "825", "236", "250", "604", "672", "778",
+    "204", "431", "506", "709", "879", "867", "782", "902",
+    "226", "249", "289", "343", "365", "382", "416", "437", "519", "548", "613", "647", "705", "807", "905",
+    "367", "418", "438", "450", "514", "579", "581", "819", "873",
+    "306", "474", "639",
+  ]);
+  // normalized is +1XXXXXXXXXX — area code is chars 2-4
+  return canadianAreaCodes.has(normalized.slice(2, 5));
+}
+
 function addAllowlistEntry() {
   const normalized = normalizePhone(newAllowlistPhone.value.trim());
-  if (!normalized) {
+  if (!normalized || !isCanadianAreaCode(normalized)) {
     allowlistError.value = "Enter a valid 10-digit or E.164 Canadian phone number";
     return;
   }

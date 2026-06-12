@@ -3,7 +3,7 @@ import {
   createSmsService,
   SmsConfigurationError,
 } from "@/src/infrastructure/services/sms/create-sms-service";
-import { normalizePhoneNumber } from "@/src/infrastructure/services/sms/phone-number";
+import { isCanadianPhoneNumber, normalizePhoneNumber } from "@/src/infrastructure/services/sms/phone-number";
 
 export default defineEventHandler(async (event) => {
   const body = await readBody(event);
@@ -36,11 +36,18 @@ export default defineEventHandler(async (event) => {
     }
 
     const normalizedTarget = normalizePhoneNumber(to.trim());
+    if (!normalizedTarget || !isCanadianPhoneNumber(to.trim())) {
+      return {
+        success: false,
+        error: `${to.trim()} is not a valid Canadian phone number.`,
+      };
+    }
+
     const allowlistNormalized = allowlist
       .map((entry) => normalizePhoneNumber(entry.phoneNumber))
       .filter((n): n is string => n !== null);
 
-    if (!normalizedTarget || !allowlistNormalized.includes(normalizedTarget)) {
+    if (!allowlistNormalized.includes(normalizedTarget)) {
       return {
         success: false,
         error: `${to.trim()} is not in the approved phone number allowlist.`,
@@ -58,7 +65,7 @@ export default defineEventHandler(async (event) => {
     }
 
     await smsService.sendSms({
-      to: to.trim(),
+      to: normalizedTarget,
       message:
         message ||
         "This is a test SMS to verify your SMS configuration is working correctly.",

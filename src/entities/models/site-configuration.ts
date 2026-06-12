@@ -19,7 +19,7 @@ const SmsProviderEnum = z.enum(["twilio", "aws"]);
 export type SmsProvider = z.infer<typeof SmsProviderEnum>;
 
 export const smsAllowlistEntrySchema = z.object({
-  phoneNumber: z.string().trim().min(1),
+  phoneNumber: z.string().trim().regex(/^\+1[2-9]\d{9}$/, "Phone number must be in E.164 format (+1XXXXXXXXXX)"),
   label: z.string().trim().max(100).optional(),
 });
 export type SmsAllowlistEntry = z.infer<typeof smsAllowlistEntrySchema>;

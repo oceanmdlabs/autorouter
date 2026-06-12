@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { handleMissingActiveTenantError } from "@/app/lib/active-tenant";
 import { getRoutingEventTypeDescription, routingEventTypeEnum } from "@/src/entities/models/routing-event-type";
-import type { NewRoutingRule, RoutingRule } from '@/src/entities/models/routing-rule';
+import { allowedContextFieldValues, type AllowedContextField, type NewRoutingRule, type RoutingRule } from '@/src/entities/models/routing-rule';
 import { clientRoutingToolRegistry, routingToolNames } from '@/src/entities/models/routing-tool-client';
 import type { RoutingToolName } from '@/src/infrastructure/services/routing-tools/routing-tool-registry';
 
@@ -20,6 +20,7 @@ const formValues = ref<NewRoutingRule>({
 	active: true,
 	enabledTools: [],
 	summarizeAttachmentsAcknowledged: false,
+	allowedContextFields: [],
 	stopProcessingOnMatch: false,
 })
 
@@ -55,6 +56,7 @@ watch(() => loadedData.value, (newData) => {
 			active: newData.active,
 			enabledTools: newData.enabledTools || [],
 			summarizeAttachmentsAcknowledged: newData.summarizeAttachmentsAcknowledged ?? false,
+			allowedContextFields: (newData.allowedContextFields ?? []) as AllowedContextField[],
 			stopProcessingOnMatch: newData.stopProcessingOnMatch ?? false,
 		};
 		// Initialize toolStates from loaded data
@@ -78,7 +80,9 @@ watch(toolStates, (newToolStates) => {
 
 function confirmWarning() {
 	formValues.value.summarizeAttachmentsAcknowledged = true
-	toolStates.summarizeAttachments = true
+	if (!formValues.value.allowedContextFields.includes('attachments')) {
+		formValues.value.allowedContextFields = [...formValues.value.allowedContextFields, 'attachments']
+	}
 	showWarningDialog.value = false
 	warningChecked.value = false
 }
@@ -89,9 +93,33 @@ function cancelWarning() {
 }
 
 const needsAcknowledgement = computed(() =>
-	formValues.value.enabledTools.includes('summarizeAttachments') &&
+	formValues.value.allowedContextFields.includes('attachments') &&
 	!formValues.value.summarizeAttachmentsAcknowledged
 )
+
+function toggleContextField(field: AllowedContextField) {
+	if (!formValues.value.active) return
+	const current = formValues.value.allowedContextFields
+	if (current.includes(field)) {
+		formValues.value.allowedContextFields = current.filter(f => f !== field)
+		if (field === 'attachments') {
+			formValues.value.summarizeAttachmentsAcknowledged = false
+		}
+	} else {
+		if (field === 'attachments' && !formValues.value.summarizeAttachmentsAcknowledged) {
+			showWarningDialog.value = true
+		} else {
+			formValues.value.allowedContextFields = [...current, field]
+		}
+	}
+}
+
+const contextFieldLabels: Record<AllowedContextField, { label: string; description: string }> = {
+	age: { label: 'Age', description: 'Patient\'s calculated age' },
+	gender: { label: 'Gender / Sex', description: 'Patient\'s sex or gender' },
+	postalCode: { label: 'Full Postal Code', description: 'Patient\'s full postal code for geographic routing' },
+	attachments: { label: 'Attachments', description: 'Allow AI to analyze referral attachments (requires privacy acknowledgement)' },
+}
 
 // Form submission
 async function handleSubmit() {
@@ -304,6 +332,45 @@ onMounted(() => {
 
 					<div class="space-y-2">
 						<Label class="flex items-center gap-2">
+							Patient Context
+							<span class="inline-flex items-center justify-center rounded-full bg-green-100 p-1">
+								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" class="w-4 h-4 text-green-600">
+									<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+								</svg>
+							</span>
+						</Label>
+						<p class="text-sm text-muted-foreground">Select which patient data fields will be included in the AI context when this rule is evaluated.</p>
+						<div class="flex flex-wrap gap-2 pt-1">
+							<button
+								v-for="field in allowedContextFieldValues"
+								:key="field"
+								type="button"
+								:disabled="!formValues.active"
+								@click="toggleContextField(field)"
+								:class="[
+									'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium transition-colors',
+									formValues.allowedContextFields.includes(field)
+										? 'border-green-600 bg-green-50 text-green-700'
+										: 'border-gray-300 bg-white text-gray-600 hover:border-gray-400',
+									!formValues.active ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+								]"
+							>
+								<span v-if="formValues.allowedContextFields.includes(field)" class="text-green-600">✓</span>
+								{{ contextFieldLabels[field].label }}
+							</button>
+						</div>
+						<div v-if="formValues.allowedContextFields.length > 0" class="mt-2 space-y-1">
+							<p v-for="field in formValues.allowedContextFields" :key="field" class="text-xs text-muted-foreground">
+								<strong>{{ contextFieldLabels[field].label }}:</strong> {{ contextFieldLabels[field].description }}
+							</p>
+						</div>
+						<p v-if="formValues.allowedContextFields.length === 0" class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2 mt-1">
+							No patient data will be included in the AI context. Enable fields above to allow the AI to use patient information when evaluating this rule.
+						</p>
+					</div>
+
+					<div class="space-y-2">
+						<Label class="flex items-center gap-2">
 							Enabled Tools
 							<span class="inline-flex items-center justify-center rounded-full bg-blue-100 p-1">
 								<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
@@ -319,8 +386,7 @@ onMounted(() => {
 						<div class="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 								<div v-for="toolName in availableTools" :key="toolName"
-									class="flex items-center space-x-3 p-3 rounded-md border bg-white hover:bg-gray-50 transition-colors"
-									@pointerdown.capture="toolName === 'summarizeAttachments' && !formValues.summarizeAttachmentsAcknowledged ? ($event.preventDefault(), $event.stopPropagation(), showWarningDialog = true) : undefined">
+									class="flex items-center space-x-3 p-3 rounded-md border bg-white hover:bg-gray-50 transition-colors">
 									<Switch :id="`tool-${toolName}`"
 										v-model="toolStates[toolName]"
 										:disabled="!formValues.active" />

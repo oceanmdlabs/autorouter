@@ -12,7 +12,7 @@ import type {
 } from "fhir/r4";
 import { InvalidArgumentsError } from "@/src/entities/errors/common";
 
-export function summarizeServiceRequestMessage(bundle: Bundle): string {
+export function summarizeServiceRequestMessage(bundle: Bundle, allowedContextFields: string[] = []): string {
   if (!bundle || !bundle.entry) {
     return "No valid bundle found in message";
   }
@@ -55,14 +55,20 @@ export function summarizeServiceRequestMessage(bundle: Bundle): string {
     summary += `${serviceRequestSummary}\n`;
   }
 
-  // Patient information (excluding PII)
+  // Patient information (only opted-in fields)
   if (patient) {
     summary += "Patient:\n";
-    if (patient.gender) {
+    if (patient.gender && allowedContextFields.includes("gender")) {
       summary += `Gender: ${patient.gender}\n`;
     }
-    if (patient.birthDate) {
+    if (patient.birthDate && allowedContextFields.includes("age")) {
       summary += `Age: ${calculateAge(patient.birthDate)}\n`;
+    }
+    if (allowedContextFields.includes("postalCode")) {
+      const postalCode = patient.address?.[0]?.postalCode;
+      if (postalCode) {
+        summary += `Postal Code: ${postalCode}\n`;
+      }
     }
     if (patient.generalPractitioner?.[0]?.reference) {
       const generalPractitioner = practitioners.find(

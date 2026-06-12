@@ -21,7 +21,7 @@ IMPORTANT: Only call a tool if the referral content EXPLICITLY and DIRECTLY meet
     "\n\n** AN EVENT HAS OCCURRED: " +
     getRoutingEventTypeDescription(eventType) +
     " **";
-  prompt += summarizeServiceRequestMessage(routingEventMessage);
+  prompt += summarizeServiceRequestMessage(routingEventMessage, rule.allowedContextFields ?? []);
 
   prompt +=
     "\n\nThe user has instructed you to do the following:\n-- BEGIN USER INSTRUCTIONS --\n" +

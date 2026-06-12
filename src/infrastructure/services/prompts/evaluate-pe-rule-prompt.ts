@@ -21,7 +21,7 @@ Only call a tool if you are confident that the user's instructions require it. I
     "\n\n** AN EVENT HAS OCCURRED: " +
     getRoutingEventTypeDescription(eventType) +
     " **";
-  prompt += summarizePEEvent(peEventMessage);
+  prompt += summarizePEEvent(peEventMessage, rule.allowedContextFields ?? []);
 
   prompt +=
     "\n\nThe user has instructed you to do the following:\n-- BEGIN USER INSTRUCTIONS --\n" +

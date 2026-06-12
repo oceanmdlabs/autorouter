@@ -76,6 +76,10 @@ export const routingRules = pgTable(
       .notNull()
       .default([]),
     summarizeAttachmentsAcknowledged: boolean("summarize_attachments_acknowledged").notNull().default(false),
+    allowedContextFields: jsonb("allowed_context_fields")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
     priority: integer("priority").notNull(),
     stopProcessingOnMatch: boolean("stop_processing_on_match").notNull().default(false),
   },

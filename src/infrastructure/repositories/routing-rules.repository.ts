@@ -2,6 +2,7 @@ import { ApplicationContext } from "@/src/entities/models/application-context";
 import { asc, desc, eq, sql } from "drizzle-orm";
 import { routingRules } from "@/drizzle/schema";
 import type {
+  AllowedContextField,
   NewRoutingRule,
   RoutingRule,
 } from "@/src/entities/models/routing-rule";
@@ -24,6 +25,7 @@ export const createRoutingRulesRepository = ({
       return results.map((rule) => ({
         ...rule,
         enabledTools: (rule.enabledTools || []) as RoutingToolName[],
+        allowedContextFields: (rule.allowedContextFields || []) as AllowedContextField[],
       }));
     },
 
@@ -35,6 +37,7 @@ export const createRoutingRulesRepository = ({
       return {
         ...result,
         enabledTools: (result.enabledTools || []) as RoutingToolName[],
+        allowedContextFields: (result.allowedContextFields || []) as AllowedContextField[],
       };
     },
 

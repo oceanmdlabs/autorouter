@@ -1,7 +1,8 @@
 import type { PatientEngagementEventMessage } from "@/src/entities/models/patient-engagement-event-context";
 
 export function summarizePEEvent(
-  peEventContext: PatientEngagementEventMessage
+  peEventContext: PatientEngagementEventMessage,
+  allowedContextFields: string[] = []
 ): string {
   let summary = "\n\n";
   const patient = peEventContext.patient;
@@ -39,11 +40,8 @@ export function summarizePEEvent(
   if (patient.demographics.address.city) {
     summary += `City: ${patient.demographics.address.city}\n`;
   }
-  if (patient.demographics.address.postalCode) {
-    summary += `Postal Code (first 3 letters) : ${patient.demographics.address.postalCode?.slice(
-      0,
-      3
-    )}\n`;
+  if (patient.demographics.address.postalCode && allowedContextFields.includes("postalCode")) {
+    summary += `Postal Code: ${patient.demographics.address.postalCode}\n`;
   }
   if (patient.cpp) {
     summary += `CPP: ${JSON.stringify(patient.cpp)}\n`;
@@ -51,10 +49,10 @@ export function summarizePEEvent(
   if (patient.results) {
     summary += `Results: ${JSON.stringify(patient.results)}\n`;
   }
-  if (patient.demographics.sex) {
+  if (patient.demographics.sex && allowedContextFields.includes("gender")) {
     summary += `Sex / Gender: ${patient.demographics.sex}\n`;
   }
-  if (patient.demographics.birthDate) {
+  if (patient.demographics.birthDate && allowedContextFields.includes("age")) {
     summary += `Age: ${calculateAge(
       patient.demographics.birthDate.toString()
     )}\n`;

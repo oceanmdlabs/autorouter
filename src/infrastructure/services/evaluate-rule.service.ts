@@ -82,7 +82,11 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
     });
 
     cxt.logger.info(
-      `Evaluating rule ${rule.name} for request ${requestDescription} with prompt:\n${prompt}`
+      `Evaluating rule ${rule.name} for request ${requestDescription}`,
+      {
+        allowedContextFields: rule.allowedContextFields ?? [],
+        prompt,
+      }
     );
 
     try {

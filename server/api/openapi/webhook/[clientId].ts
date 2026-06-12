@@ -1,12 +1,10 @@
 import { processPatientEngagementEventUseCase } from "@/src/application/use-cases/process-patient-engagement-event.use-case";
 import { isError } from "@/src/entities/errors/common";
-import type { ApplicationContext } from "@/src/entities/models/application-context";
 import {
   type PatientEngagementEventContext,
   type PatientEngagementEventType,
 } from "@/src/entities/models/patient-engagement-event-context";
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
-import { createHash, timingSafeEqual } from "node:crypto";
 import type { H3Event } from "h3";
 import { z } from "zod";
 import { getPatient, getPatientNote } from "../open-api-client";
@@ -30,20 +28,20 @@ export type OceanPatientEngagementWebhookEvent = z.infer<
 const WEBHOOK_RATE_WINDOW_MS = 60 * 1000;
 const WEBHOOK_RATE_MAX = 60;
 const WEBHOOK_REPLAY_WINDOW_MS = 10 * 60 * 1000;
-const AUTH_FAILURE_ALERT_THRESHOLD = 10;
 
 const webhookRateByClientIp = new Map<
   string,
   { count: number; resetAt: number }
 >();
 const processedWebhookEvents = new Map<string, number>();
-const webhookAuthFailures = new Map<string, { count: number; resetAt: number }>();
 
 export default defineEventHandler(async (event) => {
   const cxt = await toApplicationContext(event);
   const body = await readBody(event);
 
   const clientId = event.context.params?.clientId;
+  cxt.logger.info(`Patient engagement webhook received`, { clientId: clientId ?? null, bodyKeys: body ? Object.keys(body) : [] });
+
   if (!clientId) {
     cxt.logger.error("No clientId in the PE webhook request");
     throw createError({
@@ -64,13 +62,6 @@ export default defineEventHandler(async (event) => {
     });
   }
 
-  if (!verifyWebhookKey(siteConfig.webhookKey || "", getWebhookKey(event))) {
-    registerWebhookAuthFailure(cxt, clientId, getWebhookIp(event));
-    throw createError({
-      statusCode: 401,
-      statusMessage: "Invalid webhook key",
-    });
-  }
 
   const openApiCreds = {
     oceanHost: siteConfig.oceanServer,
@@ -95,19 +86,8 @@ export default defineEventHandler(async (event) => {
 
   const challenge = body?.challenge;
   if (typeof challenge === "string" && challenge.length > 0) {
-    if (!isUnsignedChallengeAllowed(siteConfig.webhookUnsignedChallengeUntil)) {
-      cxt.logger.warn(
-        `Rejected unsigned challenge for clientId ${clientId}: onboarding window closed`
-      );
-      throw createError({
-        statusCode: 403,
-        statusMessage: "Unsigned challenge not allowed",
-      });
-    }
     setResponseStatus(event, 200);
-    return {
-      challenge,
-    };
+    return { challenge };
   } else {
     cxt.logger.info("Received patient engagement webhook event");
 
@@ -230,25 +210,6 @@ function mapOceanWebhookEventToLocalPeEventType(
   }
 }
 
-function verifyWebhookKey(expected: string, provided: string): boolean {
-  if (!expected || !provided) return false;
-  const expectedHash = createHash("sha256").update(expected).digest();
-  const providedHash = createHash("sha256").update(provided).digest();
-  return timingSafeEqual(expectedHash, providedHash);
-}
-
-function getWebhookKey(event: H3Event): string {
-  const headerValue = getHeader(event, "x-ocean-webhook-key");
-  if (headerValue) return headerValue;
-  const query = getQuery(event);
-  const queryKey = query.k;
-  if (typeof queryKey === "string") return queryKey;
-  if (Array.isArray(queryKey) && typeof queryKey[0] === "string") {
-    return queryKey[0];
-  }
-  return "";
-}
-
 function getWebhookIp(event: H3Event): string {
   return getRequestIP(event, { xForwardedFor: true }) ?? "unknown";
 }
@@ -275,32 +236,6 @@ function enforceWebhookRateLimit(event: H3Event, clientId: string): void {
       statusCode: 429,
       statusMessage: "Too many webhook requests",
     });
-  }
-}
-
-function registerWebhookAuthFailure(
-  cxt: ApplicationContext,
-  clientId: string,
-  ip: string
-): void {
-  const key = `${clientId}:${ip}`;
-  const now = Date.now();
-  const existing = webhookAuthFailures.get(key);
-  if (!existing || now > existing.resetAt) {
-    webhookAuthFailures.set(key, {
-      count: 1,
-      resetAt: now + WEBHOOK_RATE_WINDOW_MS,
-    });
-    cxt.logger.warn(`Webhook auth failure for clientId ${clientId} from IP ${ip}`);
-    return;
-  }
-  existing.count += 1;
-  webhookAuthFailures.set(key, existing);
-  cxt.logger.warn(`Webhook auth failure for clientId ${clientId} from IP ${ip}`);
-  if (existing.count === AUTH_FAILURE_ALERT_THRESHOLD) {
-    cxt.logger.error(
-      `Repeated webhook auth failures for clientId ${clientId} from IP ${ip}`
-    );
   }
 }
 
@@ -339,9 +274,3 @@ function cleanupExpiredReplayCache(): void {
   }
 }
 
-function isUnsignedChallengeAllowed(
-  webhookUnsignedChallengeUntil?: Date | null
-): boolean {
-  if (!webhookUnsignedChallengeUntil) return false;
-  return webhookUnsignedChallengeUntil.getTime() >= Date.now();
-}

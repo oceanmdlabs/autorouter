@@ -15,6 +15,7 @@ const {
   tokenEndpoint,
   apiEndpoint,
   cdsHookEndpoint,
+  webhookEndpoint,
   isRecentSuccessfulInboundConnection,
   user,
   panelHasChanges,
@@ -225,7 +226,9 @@ function updateErequestSlice(v: typeof erequestSlice.value) {
             :can-manage-tenant="canManageTenant"
             :saving="savingPanels.openApi"
             :has-changes="panelHasChanges('openApi')"
+            :webhook-endpoint="webhookEndpoint"
             @save="savePanel('openApi')"
+            @copy="copyToClipboard"
           />
 
           <SiteConfigurationErequestArchivalPanel

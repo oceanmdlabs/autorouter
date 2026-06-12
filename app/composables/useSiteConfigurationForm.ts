@@ -74,6 +74,8 @@ export function useSiteConfigurationForm() {
   const tokenEndpoint = computed(() => `${host}/api/oauth2/token`);
   const apiEndpoint = computed(() => `${host}/api/fhir/$process-message`);
   const cdsHookEndpoint = computed(() => `${host}/api/cds`);
+  const webhookEndpoint = computed(() => formValues.value?.clientId ? `${host}/api/openapi/webhook/${formValues.value.clientId}` : "");
+
 
   const { data: loadedData, status } = useAsyncData("site", async () => {
     return await requestFetch<{
@@ -288,6 +290,7 @@ export function useSiteConfigurationForm() {
     tokenEndpoint,
     apiEndpoint,
     cdsHookEndpoint,
+    webhookEndpoint,
     isRecentSuccessfulInboundConnection,
     user,
     // Methods

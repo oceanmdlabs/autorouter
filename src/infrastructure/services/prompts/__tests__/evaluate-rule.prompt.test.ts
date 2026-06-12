@@ -12,7 +12,7 @@ describe("summarizeServiceRequestMessage", () => {
     // map the fullUrl to ids:
     bundle.en;
 
-    const summary = summarizeServiceRequestMessage(bundle);
+    const summary = summarizeServiceRequestMessage(bundle, ["age", "gender", "postalCode"]);
     expect(summary).toContain("Gender: male");
     expect(summary).toContain("Back pain with no red flags");
     expect(summary).toContain(
@@ -22,6 +22,11 @@ describe("summarizeServiceRequestMessage", () => {
       "id-referral-target-reference: autorouter_test49721437"
     );
     expect(summary).toContain("Address: 3080 Yonge St, Toronto, ON, M4P 0C6");
+
+    // Verify PHI is excluded when no fields are opted in
+    const summaryNoContext = summarizeServiceRequestMessage(bundle, []);
+    expect(summaryNoContext).not.toContain("Gender:");
+    expect(summaryNoContext).not.toContain("Age:");
   });
 
   it("should handle a CDSHookRequest message", () => {

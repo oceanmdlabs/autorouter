@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Copy } from "lucide-vue-next";
 const props = defineProps<{
   modelValue: {
     siteKey: string | null;
@@ -9,6 +10,7 @@ const props = defineProps<{
   canManageTenant: boolean;
   saving: boolean;
   hasChanges: boolean;
+  webhookEndpoint: string;
 }>();
 
 const emit = defineEmits<{
@@ -20,6 +22,7 @@ const emit = defineEmits<{
     },
   ];
   save: [];
+  copy: [text: string];
 }>();
 
 const local = reactive({ ...props.modelValue });
@@ -60,6 +63,21 @@ watch(
         is an optional connection that enables advanced patient
         interaction features.
       </p>
+      <div class="space-y-4 bg-gray-50 p-4 rounded-lg">
+        <div class="space-y-2">
+          <Label class="text-sm font-medium">Patient Engagement Webhook URL</Label>
+          <div class="flex items-center gap-2">
+            <Input :model-value="webhookEndpoint" readonly class="bg-white" />
+            <Button variant="outline" size="icon" @click="emit('copy', webhookEndpoint)">
+              <Copy class="h-4 w-4" />
+            </Button>
+          </div>
+          <p class="text-xs text-gray-600">
+            Use this URL when configuring the Patient Engagement integration in Ocean.
+          </p>
+        </div>
+      </div>
+
       <div class="space-y-4 bg-gray-50 p-4 rounded-lg">
         <div class="space-y-2">
           <Label for="siteKey">Site Key</Label>

@@ -30,12 +30,28 @@ export async function processServiceRequestEventUseCase(
     ) {
       details = "Patient has opted out of AI processing.";
     } else {
+      const needsAttachmentSummary =
+        rules.some((r) => r.allowedContextFields?.includes("attachments")) &&
+        (event.attachments?.length ?? 0) > 0;
+      if (needsAttachmentSummary) {
+        try {
+          cxt.logger.info("Pre-summarizing attachments for rule evaluation context");
+          event.attachmentSummary = await cxt.getAiService().summarizeAttachments(
+            "Summarize the full contents of these attachments to assist in routing rule evaluation.",
+            event.attachments!
+          );
+        } catch (err) {
+          cxt.logger.warn(`Failed to pre-summarize attachments: ${(err as Error).message}`);
+        }
+      }
+
       evaluationResults = await evaluateRulesInOrder({
         rules,
         evaluateRule: evaluateRuleService.evaluateRule,
         routingEventMessage: event.serviceRequestBundle,
         eventType: event.triggeringEvent,
         requestDescription: event.referralRef || "pendingServiceRequest",
+        attachmentSummary: event.attachmentSummary,
       });
     }
 

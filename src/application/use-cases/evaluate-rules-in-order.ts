@@ -8,6 +8,7 @@ export async function evaluateRulesInOrder({
   routingEventMessage,
   eventType,
   requestDescription,
+  attachmentSummary,
 }: {
   rules: RoutingRule[];
   evaluateRule: (params: {
@@ -15,10 +16,12 @@ export async function evaluateRulesInOrder({
     routingEventMessage: RoutingEventMessage;
     eventType: RoutingEventType;
     requestDescription: string;
+    attachmentSummary?: string;
   }) => Promise<RuleEvaluationResult>;
   routingEventMessage: RoutingEventMessage;
   eventType: RoutingEventType;
   requestDescription: string;
+  attachmentSummary?: string;
 }): Promise<RuleEvaluationResult[]> {
   const results: RuleEvaluationResult[] = [];
   let stoppedBy: { id: string; name: string } | null = null;
@@ -38,7 +41,7 @@ export async function evaluateRulesInOrder({
       continue;
     }
 
-    const result = await evaluateRule({ rule, routingEventMessage, eventType, requestDescription });
+    const result = await evaluateRule({ rule, routingEventMessage, eventType, requestDescription, attachmentSummary });
     results.push(result);
 
     if (

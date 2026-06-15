@@ -97,6 +97,11 @@ const needsAcknowledgement = computed(() =>
 	!formValues.value.summarizeAttachmentsAcknowledged
 )
 
+const summarizeAttachmentsWithoutContext = computed(() =>
+	formValues.value.enabledTools.includes('summarizeAttachments') &&
+	!formValues.value.allowedContextFields.includes('attachments')
+)
+
 function toggleContextField(field: AllowedContextField) {
 	if (!formValues.value.active) return
 	const current = formValues.value.allowedContextFields
@@ -136,6 +141,13 @@ async function handleSubmit() {
 	// Block save if summarizeAttachments is enabled without acknowledgement
 	if (needsAcknowledgement.value) {
 		showWarningDialog.value = true
+		isLoading.value = false
+		return
+	}
+
+	// Block save if summarizeAttachments tool is enabled but attachments context is not opted in
+	if (summarizeAttachmentsWithoutContext.value) {
+		errors.value = { enabledTools: "The 'Summarize Attachments' tool requires the Attachments context field to be enabled." }
 		isLoading.value = false
 		return
 	}
@@ -386,7 +398,10 @@ onMounted(() => {
 						<div class="rounded-lg border border-blue-200 bg-blue-50/50 p-4">
 							<div class="grid grid-cols-1 md:grid-cols-2 gap-3">
 								<div v-for="toolName in availableTools" :key="toolName"
-									class="flex items-center space-x-3 p-3 rounded-md border bg-white hover:bg-gray-50 transition-colors">
+									:class="[
+										'flex items-center space-x-3 p-3 rounded-md border bg-white hover:bg-gray-50 transition-colors',
+										toolName === 'summarizeAttachments' && summarizeAttachmentsWithoutContext ? 'border-destructive' : '',
+									]">
 									<Switch :id="`tool-${toolName}`"
 										v-model="toolStates[toolName]"
 										:disabled="!formValues.active" />
@@ -394,6 +409,9 @@ onMounted(() => {
 										<Label :for="`tool-${toolName}`" class="text-sm font-medium cursor-pointer">
 											{{ clientRoutingToolRegistry[toolName].description }}
 										</Label>
+										<p v-if="toolName === 'summarizeAttachments' && summarizeAttachmentsWithoutContext" class="text-xs text-destructive mt-0.5">
+											Requires the Attachments context field to be enabled above.
+										</p>
 									</div>
 								</div>
 							</div>

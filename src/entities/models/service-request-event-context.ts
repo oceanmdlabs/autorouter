@@ -11,6 +11,7 @@ export type ServiceRequestEventContext = {
   requestedListingRef?: string;
   requestedServiceDescription?: string;
   attachments?: Attachment[];
+  attachmentSummary?: string;
   details?: string;
   archivalMessage?: string;
   archivalError?: string;

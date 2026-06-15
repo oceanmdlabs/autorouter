@@ -11,8 +11,8 @@ import type { RoutingToolName } from "@/src/infrastructure/services/routing-tool
 export const allowedContextFieldValues = ["age", "gender", "postalCode", "attachments"] as const;
 export type AllowedContextField = typeof allowedContextFieldValues[number];
 
-function requireSummarizeAcknowledgement(
-  data: { allowedContextFields?: string[]; summarizeAttachmentsAcknowledged?: boolean },
+function validateAttachmentSettings(
+  data: { enabledTools?: string[]; allowedContextFields?: string[]; summarizeAttachmentsAcknowledged?: boolean },
   ctx: z.RefinementCtx
 ) {
   if (data.allowedContextFields?.includes("attachments") && !data.summarizeAttachmentsAcknowledged) {
@@ -20,6 +20,13 @@ function requireSummarizeAcknowledgement(
       code: z.ZodIssueCode.custom,
       message: "You must acknowledge the privacy warning before enabling attachment summarization.",
       path: ["summarizeAttachmentsAcknowledged"],
+    });
+  }
+  if (data.enabledTools?.includes("summarizeAttachments") && !data.allowedContextFields?.includes("attachments")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "The 'Summarize Attachments' tool requires the Attachments context field to be enabled.",
+      path: ["enabledTools"],
     });
   }
 }
@@ -36,15 +43,15 @@ const baseFields = baseResourceSchema.merge(tenantConfinedSchema).extend({
   stopProcessingOnMatch: z.boolean().default(false),
 });
 
-const schema = baseFields.superRefine(requireSummarizeAcknowledgement);
+const schema = baseFields.superRefine(validateAttachmentSettings);
 const newSchema = baseFields
   .merge(newBaseResourceSchema)
   .extend({ priority: z.number().int().positive().optional() })
-  .superRefine(requireSummarizeAcknowledgement);
+  .superRefine(validateAttachmentSettings);
 const updateSchema = baseFields
   .merge(updateBaseResourceSchema)
   .extend({ priority: z.number().int().positive().optional() })
-  .superRefine(requireSummarizeAcknowledgement);
+  .superRefine(validateAttachmentSettings);
 
 export const routingRuleSchema = schema;
 export const newRoutingRuleSchema = newSchema;

@@ -106,6 +106,20 @@ export function createErequestsRepository({
       return record;
     },
 
+    async findInboundReceivedByDateOfBirth(dob: Date) {
+      return await db
+        .select()
+        .from(erequests)
+        .where(
+          and(
+            eq(erequests.tenantId, cxt.getNonEmptyTenantId()),
+            eq(erequests.triggeringEvent, "request_received"),
+            eq(erequests.patientDateOfBirth, dob)
+          )
+        )
+        .orderBy(desc(erequests.receivedAt));
+    },
+
     async create(record: NewErequest) {
       const insertRecord = {
         ...dbService.initMetadataAndTenant(record),

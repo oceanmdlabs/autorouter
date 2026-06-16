@@ -203,7 +203,7 @@ function extractErequestMetadata(
     sourceMessageId: messageHeader?.id ?? null,
     referralRef: eventContext.referralRef ?? null,
     triggeringEvent: eventContext.triggeringEvent,
-    receivedAt: new Date(),
+    receivedAt: resolveReceivedAt(bundle, serviceRequest),
     patientHealthNumber:
       findIdentifierValue(
         patient?.identifier,
@@ -231,6 +231,24 @@ function extractErequestMetadata(
       eventContext.requestedServiceDescription ?? null,
     rawBundle: bundle,
   };
+}
+
+/**
+ * Resolves when the referral was actually sent in Ocean, preferring the FHIR
+ * message send time (`Bundle.timestamp`), then the referral's authored time
+ * (`ServiceRequest.authoredOn`). Falls back to the archival time only when the
+ * bundle carries no usable timestamp. FHIR instants include a timezone offset,
+ * so `new Date(...)` yields the correct instant.
+ */
+function resolveReceivedAt(bundle: Bundle, serviceRequest?: ServiceRequest): Date {
+  const raw = bundle.timestamp ?? serviceRequest?.authoredOn;
+  if (raw) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  return new Date();
 }
 
 function collectDocuments(bundle: Bundle) {

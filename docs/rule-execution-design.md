@@ -210,6 +210,42 @@ Analytics can come later. The first audit pass should optimize for traceability 
 - Present rule decisions and tool executions as a single ordered timeline.
 - Add filtering by referral, rule, decision, validation status, and tool status.
 
+## Cross-Event Intake And Referral Context
+
+The `intake_questionnaire_completed` routing event links a completed Patient Engagement intake
+questionnaire to the archived inbound eReferral/eConsult it relates to, so rules can act on the
+original referral (accept, forward, message the requester, etc.) using what the patient just
+submitted.
+
+- **Archival prerequisite.** This event only runs when eRequest archival is enabled
+  (`siteConfig.erequestArchivalEnabled`). With archival off, no matching is attempted and the event
+  does not fire. It is triggered after a `patient_message_forms_completion` event, once the patient
+  and note have been fetched, and runs in addition to the normal forms-completion rules.
+- **Matching heuristic.** Within the same tenant, archived inbound referrals (`request_received`)
+  are matched against the intake patient by, strongest key first:
+  1. exact normalized medical record number (the EMR patient reference) + date of birth — the
+     strongest available key within a tenant's EMR; otherwise
+  2. exact normalized health number + date of birth; otherwise
+  3. normalized first name + surname + date of birth, when the stronger identifiers are unavailable
+     or find no candidate.
+  A date of birth is required for any match. Identifiers (MRN, health number) are normalized by
+  stripping non-alphanumeric characters and upper-casing; names are lower-cased, trimmed,
+  whitespace-collapsed, and de-accented.
+- **Multiple matches.** When more than one archived inbound referral matches, the most recently
+  received one (`receivedAt`) is selected. This recency heuristic is surfaced in the rule
+  configuration (event description) so admins know how ties are resolved.
+- **Activity Log transparency.** Every intake match attempt writes an Activity Log entry recording
+  whether matching found no referral, exactly one referral, or multiple referrals (noting the most
+  recent was selected via the recency heuristic).
+- **Evaluation context.** The rule LLM receives the completed intake questionnaire/note plus the
+  matched referral's metadata (referral ref, received time, requested listing) and a summary derived
+  from its archived `rawBundle`.
+- **Outbound tools.** The matched referral's archived `rawBundle` is exposed on the event context as
+  `serviceRequestBundle`, so existing service-request tools (status change, forward, category
+  update, booking instructions, communications) target the referral with no handler changes.
+- **Out of scope.** Attachment-dependent tools are not wired up for this event: archived blobs are
+  retained separately from the live in-memory `attachments` field and need separate design.
+
 ## Open Design Questions
 
 1. Should `stopProcessingOnMatch` require at least one successfully executed action, or is a valid planned action enough?

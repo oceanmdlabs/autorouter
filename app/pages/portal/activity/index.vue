@@ -62,6 +62,7 @@ type StructuredDetails = {
     actions?: RuleAction[];
   }[];
   archival?: string;
+  match?: string;
 };
 
 function describeAction(action: RuleAction): { type: string; taken: string } {
@@ -176,6 +177,9 @@ async function clearLogs() {
                 <TableCell class="whitespace-pre-wrap text-xs">
                   <template v-if="parseStructuredDetails(log.details)">
                     <div class="space-y-2">
+                      <div v-if="parseStructuredDetails(log.details)!.match" class="text-foreground font-medium">
+                        {{ parseStructuredDetails(log.details)!.match }}
+                      </div>
                       <div
                         v-for="rule in parseStructuredDetails(log.details)!.rules"
                         :key="rule.ruleName"

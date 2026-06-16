@@ -55,6 +55,7 @@ const routingEventTypeEnum = [
   "request_message",
   "patient_message_forms_completion",
   "patient_note_added",
+  "intake_questionnaire_completed",
 ] as const;
 
 export const triggeringEventEnum = pgEnum(
@@ -466,7 +467,9 @@ export const erequests = pgTable(
     messageChecksum: text("message_checksum").notNull(),
     referralRef: text("referral_ref"),
     triggeringEvent: triggeringEventEnum("triggering_event").notNull(),
-    receivedAt: timestamp("received_at").notNull().defaultNow(),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     patientHealthNumber: text("patient_health_number"),
     patientMedicalRecordNumber: text("patient_medical_record_number"),
     patientName: text("patient_name"),

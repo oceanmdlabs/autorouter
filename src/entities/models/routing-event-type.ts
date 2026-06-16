@@ -10,6 +10,7 @@ export const routingEventTypeEnum = [
   "request_message",
   "patient_message_forms_completion",
   "patient_note_added",
+  "intake_questionnaire_completed",
 ] as const;
 
 export const routingEventTypeSchema = z.enum(routingEventTypeEnum);
@@ -40,6 +41,8 @@ export function getRoutingEventTypeDescription(
       return "A patient has completed their forms.";
     case "patient_note_added":
       return "A patient has responded to a form or message.";
+    case "intake_questionnaire_completed":
+      return "A patient completed an intake questionnaire that was linked to an archived referral. If more than one archived referral matches the patient, the most recently received referral is used.";
   }
 }
 export function getRoutingEventTypeTitle(eventType?: RoutingEventType | null) {
@@ -65,5 +68,7 @@ export function getRoutingEventTypeTitle(eventType?: RoutingEventType | null) {
       return "Patient forms completed";
     case "patient_note_added":
       return "Patient note added";
+    case "intake_questionnaire_completed":
+      return "Intake questionnaire completed";
   }
 }

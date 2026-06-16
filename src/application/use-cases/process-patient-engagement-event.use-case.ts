@@ -8,6 +8,7 @@ import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluat
 import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
 import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
 import { writeDecisionAudits } from "./write-decision-audits";
+import { processIntakeQuestionnaireCompletedUseCase } from "./process-intake-questionnaire-completed.use-case";
 
 export interface ProcessPEEventOutput {
   message: string;
@@ -24,6 +25,19 @@ export async function processPatientEngagementEventUseCase(
   const rules = await cxt.getRoutingRulesRepository().getAllAtTenant();
   const evaluateRuleService = createEvaluateRuleService({ cxt });
   const requestDescription = "peEvent_" + event.message.patient.ref;
+
+  const ptUpdate = event.message.note.ptUpdate;
+  cxt.logger.info("PE event context for rule evaluation", {
+    triggeringEvent: event.triggeringEvent,
+    patientRef: event.message.patient.ref,
+    oceanSessionId: event.message.oceanSessionId,
+    hasForms: !!ptUpdate.completedForms,
+    hasProgressNote: !!ptUpdate.progressNote,
+    contextFieldsAcrossRules: rules
+      .filter((r) => r.active && r.triggeringEvent === event.triggeringEvent)
+      .map((r) => ({ ruleName: r.name, allowedContextFields: r.allowedContextFields ?? [] })),
+  });
+
   const evaluationResults: RuleEvaluationResult[] = await evaluateRulesInOrder({
     rules,
     evaluateRule: evaluateRuleService.evaluateRule,
@@ -31,7 +45,6 @@ export async function processPatientEngagementEventUseCase(
     eventType: event.triggeringEvent,
     requestDescription,
   });
-  event.message.note.ptUpdate.completedForms;
 
   const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
   const filteredResults = filterBlockedEmailActions(
@@ -107,6 +120,19 @@ export async function processPatientEngagementEventUseCase(
     details,
     error,
   });
+
+  // After a completed intake questionnaire, attempt to link it to an archived
+  // inbound referral and run the dedicated intake routing event. Failures here
+  // must not affect the primary patient-engagement response.
+  if (event.triggeringEvent === "patient_message_forms_completion") {
+    try {
+      await processIntakeQuestionnaireCompletedUseCase(event, cxt);
+    } catch (e) {
+      cxt.logger.error(
+        `Error processing intake questionnaire completion for patient ${event.message.patient.ref}: ${e}`
+      );
+    }
+  }
 
   return {
     message: `Patient engagement event processed for ${getPatientEngagementEventContextDescription(

@@ -28,14 +28,21 @@ export const summarizeAttachmentsHandler: RoutingToolHandler<
       return;
     }
 
-    const aiService = cxt.getAiService();
+    const cachedSummary =
+      "attachmentSummary" in eventContext ? eventContext.attachmentSummary : undefined;
 
-    try {
-      summary = await aiService.summarizeAttachments(instructions, attachments);
-    } catch (error) {
-      cxt.logger.error(`Error analyzing attachments:`, error);
-      summary = `Error analyzing attachments: ${(error as Error).message}`;
+    if (!cachedSummary) {
+      cxt.logger.warn("summarizeAttachments tool fired without attachments context opt-in; skipping.");
+      await cxt.getActivityLogEntriesRepository().create({
+        ...eventContext,
+        tool: TOOL_NAME,
+        details: null,
+        error: "Attachment summarization requires the Attachments context field to be enabled for this rule.",
+      });
+      return;
     }
+
+    summary = cachedSummary;
 
     const message = createSendCommunicationMessage(
       serviceRequestBundle,

@@ -7,10 +7,18 @@ import type {
   RoutingToolRegistry,
 } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
 
+export type DryRunPayload = {
+  payloadType: "ocean-fhir-message" | "email" | "sms" | "internal" | "cds-card";
+  summary: string;
+  payload: Record<string, unknown>;
+  error?: string;
+};
+
 export type RoutingToolAction<T extends RoutingToolName> = {
   id: string;
   tool: T;
   input: z.infer<RoutingToolRegistry[T]["input"]>;
+  dryRunPayload?: DryRunPayload;
 };
 
 export type RoutingToolHandler<T extends RoutingToolName> = (
@@ -20,6 +28,12 @@ export type RoutingToolHandler<T extends RoutingToolName> = (
   ruleName?: string
 ) => Promise<string | void>;
 
+export type RoutingToolDryRunner<T extends RoutingToolName> = (
+  action: RoutingToolAction<T>,
+  eventContext: RoutingEventContext,
+  cxt: ApplicationContext
+) => Promise<DryRunPayload>;
+
 export type RoutingToolDefinition<
   T extends RoutingToolName,
   P extends z.ZodType
@@ -27,6 +41,7 @@ export type RoutingToolDefinition<
   name: T;
   input: P;
   handler?: RoutingToolHandler<T>;
+  dryRun?: RoutingToolDryRunner<T>;
   supportsCdsHook?: boolean;
   description: string;
   briefDescription?: string;

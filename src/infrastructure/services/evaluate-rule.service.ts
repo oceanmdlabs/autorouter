@@ -47,11 +47,13 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
     routingEventMessage,
     eventType,
     requestDescription,
+    attachmentSummary,
   }: {
     rule: RoutingRule;
     routingEventMessage: RoutingEventMessage;
     eventType: RoutingEventType;
     requestDescription: string;
+    attachmentSummary?: string;
   }): Promise<RuleEvaluationResult> {
     if (!rule.active) {
       return {
@@ -75,14 +77,22 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
         },
       };
     }
-    const prompt = createEvaluationPrompt({
+    let prompt = createEvaluationPrompt({
       rule,
       routingEventMessage,
       eventType,
     });
 
+    if (rule.allowedContextFields?.includes("attachments") && attachmentSummary) {
+      prompt += `\n\nAttachment Contents:\n${attachmentSummary}`;
+    }
+
     cxt.logger.info(
-      `Evaluating rule ${rule.name} for request ${requestDescription} with prompt:\n${prompt}`
+      `Evaluating rule ${rule.name} for request ${requestDescription}`,
+      {
+        allowedContextFields: rule.allowedContextFields ?? [],
+        prompt,
+      }
     );
 
     try {

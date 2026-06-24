@@ -109,6 +109,8 @@ export async function getPatient({
     }
     const oceanPatient = JSON.parse(decryptedPatientJson) as OceanPatient;
     oceanPatient.externalPatientRef = externalPtRef;
+    // The decrypted body may omit `ref`; backfill it from the ref we fetched by.
+    oceanPatient.ref = oceanPatient.ref || ptRef;
     return oceanPatient;
   }
   return new IOError(result.status?.toString());

@@ -2,6 +2,9 @@ import { ApplicationContext } from "@/src/entities/models/application-context";
 import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluate-rule.service";
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
 import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
+import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
+import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
+import { writeDecisionAudits } from "./write-decision-audits";
 export interface ProcessServiceRequestEventOutput {
   message: string;
 }
@@ -18,8 +21,8 @@ export async function processServiceRequestEventUseCase(
 
   if (event.triggeringEvent) {
     const rules = await cxt.getRoutingRulesRepository().getAllAtTenant();
-    const evaluationResults: RuleEvaluationResult[] = [];
     const evaluateRuleService = createEvaluateRuleService({ cxt });
+    let evaluationResults: RuleEvaluationResult[] = [];
     if (
       evaluateRuleService.avoidProcessingDueToPatientOptOut(
         event.serviceRequestBundle
@@ -27,20 +30,40 @@ export async function processServiceRequestEventUseCase(
     ) {
       details = "Patient has opted out of AI processing.";
     } else {
-      for (const rule of rules) {
-        evaluationResults.push(
-          await evaluateRuleService.evaluateRule({
-            rule,
-            routingEventMessage: event.serviceRequestBundle,
-            eventType: event.triggeringEvent,
-            requestDescription: event.referralRef || "pendingServiceRequest",
-          })
-        );
+      const needsAttachmentSummary =
+        rules.some((r) => r.allowedContextFields?.includes("attachments")) &&
+        (event.attachments?.length ?? 0) > 0;
+      if (needsAttachmentSummary) {
+        try {
+          cxt.logger.info("Pre-summarizing attachments for rule evaluation context");
+          event.attachmentSummary = await cxt.getAiService().summarizeAttachments(
+            "Summarize the full contents of these attachments to assist in routing rule evaluation.",
+            event.attachments!
+          );
+        } catch (err) {
+          cxt.logger.warn(`Failed to pre-summarize attachments: ${(err as Error).message}`);
+        }
       }
+
+      evaluationResults = await evaluateRulesInOrder({
+        rules,
+        evaluateRule: evaluateRuleService.evaluateRule,
+        routingEventMessage: event.serviceRequestBundle,
+        eventType: event.triggeringEvent,
+        requestDescription: event.referralRef || "pendingServiceRequest",
+        attachmentSummary: event.attachmentSummary,
+      });
     }
 
+    const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
+    const filteredResults = filterBlockedEmailActions(
+      evaluationResults,
+      siteConfig?.emailSendAllowlist
+    );
+
     const actionResults = new Map<string, string>();
-    for (const result of evaluationResults) {
+    for (const result of filteredResults) {
+      if (result.stoppedByRuleId) continue;
       cxt.logger.info(
         `Processing rule ${result.ruleName} evaluation actions for ${
           event.referralRef
@@ -59,12 +82,13 @@ export async function processServiceRequestEventUseCase(
       }
     }
 
-    if (evaluationResults.length === 0) {
+    if (filteredResults.length === 0) {
       details = details || "No actions taken.";
     } else {
-      const rulesSummary = evaluationResults.map((r) => ({
+      const rulesSummary = filteredResults.map((r) => ({
         ruleName: r.ruleName,
         triggered: r.evaluation.triggered ?? false,
+        ...(r.stoppedByRuleId ? { skipped: true, skippedByRule: r.stoppedByRuleName } : {}),
         ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
         ...(r.evaluation.reasoning ? { reasoning: r.evaluation.reasoning } : {}),
         ...(r.evaluation.triggered && r.evaluation.actions.length > 0
@@ -79,10 +103,21 @@ export async function processServiceRequestEventUseCase(
       }));
       details = JSON.stringify({ rules: rulesSummary });
     }
-    error = evaluationResults
+    error = filteredResults
+      .filter((r) => !r.stoppedByRuleId)
       .map((r) => r.evaluation.error)
       .filter(Boolean)
       .join("\n");
+
+    if (siteConfig?.id && cxt.getTenantId()) {
+      await writeDecisionAudits(filteredResults, rules, {
+        tenantId: cxt.getTenantId()!,
+        siteId: siteConfig.id,
+        referralId: event.referralRef ?? "unknown",
+        actionResults,
+        cxt,
+      });
+    }
   }
 
   if (event.archivalMessage) {

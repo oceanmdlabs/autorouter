@@ -31,10 +31,9 @@ export function getSourceEndpoint(): string {
 
 export function getReferralUrl(
   referralRef: string,
-  oceanSiteNum: string
+  oceanSiteNum: string,
+  oceanServer: OceanServer = "ocean"
 ): string | undefined {
   if (!referralRef || !oceanSiteNum) return undefined;
-  return `${getOceanServerUrl(
-    "ocean"
-  )}/ocean/portal.html?siteNum=${oceanSiteNum}#/referrals/${referralRef}/edit`;
+  return `${getOceanServerUrl(oceanServer)}/ocean/portal.html?siteNum=${oceanSiteNum}#/referrals/${referralRef}/edit`;
 }

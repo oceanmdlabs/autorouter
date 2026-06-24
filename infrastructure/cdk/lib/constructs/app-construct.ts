@@ -83,6 +83,20 @@ export class AppConstruct extends Construct {
       })
     );
 
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["ses:SendEmail", "ses:SendRawEmail"],
+        resources: ["*"],
+      })
+    );
+
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["sms-voice:SendTextMessage"],
+        resources: ["*"],
+      })
+    );
+
     const erequestsBucket = new s3.Bucket(this, "ErequestsBucket", {
       bucketName: `${props.namePrefix}-erequests`,
       removalPolicy: RemovalPolicy.RETAIN,

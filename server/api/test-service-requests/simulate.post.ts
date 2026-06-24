@@ -10,6 +10,7 @@ export default defineEventHandler(async (event) => {
     const results = await testServiceRequestUseCase(cxt)({
       testServiceRequestId: body.testServiceRequestId,
       eventType: routingEventTypeSchema.parse(body.eventType),
+      mode: body.mode === "dry-run" ? "dry-run" : "evaluate",
     });
     return results;
   } catch (error: any) {

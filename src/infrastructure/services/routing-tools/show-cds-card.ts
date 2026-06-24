@@ -19,4 +19,12 @@ export const showCdsCardTool: RoutingToolDefinition<
     "Provide supplemental information, warnings, or errors regarding the submission (via a CDS Hooks card)",
   briefDescription: "CDS Submission Hook",
   supportsCdsHook: true,
+  dryRun: async (action) => {
+    const { severity, title, message } = action.input;
+    return {
+      payloadType: "cds-card",
+      summary: `CDS card [${severity}]: ${title}`,
+      payload: { severity, title, message },
+    };
+  },
 };

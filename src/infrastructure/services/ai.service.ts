@@ -8,6 +8,7 @@ import { generateObject, generateText, tool, type LanguageModel } from "ai";
 import type { z } from "zod";
 import type {
   IAiService,
+  ToolCall,
   ToolCallResult,
   ToolSet,
 } from "@/src/application/services/ai.service.interface";
@@ -82,7 +83,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
     const sdkTools = Object.fromEntries(
       Object.entries(tools).map(([name, t]) => [
         name,
-        tool({ parameters: t.inputSchema, execute: t.execute }),
+        tool({ parameters: t.inputSchema, execute: async () => "scheduled" }),
       ])
     );
 
@@ -91,15 +92,33 @@ export const createAiService = (deps: Dependencies): IAiService => {
       prompt,
       tools: sdkTools,
       toolChoice: "auto",
+      maxSteps: 10,
     });
+    // With maxSteps > 1, response.toolCalls only covers the last step.
+    // Flatten across all steps to capture sequential multi-tool calls.
+    const allStepToolCalls = response.steps.flatMap((step) => step.toolCalls);
+    const allStepText = response.steps.map((step) => step.text).filter(Boolean).join("\n").trim();
+
+    // Some models (e.g. Mistral on Bedrock) write multiple tool calls as JSON text
+    // rather than returning them as structured tool calls. Parse them as a fallback.
+    const structuredToolCalls: ToolCall[] = allStepToolCalls.length > 0
+      ? allStepToolCalls.map((toolCall) => ({
+          tool: toolCall.toolName,
+          input: toolCall.args as z.infer<RoutingToolRegistry[RoutingToolName]["input"]>,
+        }))
+      : parseTextToolCalls(allStepText, Object.keys(tools)) as ToolCall[];
+
+    if (allStepToolCalls.length === 0 && structuredToolCalls.length > 0) {
+      cxt.logger.info("Parsed tool calls from text response", {
+        toolCalls: structuredToolCalls.map((tc) => tc.tool),
+      });
+    }
+
+    const reasoning = extractReasoning(allStepText, structuredToolCalls.length > 0 && allStepToolCalls.length === 0);
+
     return {
-      toolCalls: response.toolCalls.map((toolCall) => ({
-        tool: toolCall.toolName,
-        input: toolCall.args as z.infer<
-          RoutingToolRegistry[RoutingToolName]["input"]
-        >,
-      })),
-      reasoning: response.text || undefined,
+      toolCalls: structuredToolCalls,
+      reasoning: reasoning || undefined,
     };
   }
 
@@ -117,24 +136,54 @@ export const createAiService = (deps: Dependencies): IAiService => {
     attachments: Attachment[]
   ): Promise<string> {
     const model = await getAiModel();
-    const result = await generateText({
-      model,
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: instructions },
-            ...attachments.map((attachment) => ({
-              type: "file" as const,
-              mimeType: attachment.contentType,
-              data: attachment.data,
-            })),
-          ] as any,
-        },
-      ],
-    });
 
-    return result.text;
+    const buildContent = (atts: Attachment[]) => [
+      { type: "text" as const, text: instructions },
+      ...atts.map((attachment) => {
+        const mimeType = attachment.contentType ?? "application/pdf";
+        const isImage = mimeType.startsWith("image/");
+        return isImage
+          ? { type: "image" as const, mimeType, image: attachment.data }
+          : { type: "file" as const, mimeType, data: attachment.data };
+      }),
+    ];
+
+    try {
+      const result = await generateText({
+        model,
+        messages: [{ role: "user", content: buildContent(attachments) as any }],
+      });
+      return result.text;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      const isImageError =
+        /image|vision|multimodal|content block/i.test(message);
+      const imageAttachments = attachments.filter((a) =>
+        (a.contentType ?? "").startsWith("image/")
+      );
+
+      if (!isImageError || imageAttachments.length === 0) throw err;
+
+      const nonImageAttachments = attachments.filter(
+        (a) => !(a.contentType ?? "").startsWith("image/")
+      );
+      const skippedNames = imageAttachments.map((a) => a.title).join(", ");
+
+      if (nonImageAttachments.length === 0) {
+        return `Note: The configured AI model does not support image analysis. Skipped image(s): ${skippedNames}.`;
+      }
+
+      const result = await generateText({
+        model,
+        messages: [
+          {
+            role: "user",
+            content: buildContent(nonImageAttachments) as any,
+          },
+        ],
+      });
+      return `${result.text}\n\nNote: The following image attachment(s) were skipped because the configured AI model does not support image analysis: ${skippedNames}.`;
+    }
   }
 
   return {
@@ -143,6 +192,46 @@ export const createAiService = (deps: Dependencies): IAiService => {
     summarizeAttachments,
   };
 };
+
+// Parses tool calls written as JSON text by models that don't support structured
+// tool calling for multiple simultaneous calls (e.g. Mistral on Bedrock).
+// Format: [{"name": "toolName", "arguments": {...}}] — one per line.
+function parseTextToolCalls(
+  text: string,
+  availableTools: string[]
+): Array<{ tool: string; input: Record<string, unknown> }> {
+  const results: Array<{ tool: string; input: Record<string, unknown> }> = [];
+  for (const line of text.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("[{")) continue;
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (!Array.isArray(parsed)) continue;
+      for (const item of parsed) {
+        if (
+          typeof item.name === "string" &&
+          item.arguments !== null &&
+          typeof item.arguments === "object" &&
+          availableTools.includes(item.name)
+        ) {
+          results.push({ tool: item.name, input: item.arguments });
+        }
+      }
+    } catch {}
+  }
+  return results;
+}
+
+// When tool calls are parsed from text, strip the JSON lines from the reasoning
+// so only the human-readable explanation is shown.
+function extractReasoning(text: string, toolCallsFromText: boolean): string {
+  if (!toolCallsFromText) return text;
+  return text
+    .split("\n")
+    .filter((line) => !line.trim().startsWith("[{"))
+    .join("\n")
+    .trim();
+}
 
 function getDefaultModel(provider: string): string | null | undefined {
   switch (provider) {

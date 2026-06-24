@@ -1,0 +1,470 @@
+<title>Ocean Autorouter — Architecture Reference</title>
+<style>
+:root {
+  --ground: #08142A;
+  --g2: #0D1E3C;
+  --g3: #132240;
+  --g4: #1A2D50;
+  --border: #1F3A62;
+  --text: #D4E5F7;
+  --dim: #6A87A8;
+  --dimmer: #344D68;
+  --accent: #00C4A8;
+  --blue: #4A8CF7;
+  --amber: #F0A42B;
+  --purple: #9B6CF9;
+  --sans: system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+  --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', Consolas, monospace;
+  --r: 6px;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--ground); color: var(--text); font-family: var(--sans); font-size: 14px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 32px; }
+
+/* MASTHEAD */
+.masthead { padding: 52px 0 44px; border-bottom: 1px solid var(--border); }
+.mast-inner { display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; }
+.mast-label { font-size: 10.5px; letter-spacing: 0.22em; text-transform: uppercase; color: var(--dim); font-weight: 500; margin-bottom: 8px; }
+.mast-title { font-size: 46px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.0; }
+.mast-title .hi { color: var(--accent); }
+.mast-right { text-align: right; }
+.mast-desc { max-width: 360px; font-size: 13px; color: var(--dim); line-height: 1.65; text-align: right; }
+.mast-purpose { font-size: 10px; text-transform: uppercase; letter-spacing: 0.14em; color: var(--dimmer); margin-top: 12px; }
+
+/* EYEBROW */
+.eyebrow { font-size: 10px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin-bottom: 28px; display: flex; align-items: center; gap: 10px; }
+.eyebrow::before { content: ''; display: block; width: 28px; height: 1.5px; background: var(--accent); flex-shrink: 0; }
+
+/* PIPELINE */
+.pipeline-section { padding: 60px 0 56px; border-bottom: 1px solid var(--border); }
+.pipeline { display: flex; align-items: center; overflow-x: auto; padding-bottom: 12px; }
+.pnode { display: flex; flex-direction: column; align-items: center; gap: 8px; flex-shrink: 0; }
+.pbox { background: var(--g3); border: 1.5px solid var(--border); border-radius: var(--r); padding: 12px 18px; font-size: 12.5px; font-weight: 700; white-space: nowrap; color: var(--text); text-align: center; line-height: 1.35; transition: border-color 0.4s, box-shadow 0.4s, background 0.4s; }
+.pbox .sub { display: block; font-size: 9.5px; font-weight: 400; font-family: var(--mono); color: var(--dimmer); margin-top: 3px; }
+.parrow { display: flex; align-items: center; padding: 0 4px; flex-shrink: 0; }
+@keyframes nodePulse {
+  0%, 12%, 100% { border-color: var(--border); box-shadow: none; background: var(--g3); }
+  6% { border-color: var(--accent); box-shadow: 0 0 24px rgba(0,196,168,0.2), inset 0 0 12px rgba(0,196,168,0.05); background: rgba(0,196,168,0.05); }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pnode:nth-child(1)  .pbox { animation: nodePulse 7.5s 0.0s  infinite; }
+  .pnode:nth-child(3)  .pbox { animation: nodePulse 7.5s 0.9s  infinite; }
+  .pnode:nth-child(5)  .pbox { animation: nodePulse 7.5s 1.8s  infinite; }
+  .pnode:nth-child(7)  .pbox { animation: nodePulse 7.5s 2.7s  infinite; }
+  .pnode:nth-child(9)  .pbox { animation: nodePulse 7.5s 3.6s  infinite; }
+  .pnode:nth-child(11) .pbox { animation: nodePulse 7.5s 4.5s  infinite; }
+}
+
+/* SECTIONS */
+.section { padding: 56px 0; border-bottom: 1px solid var(--border); }
+.sec-title { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 28px; }
+.sec-sub { font-size: 12.5px; color: var(--dim); margin-top: -20px; margin-bottom: 28px; line-height: 1.6; }
+
+/* GRIDS */
+.cols-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+.cols-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.cols-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+
+/* CARD */
+.card { background: var(--g2); border: 1px solid var(--border); border-radius: var(--r); padding: 20px 22px; }
+.card-ttl { font-size: 13px; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.badge { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; padding: 2px 7px; border-radius: 2px; font-weight: 700; flex-shrink: 0; }
+.badge-fhir { background: rgba(74,140,247,0.15); color: var(--blue); }
+.badge-web  { background: rgba(0,196,168,0.15); color: var(--accent); }
+.badge-cds  { background: rgba(155,108,249,0.15); color: var(--purple); }
+.card-path { font-family: var(--mono); font-size: 10px; color: var(--accent); margin-bottom: 12px; line-height: 1.6; }
+.card-txt { font-size: 12.5px; color: var(--dim); line-height: 1.65; }
+
+/* EVENT TYPES */
+.evt-list { display: flex; flex-direction: column; }
+.evt-row { display: grid; grid-template-columns: 290px 1fr auto; gap: 12px; align-items: center; padding: 9px 0; border-bottom: 1px solid var(--g4); font-size: 12px; }
+.evt-row:last-child { border-bottom: none; }
+.evt-code { font-family: var(--mono); font-size: 10.5px; color: var(--accent); }
+.evt-desc { color: var(--dim); }
+.evt-tag { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; padding: 2px 7px; border-radius: 2px; font-weight: 700; white-space: nowrap; }
+.tag-fhir  { background: rgba(74,140,247,0.12); color: var(--blue); }
+.tag-pe    { background: rgba(0,196,168,0.12); color: var(--accent); }
+.tag-cds   { background: rgba(155,108,249,0.12); color: var(--purple); }
+.tag-avoid { background: rgba(240,164,43,0.12); color: var(--amber); }
+.tag-cross { background: rgba(155,108,249,0.12); color: var(--purple); }
+
+/* RULE FIELDS */
+.rfield-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rfield { background: var(--g2); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; }
+.rfield-name { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--accent); margin-bottom: 3px; }
+.rfield-type { font-family: var(--mono); font-size: 9.5px; color: var(--dimmer); margin-bottom: 5px; }
+.rfield-desc { font-size: 11.5px; color: var(--dim); line-height: 1.5; }
+
+/* EVAL STEPS */
+.eval-steps { border: 1px solid var(--border); border-radius: var(--r); overflow: hidden; }
+.estep { display: flex; align-items: flex-start; gap: 16px; padding: 14px 20px; background: var(--g2); border-bottom: 1px solid var(--g4); }
+.estep:last-child { border-bottom: none; }
+.estep-n { font-family: var(--mono); font-size: 10px; color: var(--dimmer); width: 22px; flex-shrink: 0; padding-top: 2px; }
+.estep-lbl { font-weight: 700; font-size: 12.5px; color: var(--text); margin-bottom: 3px; }
+.estep-detail { font-size: 11.5px; color: var(--dim); line-height: 1.55; }
+.estep-file { font-family: var(--mono); font-size: 10px; color: var(--accent); margin-top: 4px; }
+
+/* TOOLS */
+.tools-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px; }
+.tool { border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; }
+.tool.t-ocean  { background: rgba(74,140,247,0.06);  border-color: rgba(74,140,247,0.25); }
+.tool.t-comms  { background: rgba(240,164,43,0.06);  border-color: rgba(240,164,43,0.25); }
+.tool.t-ctx    { background: rgba(0,196,168,0.06);   border-color: rgba(0,196,168,0.25); }
+.tool.t-cds    { background: rgba(155,108,249,0.06); border-color: rgba(155,108,249,0.25); }
+.tool-name { font-family: var(--mono); font-size: 11.5px; font-weight: 700; margin-bottom: 5px; }
+.tool.t-ocean .tool-name { color: var(--blue); }
+.tool.t-comms .tool-name { color: var(--amber); }
+.tool.t-ctx   .tool-name { color: var(--accent); }
+.tool.t-cds   .tool-name { color: var(--purple); }
+.tool-desc { font-size: 11px; color: var(--dim); line-height: 1.5; }
+.tool-note { font-size: 10px; color: var(--dimmer); font-style: italic; margin-top: 3px; }
+.legend { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--dim); }
+.ldot { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+.ld-o { background: var(--blue); }
+.ld-c { background: var(--amber); }
+.ld-x { background: var(--accent); }
+.ld-cds { background: var(--purple); }
+
+/* AI */
+.ai-card { background: var(--g2); border: 1px solid var(--border); border-radius: var(--r); padding: 18px 16px; }
+.ai-name { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.ai-model { font-family: var(--mono); font-size: 10px; color: var(--dim); margin-bottom: 5px; }
+.ai-note { font-size: 11px; color: var(--dimmer); line-height: 1.5; }
+.ai-flow { background: var(--g2); border: 1px solid var(--border); border-radius: var(--r); padding: 20px 22px; font-size: 12px; color: var(--dim); line-height: 1.8; }
+.ai-flow code { font-family: var(--mono); font-size: 10.5px; color: var(--accent); background: rgba(0,196,168,0.08); padding: 1px 5px; border-radius: 3px; }
+.ai-flow strong { color: var(--text); font-size: 12px; }
+
+/* DB */
+.db-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.dbtbl { background: var(--g2); border: 1px solid var(--border); border-radius: var(--r); padding: 12px 14px; }
+.dbtbl-name { font-family: var(--mono); font-size: 11px; font-weight: 700; color: var(--blue); margin-bottom: 5px; }
+.dbtbl-desc { font-size: 11px; color: var(--dimmer); line-height: 1.5; }
+
+/* TENANCY */
+.tenancy-box { background: var(--g2); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: var(--r); padding: 18px 22px; font-size: 12.5px; color: var(--dim); line-height: 1.75; }
+.tenancy-box code { font-family: var(--mono); font-size: 10.5px; color: var(--accent); }
+
+/* FILE MAP */
+.filegroup { margin-bottom: 28px; }
+.filegroup:last-child { margin-bottom: 0; }
+.fgroup-lbl { font-size: 10px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--dimmer); font-weight: 700; margin-bottom: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--g3); }
+.frow { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--g4); }
+.frow:last-child { border-bottom: none; }
+.fpath { font-family: var(--mono); font-size: 10px; color: var(--accent); word-break: break-all; }
+.fpurpose { color: var(--dim); font-size: 11.5px; text-align: right; max-width: 340px; }
+
+/* FOOTER */
+.footer { padding: 32px 0 40px; }
+.footer-inner { display: flex; justify-content: space-between; align-items: center; font-size: 11px; color: var(--dimmer); }
+.footer-stack { display: flex; gap: 16px; flex-wrap: wrap; }
+.fstack-tag { font-family: var(--mono); font-size: 10px; color: var(--dimmer); }
+
+/* INLINE CODE */
+.ic { font-family: var(--mono); font-size: 10.5px; color: var(--accent); }
+
+@media (max-width: 900px) {
+  .cols-2, .cols-3, .cols-4, .db-grid, .rfield-grid { grid-template-columns: 1fr; }
+  .mast-inner { flex-direction: column; align-items: flex-start; }
+  .mast-right, .mast-desc { text-align: left; }
+  .evt-row { grid-template-columns: 1fr; gap: 4px; }
+  .frow { grid-template-columns: 1fr; }
+  .fpurpose { text-align: left; }
+}
+</style>
+
+<!-- MASTHEAD -->
+<div class="masthead">
+  <div class="wrap">
+    <div class="mast-inner">
+      <div>
+        <div class="mast-label">Ocean Labs</div>
+        <div class="mast-title">Ocean <span class="hi">Autorouter</span></div>
+      </div>
+      <div class="mast-right">
+        <div class="mast-desc">AI-powered routing for eReferral and eConsult workflows. Rules evaluate inbound FHIR events, an LLM decides which actions to take, and Ocean is updated automatically.</div>
+        <div class="mast-purpose">Architecture Reference · Self-Summary for Claude</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PIPELINE HERO -->
+<div class="pipeline-section">
+  <div class="wrap">
+    <div class="eyebrow">Routing Pipeline</div>
+    <div class="pipeline">
+      <div class="pnode">
+        <div class="pbox">Event In<span class="sub">FHIR / Webhook / CDS</span></div>
+      </div>
+      <div class="parrow"><svg width="32" height="14" viewBox="0 0 32 14" fill="none"><line x1="0" y1="7" x2="22" y2="7" stroke="#1F3A62" stroke-width="1.5"/><polyline points="18,3 24,7 18,11" fill="none" stroke="#1F3A62" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+      <div class="pnode">
+        <div class="pbox">Parse &amp; Validate<span class="sub">process-message.controller</span></div>
+      </div>
+      <div class="parrow"><svg width="32" height="14" viewBox="0 0 32 14" fill="none"><line x1="0" y1="7" x2="22" y2="7" stroke="#1F3A62" stroke-width="1.5"/><polyline points="18,3 24,7 18,11" fill="none" stroke="#1F3A62" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+      <div class="pnode">
+        <div class="pbox">Archive eRequest<span class="sub">archive-erequest.use-case</span></div>
+      </div>
+      <div class="parrow"><svg width="32" height="14" viewBox="0 0 32 14" fill="none"><line x1="0" y1="7" x2="22" y2="7" stroke="#1F3A62" stroke-width="1.5"/><polyline points="18,3 24,7 18,11" fill="none" stroke="#1F3A62" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+      <div class="pnode">
+        <div class="pbox">Evaluate Rules<span class="sub">evaluateRulesInOrder</span></div>
+      </div>
+      <div class="parrow"><svg width="32" height="14" viewBox="0 0 32 14" fill="none"><line x1="0" y1="7" x2="22" y2="7" stroke="#1F3A62" stroke-width="1.5"/><polyline points="18,3 24,7 18,11" fill="none" stroke="#1F3A62" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+      <div class="pnode">
+        <div class="pbox">AI Decision<span class="sub">ai.service → getToolCalls</span></div>
+      </div>
+      <div class="parrow"><svg width="32" height="14" viewBox="0 0 32 14" fill="none"><line x1="0" y1="7" x2="22" y2="7" stroke="#1F3A62" stroke-width="1.5"/><polyline points="18,3 24,7 18,11" fill="none" stroke="#1F3A62" stroke-width="1.5" stroke-linejoin="round"/></svg></div>
+      <div class="pnode">
+        <div class="pbox">Execute Tools<span class="sub">routing-tool-action.service</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EVENT STREAMS -->
+<div class="section">
+  <div class="wrap">
+    <div class="eyebrow">Event Streams</div>
+    <div class="sec-title">Three ways events enter the system</div>
+    <div class="cols-3">
+      <div class="card">
+        <div class="card-ttl">FHIR Messages <span class="badge badge-fhir">eReferral</span></div>
+        <div class="card-path">server/api/fhir/[...fhirPath].ts<br>→ process-message.controller.ts</div>
+        <div class="card-txt">Ocean pushes FHIR R4 Bundles when a referral is created, accepted, declined, cancelled, or messaged. The controller extracts event context and passes it to the service request use case.</div>
+      </div>
+      <div class="card">
+        <div class="card-ttl">Patient Engagement Webhooks <span class="badge badge-web">Open API</span></div>
+        <div class="card-path">server/api/openapi/webhook/[clientId].ts<br>→ process-patient-engagement-event.use-case</div>
+        <div class="card-txt">Ocean's patient portal sends webhooks when patients complete forms or add notes. The handler fetches patient and note via Open API, then runs PE event rules. Rate-limited + replay-protected in memory.</div>
+      </div>
+      <div class="card">
+        <div class="card-ttl">CDS Hooks <span class="badge badge-cds">Pre-submission</span></div>
+        <div class="card-path">server/api/cds/cds-services/order-sign-cds.ts</div>
+        <div class="card-txt">CDS hooks fire before a referral is submitted. Only <span class="ic">showCdsCard</span> is available here. Rules using <span class="ic">request_pre_submission</span> return advisory cards back to the clinician's EHR.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- EVENT TYPES -->
+<div class="section">
+  <div class="wrap">
+    <div class="eyebrow">Event Types</div>
+    <div class="sec-title">All ten triggering events</div>
+    <div class="evt-list">
+      <div class="evt-row"><div class="evt-code">request_pre_submission</div><div class="evt-desc">CDS hook fires before a new referral is submitted</div><span class="evt-tag tag-cds">CDS</span></div>
+      <div class="evt-row"><div class="evt-code">request_received</div><div class="evt-desc">A new inbound referral or eConsult arrives</div><span class="evt-tag tag-fhir">FHIR</span></div>
+      <div class="evt-row"><div class="evt-code">request_updated</div><div class="evt-desc">Referral content changed — intentionally avoided (causes recursive processing)</div><span class="evt-tag tag-avoid">Avoided</span></div>
+      <div class="evt-row"><div class="evt-code">request_cancelled</div><div class="evt-desc">Referral was cancelled by the requester</div><span class="evt-tag tag-fhir">FHIR</span></div>
+      <div class="evt-row"><div class="evt-code">request_accepted</div><div class="evt-desc">Receiving clinic accepted the referral</div><span class="evt-tag tag-fhir">FHIR</span></div>
+      <div class="evt-row"><div class="evt-code">request_declined</div><div class="evt-desc">Receiving clinic declined the referral</div><span class="evt-tag tag-fhir">FHIR</span></div>
+      <div class="evt-row"><div class="evt-code">request_message</div><div class="evt-desc">A new message added to the referral thread</div><span class="evt-tag tag-fhir">FHIR</span></div>
+      <div class="evt-row"><div class="evt-code">patient_message_forms_completion</div><div class="evt-desc">Patient completed Ocean intake forms</div><span class="evt-tag tag-pe">PE Webhook</span></div>
+      <div class="evt-row"><div class="evt-code">patient_note_added</div><div class="evt-desc">Patient added a note via the patient portal</div><span class="evt-tag tag-pe">PE Webhook</span></div>
+      <div class="evt-row"><div class="evt-code">intake_questionnaire_completed</div><div class="evt-desc">Cross-event: patient forms matched to an archived referral — fires in addition to forms_completion when archival is enabled</div><span class="evt-tag tag-cross">Cross-event</span></div>
+    </div>
+  </div>
+</div>
+
+<!-- RULE ANATOMY -->
+<div class="section">
+  <div class="wrap">
+    <div class="eyebrow">Routing Rule</div>
+    <div class="sec-title">The core domain object</div>
+    <div class="sec-sub">Defined in <span class="ic">src/entities/models/routing-rule.ts</span> · persisted in the <span class="ic" style="color:var(--blue)">routing_rules</span> table</div>
+    <div class="rfield-grid">
+      <div class="rfield"><div class="rfield-name">triggeringEvent</div><div class="rfield-type">RoutingEventType</div><div class="rfield-desc">Which of the 10 event types activates this rule. A rule only runs when its event fires.</div></div>
+      <div class="rfield"><div class="rfield-name">prompt</div><div class="rfield-type">string</div><div class="rfield-desc">Natural language instructions for the LLM — what to check, when to act, what not to do.</div></div>
+      <div class="rfield"><div class="rfield-name">enabledTools</div><div class="rfield-type">RoutingToolName[]</div><div class="rfield-desc">Which of the 13 tools the AI is allowed to call. Tools not in this list are hidden from the model for this rule.</div></div>
+      <div class="rfield"><div class="rfield-name">allowedContextFields</div><div class="rfield-type">"age" | "gender" | "postalCode" | "attachments"</div><div class="rfield-desc">Patient data the AI can see. Attachments require a separate privacy acknowledgement to enable.</div></div>
+      <div class="rfield"><div class="rfield-name">priority</div><div class="rfield-type">number (int, positive)</div><div class="rfield-desc">Higher value runs first. Ties resolved by createdAt asc, then id asc. Drag-to-reorder in the UI.</div></div>
+      <div class="rfield"><div class="rfield-name">stopProcessingOnMatch</div><div class="rfield-type">boolean</div><div class="rfield-desc">When true and the rule fires with valid actions, all lower-priority rules are skipped and marked stopped.</div></div>
+      <div class="rfield"><div class="rfield-name">active</div><div class="rfield-type">boolean</div><div class="rfield-desc">Inactive rules are skipped during evaluation and logged as "rule is inactive."</div></div>
+      <div class="rfield"><div class="rfield-name">summarizeAttachmentsAcknowledged</div><div class="rfield-type">boolean</div><div class="rfield-desc">Privacy gate — must be true before the attachments context field can be enabled.</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- RULE EVALUATION ENGINE -->
+<div class="section">
+  <div class="wrap">
+    <div class="eyebrow">Rule Evaluation Engine</div>
+    <div class="sec-title">How rules are processed per event</div>
+    <div class="eval-steps">
+      <div class="estep"><div class="estep-n">01</div><div><div class="estep-lbl">Load all rules in priority order</div><div class="estep-detail">Repository returns rules sorted by priority desc, then createdAt asc. All rules for the tenant are fetched once.</div><div class="estep-file">src/infrastructure/repositories/routing-rules.repository.ts</div></div></div>
+      <div class="estep"><div class="estep-n">02</div><div><div class="estep-lbl">Check AI opt-out</div><div class="estep-detail">If the FHIR QuestionnaireResponse has ai_opt_out=true, skip all evaluation. Logged as "Patient has opted out."</div><div class="estep-file">evaluate-rule.service.ts → avoidProcessingDueToPatientOptOut()</div></div></div>
+      <div class="estep"><div class="estep-n">03</div><div><div class="estep-lbl">Pre-summarize attachments once</div><div class="estep-detail">If any rule has attachments in allowedContextFields and the event has attachments, summarize them once before the rule loop. The summary string is reused by all rules — never re-generated per rule.</div><div class="estep-file">process-service-request-event.use-case.ts → ai.service.summarizeAttachments()</div></div></div>
+      <div class="estep"><div class="estep-n">04</div><div><div class="estep-lbl">Iterate rules sequentially</div><div class="estep-detail">For each rule: skip if inactive or wrong event type. Build evaluation prompt + filter tool set to rule's enabledTools. Call AI. Return tool calls as planned actions.</div><div class="estep-file">src/application/use-cases/evaluate-rules-in-order.ts · evaluate-rule.service.ts</div></div></div>
+      <div class="estep"><div class="estep-n">05</div><div><div class="estep-lbl">Apply stop-processing</div><div class="estep-detail">If a triggered rule has stopProcessingOnMatch=true and returned valid actions without error, all subsequent rules receive stoppedByRuleId and are skipped without an AI call.</div><div class="estep-file">src/application/use-cases/evaluate-rules-in-order.ts</div></div></div>
+      <div class="estep"><div class="estep-n">06</div><div><div class="estep-lbl">Filter blocked email actions</div><div class="estep-detail">If an email allowlist is configured in SiteConfiguration, sendEmail actions targeting unlisted addresses are removed before execution.</div><div class="estep-file">src/application/use-cases/filter-blocked-email-actions.ts</div></div></div>
+      <div class="estep"><div class="estep-n">07</div><div><div class="estep-lbl">Execute actions for triggered, non-skipped rules</div><div class="estep-detail">Rules with stoppedByRuleId are skipped entirely. For triggered rules, each planned tool action is executed sequentially. Errors are caught and logged but don't halt other rules.</div><div class="estep-file">src/infrastructure/services/routing-tool-action.service.ts</div></div></div>
+      <div class="estep"><div class="estep-n">08</div><div><div class="estep-lbl">Write LLM decision audits</div><div class="estep-detail">Each rule evaluation → one llm_rule_decision_audit row (EXECUTE/SKIP/ERROR, reasoning). Each tool execution → one llm_rule_tool_execution_audit row (status, timing, input hash, result).</div><div class="estep-file">src/application/use-cases/write-decision-audits.ts</div></div></div>
+      <div class="estep"><div class="estep-n">09</div><div><div class="estep-lbl">Write activity log entry</div><div class="estep-detail">One activity_log_entry per event containing a JSON summary of all rule decisions and tool results, with full-text search indexing.</div><div class="estep-file">process-service-request-event.use-case.ts (final step)</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ROUTING TOOLS -->
+<div class="section">
+  <div class="wrap">
+    <div class="eyebrow">Routing Tools</div>
+    <div class="sec-title">13 tools the AI can call</div>
+    <div class="sec-sub">Registry at <span class="ic">src/infrastructure/services/routing-tools/routing-tool-registry.ts</span>. Each rule's <span class="ic">enabledTools</span> controls which tools are offered to the model.</div>
+    <div class="legend">
+      <div class="legend-item"><div class="ldot ld-o"></div>Ocean referral actions</div>
+      <div class="legend-item"><div class="ldot ld-c"></div>External communications</div>
+      <div class="legend-item"><div class="ldot ld-x"></div>Context &amp; annotation</div>
+      <div class="legend-item"><div class="ldot ld-cds"></div>CDS only</div>
+    </div>
+    <div class="tools-grid">
+      <div class="tool t-ocean"><div class="tool-name">changeStatus</div><div class="tool-desc">Accept, decline, or complete the referral in Ocean</div></div>
+      <div class="tool t-ocean"><div class="tool-name">forward</div><div class="tool-desc">Forward the referral to a different Ocean listing</div></div>
+      <div class="tool t-ocean"><div class="tool-name">assign</div><div class="tool-desc">Assign the referral to a specific provider</div></div>
+      <div class="tool t-ocean"><div class="tool-name">markAsNeedsReview</div><div class="tool-desc">Flag the referral for manual clinical review</div></div>
+      <div class="tool t-ocean"><div class="tool-name">toggleEConsult</div><div class="tool-desc">Enable or disable the eConsult pathway</div></div>
+      <div class="tool t-ocean"><div class="tool-name">updateCategory</div><div class="tool-desc">Change the referral's service category</div></div>
+      <div class="tool t-comms"><div class="tool-name">sendCommunicationToRequester</div><div class="tool-desc">Send a message to the referring physician via Ocean</div></div>
+      <div class="tool t-comms"><div class="tool-name">setBookingInstructions</div><div class="tool-desc">Set booking instructions visible to the patient</div></div>
+      <div class="tool t-comms"><div class="tool-name">sendSms</div><div class="tool-desc">Send an SMS to a phone number on the allowlist</div><div class="tool-note">Twilio or AWS SNS</div></div>
+      <div class="tool t-comms"><div class="tool-name">sendEmail</div><div class="tool-desc">Send an email to an address on the allowlist</div><div class="tool-note">SMTP2GO or AWS SES</div></div>
+      <div class="tool t-ctx"><div class="tool-name">comment</div><div class="tool-desc">Add an internal comment to the referral record</div></div>
+      <div class="tool t-ctx"><div class="tool-name">summarizeAttachments</div><div class="tool-desc">AI-generated attachment summary added to evaluation context</div><div class="tool-note">Requires privacy acknowledgement</div></div>
+      <div class="tool t-cds"><div class="tool-name">showCdsCard</div><div class="tool-desc">Return a CDS advisory card to the clinician's EHR</div><div class="tool-note">request_pre_submission only</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- AI INTEGRATION -->
+<div class="section">
+  <div class="wrap">
+    <div class="eyebrow">AI Integration</div>
+    <div class="sec-title">LLM providers &amp; tool calling</div>
+    <div class="cols-4" style="margin-bottom:20px;">
+      <div class="ai-card"><div class="ai-name">OpenAI</div><div class="ai-model">Default: gpt-4.1-mini</div><div class="ai-note">Default when not configured. Structured tool calls via Vercel AI SDK.</div></div>
+      <div class="ai-card"><div class="ai-name">Google</div><div class="ai-model">Default: gemini-2.5-flash</div><div class="ai-note">Multimodal — supports images and PDFs for attachment summarization.</div></div>
+      <div class="ai-card"><div class="ai-name">Cohere</div><div class="ai-model">Default: command-a</div><div class="ai-note">command-a-03-2025 in code.</div></div>
+      <div class="ai-card"><div class="ai-name">AWS Bedrock</div><div class="ai-model">Default: claude-3-sonnet</div><div class="ai-note">IAM credential chain. Mistral on Bedrock falls back to text-parsed tool calls.</div></div>
+    </div>
+    <div class="ai-flow">
+      <strong>Per-rule evaluation:</strong> Build prompt → filter registry to rule's <code>enabledTools</code> → <code>ai.service.getToolCalls(prompt, toolSet)</code> → structured tool calls → map to <code>RoutingToolAction[]</code>.<br><br>
+      <strong>Attachment summarization:</strong> Called once before the rule loop via <code>ai.service.summarizeAttachments()</code>. Multimodal <code>generateText</code> for PDFs and images. Image errors fall back gracefully to non-image content only, with a note appended.<br><br>
+      <strong>Provider per tenant:</strong> Configured in <code>site_config.aiProvider</code> + <code>aiApiKeyEncrypted</code> + <code>aiModel</code>. Resolved at evaluation time from SiteConfiguration.
+    </div>
+  </div>
+</div>
+
+<!-- MULTI-TENANCY -->
+<div class="section">
+  <div class="wrap">
+    <div class="eyebrow">Multi-Tenancy</div>
+    <div class="sec-title">Tenant isolation model</div>
+    <div class="tenancy-box">
+      Every table has a <code>tenant_id</code> column. All repository queries are automatically scoped — rules, logs, erequests, site config, healthcare services, audit records.<br><br>
+      <code>ApplicationContext.getTenantId()</code> returns the current tenant from the session (<code>user.activeTenantId ?? user.tenantId</code>). Users can belong to multiple tenants via <code>tenant_memberships</code> and switch between them. The <code>activeTenantId</code> on the session controls which tenant is active.<br><br>
+      The <code>clientId</code> in <code>site_config</code> routes patient engagement webhooks to the correct tenant without a user session. The OAuth2 <code>clientId</code>/<code>clientSecret</code> pair authenticates inbound FHIR messages. Each tenant has exactly one SiteConfiguration holding all credentials.
+    </div>
+  </div>
+</div>
+
+<!-- DATABASE -->
+<div class="section">
+  <div class="wrap">
+    <div class="eyebrow">Database Schema</div>
+    <div class="sec-title">PostgreSQL via Drizzle ORM</div>
+    <div class="sec-sub">Schema in <span class="ic">drizzle/schema.ts</span> · Migrations: always <span class="ic">npm run db:migrate:generate</span> — never write SQL by hand</div>
+    <div class="db-grid">
+      <div class="dbtbl"><div class="dbtbl-name">routing_rules</div><div class="dbtbl-desc">Rules with priority, prompt, enabled tools, stop-processing flag</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">site_config</div><div class="dbtbl-desc">Per-tenant credentials — all secrets AES-encrypted at rest</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">activity_log_entry</div><div class="dbtbl-desc">One row per processed event; rule summary JSON, full-text search indexed</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">llm_rule_decision_audit</div><div class="dbtbl-desc">Per-rule AI decision — EXECUTE/SKIP/ERROR, reasoning, triggered flag</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">llm_rule_tool_execution_audit</div><div class="dbtbl-desc">Per-tool execution — status, timing, input hash, result, error summary</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">erequests</div><div class="dbtbl-desc">Archived referral bundles — patient identifiers indexed for cross-event matching</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">erequest_blobs</div><div class="dbtbl-desc">Attachment storage records — filesystem or S3, checksum, download status</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">healthcare_services</div><div class="dbtbl-desc">Named Ocean listings for the admin UI — name, oceanReference</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">test_service_requests</div><div class="dbtbl-desc">Saved FHIR bundles for Testing UI — no side effects when simulated</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">privacy_audit_log</div><div class="dbtbl-desc">PHI access audit — actor, event type, subject, encrypted detail</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">users</div><div class="dbtbl-desc">OAuth users — Google or GitHub, display name, last login</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">tenant_memberships</div><div class="dbtbl-desc">User ↔ tenant — role (admin/member), status (active/revoked)</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">tenant_invites</div><div class="dbtbl-desc">Time-limited invite links — code, role, expiry, redemption</div></div>
+      <div class="dbtbl"><div class="dbtbl-name">system_admin_allowlist</div><div class="dbtbl-desc">Super-admins by OAuth provider+subject (not tenant-scoped)</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- KEY FILES -->
+<div class="section">
+  <div class="wrap">
+    <div class="eyebrow">Key Files</div>
+    <div class="sec-title">Where to find what</div>
+
+    <div class="filegroup">
+      <div class="fgroup-lbl">Entities — Domain Models</div>
+      <div class="frow"><div class="fpath">src/entities/models/application-context.ts</div><div class="fpurpose">DI container — all repositories &amp; services, session, tenant isolation</div></div>
+      <div class="frow"><div class="fpath">src/entities/models/routing-rule.ts</div><div class="fpurpose">Core rule schema (Zod) — all fields, attachment validation</div></div>
+      <div class="frow"><div class="fpath">src/entities/models/routing-event-type.ts</div><div class="fpurpose">All 10 event type enums + descriptions + titles</div></div>
+      <div class="frow"><div class="fpath">src/entities/models/routing-evaluation.ts</div><div class="fpurpose">RuleEvaluationResult — actions, triggered, error, stoppedByRuleId</div></div>
+      <div class="frow"><div class="fpath">src/entities/models/site-configuration.ts</div><div class="fpurpose">Tenant config schema — Ocean, AI, email, SMS, Open API credentials</div></div>
+    </div>
+
+    <div class="filegroup">
+      <div class="fgroup-lbl">Application — Use Cases</div>
+      <div class="frow"><div class="fpath">src/application/use-cases/process-service-request-event.use-case.ts</div><div class="fpurpose">FHIR event orchestrator — rule loop, execution, audit</div></div>
+      <div class="frow"><div class="fpath">src/application/use-cases/process-patient-engagement-event.use-case.ts</div><div class="fpurpose">PE webhook orchestrator — same pattern, patient engagement context</div></div>
+      <div class="frow"><div class="fpath">src/application/use-cases/evaluate-rules-in-order.ts</div><div class="fpurpose">Rule loop with stop-processing — iterates rules, tracks stopped state</div></div>
+      <div class="frow"><div class="fpath">src/application/use-cases/archive-erequest.use-case.ts</div><div class="fpurpose">Stores FHIR bundles + blobs for cross-event referral matching</div></div>
+      <div class="frow"><div class="fpath">src/application/use-cases/match-archived-erequest.ts</div><div class="fpurpose">MRN+DOB → healthNum+DOB → name+DOB matching heuristic</div></div>
+      <div class="frow"><div class="fpath">src/application/use-cases/process-intake-questionnaire-completed.use-case.ts</div><div class="fpurpose">Cross-event use case — runs after forms_completion when archival matches a referral</div></div>
+      <div class="frow"><div class="fpath">src/application/use-cases/write-decision-audits.ts</div><div class="fpurpose">Writes llm_rule_decision_audit + llm_rule_tool_execution_audit rows</div></div>
+      <div class="frow"><div class="fpath">src/application/use-cases/filter-blocked-email-actions.ts</div><div class="fpurpose">Removes sendEmail actions targeting addresses not on the allowlist</div></div>
+    </div>
+
+    <div class="filegroup">
+      <div class="fgroup-lbl">Infrastructure — Services</div>
+      <div class="frow"><div class="fpath">src/infrastructure/services/evaluate-rule.service.ts</div><div class="fpurpose">Per-rule AI evaluation — prompt construction, tool filtering, AI call, action mapping</div></div>
+      <div class="frow"><div class="fpath">src/infrastructure/services/routing-tool-action.service.ts</div><div class="fpurpose">Executes the AI's chosen tool actions against Ocean + external services</div></div>
+      <div class="frow"><div class="fpath">src/infrastructure/services/ai.service.ts</div><div class="fpurpose">Vercel AI SDK wrapper — getToolCalls, summarizeAttachments; multi-provider</div></div>
+      <div class="frow"><div class="fpath">src/infrastructure/services/ocean-client.service.ts</div><div class="fpurpose">Sends FHIR R4 $process-message to Ocean outbound API</div></div>
+      <div class="frow"><div class="fpath">src/infrastructure/services/ocean-message.service.ts</div><div class="fpurpose">Builds FHIR Bundle messages for each Ocean action type</div></div>
+      <div class="frow"><div class="fpath">src/infrastructure/services/routing-tools/routing-tool-registry.ts</div><div class="fpurpose">Registry of all 13 tools — name → definition, handler, input schema</div></div>
+      <div class="frow"><div class="fpath">src/infrastructure/services/prompts/evaluate-service-request-rule-prompt.ts</div><div class="fpurpose">LLM prompt builder for FHIR service request events</div></div>
+      <div class="frow"><div class="fpath">src/infrastructure/services/prompts/evaluate-pe-rule-prompt.ts</div><div class="fpurpose">LLM prompt builder for patient engagement events</div></div>
+    </div>
+
+    <div class="filegroup">
+      <div class="fgroup-lbl">Infrastructure — Controllers &amp; Adapters</div>
+      <div class="frow"><div class="fpath">src/infrastructure/adapters/controllers/process-message.controller.ts</div><div class="fpurpose">FHIR inbound: extract event context, load attachments, call use case</div></div>
+      <div class="frow"><div class="fpath">src/infrastructure/adapters/h3.adapter.ts</div><div class="fpurpose">Converts Nuxt H3 event → ApplicationContext (Nuxt/Nitro glue layer)</div></div>
+    </div>
+
+    <div class="filegroup">
+      <div class="fgroup-lbl">Server — Key API Routes</div>
+      <div class="frow"><div class="fpath">server/api/fhir/[...fhirPath].ts</div><div class="fpurpose">FHIR inbound endpoint + OAuth2 token exchange</div></div>
+      <div class="frow"><div class="fpath">server/api/openapi/webhook/[clientId].ts</div><div class="fpurpose">PE webhook — rate limit, replay prevention, fetch patient+note</div></div>
+      <div class="frow"><div class="fpath">server/api/cds/cds-services/order-sign-cds.ts</div><div class="fpurpose">CDS hook handler for request_pre_submission</div></div>
+      <div class="frow"><div class="fpath">server/api/test-service-requests/simulate.post.ts</div><div class="fpurpose">Runs full evaluation pipeline on a saved test bundle — no side effects</div></div>
+      <div class="frow"><div class="fpath">server/api/routing-rules/reorder.put.ts</div><div class="fpurpose">Updates rule priority after drag-to-reorder in the UI</div></div>
+    </div>
+
+    <div class="filegroup">
+      <div class="fgroup-lbl">Schema &amp; Migrations</div>
+      <div class="frow"><div class="fpath">drizzle/schema.ts</div><div class="fpurpose">All table definitions — the source of truth for the DB schema</div></div>
+      <div class="frow"><div class="fpath">drizzle/migrations/</div><div class="fpurpose">Generated SQL — never edit by hand; always npm run db:migrate:generate</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- FOOTER -->
+<div class="footer">
+  <div class="wrap">
+    <div class="footer-inner">
+      <div>Ocean Autorouter · Architecture Reference</div>
+      <div class="footer-stack">
+        <span class="fstack-tag">Nuxt 3</span>
+        <span class="fstack-tag">Drizzle ORM</span>
+        <span class="fstack-tag">PostgreSQL</span>
+        <span class="fstack-tag">Vercel AI SDK</span>
+        <span class="fstack-tag">FHIR R4</span>
+      </div>
+    </div>
+  </div>
+</div>

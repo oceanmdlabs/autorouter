@@ -1,9 +1,4 @@
-import type {
-  LlmDecision,
-  LlmReasonCode,
-  LlmToolExecutionStatus,
-  LlmValidationStatus,
-} from "./llm-rule-decision";
+import type { LlmDecision, LlmToolExecutionStatus } from "./llm-rule-decision";
 
 export type DecisionAuditFilters = {
   referralId?: string;
@@ -11,9 +6,6 @@ export type DecisionAuditFilters = {
   from?: Date;
   to?: Date;
   decision?: LlmDecision;
-  reasonCode?: LlmReasonCode;
-  validationStatus?: LlmValidationStatus;
-  toolStatus?: LlmToolExecutionStatus;
   page?: number;
   pageSize?: number;
   sort?: "createdAt_asc" | "createdAt_desc";
@@ -24,6 +16,9 @@ export type ToolExecutionItem = {
   toolIndex: number;
   toolName: string;
   toolDisplayName: string;
+  actionType: string | null;
+  toolInput: Record<string, unknown> | null;
+  toolResult: string | null;
   status: LlmToolExecutionStatus;
   errorCode: string | null;
   errorSummary: string | null;
@@ -31,6 +26,13 @@ export type ToolExecutionItem = {
   finishedAt: Date | null;
   createdAt: Date;
   durationMs: number | null;
+};
+
+export type AuditAction = {
+  tool: string;
+  actionType: string | null;
+  input: Record<string, unknown> | null;
+  result: string | null;
 };
 
 export type DecisionAuditItem = {
@@ -41,15 +43,13 @@ export type DecisionAuditItem = {
   ruleId: string;
   ruleName: string;
   ruleVersion: string;
+  triggered: boolean;
   decision: LlmDecision;
-  confidence: number | null;
-  reasonCode: LlmReasonCode | null;
   reasonSummary: string | null;
-  modelName: string | null;
-  modelRequestId: string | null;
-  validationStatus: LlmValidationStatus;
+  reasoning: string | null;
   validationError: string | null;
   createdAt: Date;
+  actions: AuditAction[];
   toolExecutions: ToolExecutionItem[];
   toolCount: number;
   toolFailedCount: number;

@@ -12,6 +12,7 @@ import type {
 } from "fhir/r4";
 import { ApplicationContext } from "@/src/entities/models/application-context";
 import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
+import { DocumentDownloadCache } from "@/src/infrastructure/services/document-download-cache";
 
 export type ArchiveErequestOutput = {
   archived: boolean;
@@ -31,6 +32,7 @@ type DocumentToArchive = {
 export async function archiveErequestUseCase(
   eventContext: ServiceRequestEventContext,
   cxt: ApplicationContext,
+  downloadCache?: DocumentDownloadCache,
 ): Promise<ArchiveErequestOutput> {
   const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
   if (!siteConfig?.erequestArchivalEnabled) {
@@ -74,14 +76,13 @@ export async function archiveErequestUseCase(
     };
   }
 
-  let credentials;
   let primaryBlobId: string | null = null;
   const failures: string[] = [];
 
+  const cache = downloadCache ?? new DocumentDownloadCache(cxt.getOceanClientService());
+
   try {
-    credentials = await cxt
-      .getOceanClientService()
-      .fetchOceanClientCredentials();
+    await cache.fetchCredentials();
   } catch (error) {
     const message =
       error instanceof Error
@@ -109,10 +110,7 @@ export async function archiveErequestUseCase(
     }
 
     try {
-      const data = await cxt.getOceanClientService().fetchLetterData({
-        letterUrl: document.sourceUrl,
-        credentials,
-      });
+      const data = await cache.fetchLetterData(document.sourceUrl);
       const storageKey = blobStorage.buildStorageKey({
         tenantId: cxt.getNonEmptyTenantId(),
         erequestId: erequest.id,
@@ -183,7 +181,13 @@ function extractErequestMetadata(
 ) {
   const resources =
     (bundle.entry
-      ?.map((entry) => entry.resource)
+      ?.map((entry) => {
+        if (!entry.resource) return undefined;
+        if (!entry.resource.id && entry.fullUrl) {
+          return { ...entry.resource, id: entry.fullUrl };
+        }
+        return entry.resource;
+      })
       .filter(Boolean) as Resource[]) ?? [];
   const serviceRequest = resources.find(
     (resource): resource is ServiceRequest =>
@@ -199,11 +203,11 @@ function extractErequestMetadata(
     sourceMessageId: messageHeader?.id ?? null,
     referralRef: eventContext.referralRef ?? null,
     triggeringEvent: eventContext.triggeringEvent,
-    receivedAt: new Date(),
+    receivedAt: resolveReceivedAt(bundle, serviceRequest),
     patientHealthNumber:
       findIdentifierValue(
         patient?.identifier,
-        /health-number|health card|health card number|hin/i,
+        /health[ -]number|health card|hcn|hin/i,
       ) ?? null,
     patientMedicalRecordNumber:
       findIdentifierValue(patient?.identifier, /medical record|mrn|chart/i) ??
@@ -227,6 +231,24 @@ function extractErequestMetadata(
       eventContext.requestedServiceDescription ?? null,
     rawBundle: bundle,
   };
+}
+
+/**
+ * Resolves when the referral was actually sent in Ocean, preferring the FHIR
+ * message send time (`Bundle.timestamp`), then the referral's authored time
+ * (`ServiceRequest.authoredOn`). Falls back to the archival time only when the
+ * bundle carries no usable timestamp. FHIR instants include a timezone offset,
+ * so `new Date(...)` yields the correct instant.
+ */
+function resolveReceivedAt(bundle: Bundle, serviceRequest?: ServiceRequest): Date {
+  const raw = bundle.timestamp ?? serviceRequest?.authoredOn;
+  if (raw) {
+    const parsed = new Date(raw);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+  }
+  return new Date();
 }
 
 function collectDocuments(bundle: Bundle) {

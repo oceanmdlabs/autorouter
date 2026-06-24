@@ -9,6 +9,13 @@ import type { ErequestBlob, NewErequestBlob } from "@/src/entities/models/ereque
 
 export interface IErequestsRepository {
   findByMessageChecksum(messageChecksum: string): Promise<Erequest | null>;
+  /**
+   * Returns archived inbound (`request_received`) eRequests for the current
+   * tenant whose patient date of birth exactly matches `dob`, ordered by
+   * `receivedAt` descending. Used by the intake-to-referral matcher; health
+   * number and name normalization is performed in application code.
+   */
+  findInboundReceivedByDateOfBirth(dob: Date): Promise<Erequest[]>;
   create(record: NewErequest): Promise<Erequest>;
   update(record: UpdateErequest): Promise<Erequest>;
   createBlob(record: NewErequestBlob): Promise<ErequestBlob>;

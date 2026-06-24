@@ -60,7 +60,7 @@ const activeSearchParams = computed(() =>
 );
 const submittedSearchParams = ref<Record<string, string | undefined>>({});
 
-const { data: siteConfig } = useAsyncData("erequest-site-config", async () => {
+const { data: siteConfig } = useAsyncData("site-config", async () => {
   try {
     return await requestFetch<{
       siteConfig: SiteConfiguration | null;
@@ -293,18 +293,23 @@ const removeFilter = (filterId: string) => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Received</TableHead>
+                  <TableHead>Patient</TableHead>
+                  <TableHead>Health Number</TableHead>
+                  <TableHead>EMR ID</TableHead>
                   <TableHead>Ocean Reference</TableHead>
+                  <TableHead>Requested Listing</TableHead>
+                  <TableHead>Service Type</TableHead>
                   <TableHead>Providers</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 <TableRow v-if="!hasSearched">
-                  <TableCell :colspan="3" class="text-center text-muted-foreground">
+                  <TableCell :colspan="8" class="text-center text-muted-foreground">
                     Enter one or more filters, then run a search.
                   </TableCell>
                 </TableRow>
                 <TableRow v-else-if="status === 'success' && !(data?.items?.length)">
-                  <TableCell :colspan="3" class="text-center text-muted-foreground">
+                  <TableCell :colspan="8" class="text-center text-muted-foreground">
                     No retained eRequests found.
                   </TableCell>
                 </TableRow>
@@ -315,7 +320,12 @@ const removeFilter = (filterId: string) => {
                   @click="navigateTo(`/portal/erequests/${erequest.id}`)"
                 >
                   <TableCell>{{ formatTimestampWithMinutePrecision(erequest.receivedAt) }}</TableCell>
+                  <TableCell>{{ erequest.patientName || "-" }}</TableCell>
+                  <TableCell>{{ erequest.patientHealthNumber || "-" }}</TableCell>
+                  <TableCell>{{ erequest.patientMedicalRecordNumber || "-" }}</TableCell>
                   <TableCell>{{ erequest.referralRef || "-" }}</TableCell>
+                  <TableCell>{{ erequest.requestedListingTitle || erequest.requestedListingRef || "-" }}</TableCell>
+                  <TableCell>{{ erequest.healthServiceTypes?.join(", ") || "-" }}</TableCell>
                   <TableCell class="text-sm">
                     {{ [erequest.referringProvider, erequest.receivingProvider].filter(Boolean).join(" → ") || "-" }}
                   </TableCell>

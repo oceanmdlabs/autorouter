@@ -55,6 +55,7 @@ const routingEventTypeEnum = [
   "request_message",
   "patient_message_forms_completion",
   "patient_note_added",
+  "intake_questionnaire_completed",
 ] as const;
 
 export const triggeringEventEnum = pgEnum(
@@ -76,6 +77,12 @@ export const routingRules = pgTable(
       .notNull()
       .default([]),
     summarizeAttachmentsAcknowledged: boolean("summarize_attachments_acknowledged").notNull().default(false),
+    allowedContextFields: jsonb("allowed_context_fields")
+      .$type<string[]>()
+      .notNull()
+      .default([]),
+    priority: integer("priority").notNull(),
+    stopProcessingOnMatch: boolean("stop_processing_on_match").notNull().default(false),
   },
   (table) => ({
     tenantIdx: index("idx_routing_rules_tenant_id").on(table.tenantId),
@@ -175,13 +182,10 @@ export const llmRuleDecisionAudit = pgTable(
     ruleId: text("rule_id").notNull(),
     ruleName: text("rule_name").notNull(),
     ruleVersion: text("rule_version").notNull().default("1.0"),
+    triggered: boolean("triggered").notNull().default(false),
     decision: llmDecisionEnum("decision").notNull(),
-    confidence: real("confidence"),
-    reasonCode: llmReasonCodeEnum("reason_code"),
     reasonSummary: text("reason_summary"),
-    modelName: text("model_name"),
-    modelRequestId: text("model_request_id"),
-    validationStatus: llmValidationStatusEnum("validation_status").notNull(),
+    reasoning: text("reasoning"),
     validationError: text("validation_error"),
   },
   (table) => ({
@@ -206,6 +210,9 @@ export const llmRuleToolExecutionAudit = pgTable(
     toolIndex: integer("tool_index").notNull(),
     toolName: text("tool_name").notNull(),
     argsHash: text("args_hash"),
+    toolInput: jsonb("tool_input").$type<Record<string, unknown>>(),
+    toolResult: text("tool_result"),
+    actionType: text("action_type"),
     status: llmToolExecutionStatusEnum("status").notNull(),
     errorCode: text("error_code"),
     errorSummary: text("error_summary"),
@@ -420,6 +427,10 @@ export const siteConfig = pgTable(
     twilioAccountSid: text("twilio_account_sid"),
     twilioAuthToken: text("twilio_auth_token"),
     twilioPhoneNumber: text("twilio_phone_number"),
+    smsProvider: text("sms_provider"),
+    smsDailySentCount: integer("sms_daily_sent_count"),
+    smsDailySentDate: text("sms_daily_sent_date"),
+    smsSendAllowlist: jsonb("sms_send_allowlist").$type<{ phoneNumber: string; label?: string }[]>(),
     aiProvider: aiProviderEnum("ai_provider"),
     aiApiKeyEncrypted: text("ai_api_key_encrypted"),
     aiModel: text("ai_model"),
@@ -427,6 +438,9 @@ export const siteConfig = pgTable(
     emailApiKeyEncrypted: text("email_api_key_encrypted"),
     emailFromAddress: text("email_from_address"),
     emailFromName: text("email_from_name"),
+    emailDailySentCount: integer("email_daily_sent_count"),
+    emailDailySentDate: text("email_daily_sent_date"),
+    emailSendAllowlist: jsonb("email_send_allowlist").$type<string[]>(),
     // Open API Credentials - Optional connection for Ocean patient engagement
     siteKeyEncrypted: text("site_key_encrypted"),
     siteCredentialEncrypted: text("site_credential_encrypted"),
@@ -453,7 +467,9 @@ export const erequests = pgTable(
     messageChecksum: text("message_checksum").notNull(),
     referralRef: text("referral_ref"),
     triggeringEvent: triggeringEventEnum("triggering_event").notNull(),
-    receivedAt: timestamp("received_at").notNull().defaultNow(),
+    receivedAt: timestamp("received_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
     patientHealthNumber: text("patient_health_number"),
     patientMedicalRecordNumber: text("patient_medical_record_number"),
     patientName: text("patient_name"),
@@ -520,6 +536,9 @@ export const erequests = pgTable(
         coalesce(requested_service_description, '')
       )
     )`,
+    patientNameTrigramIdx: sql`CREATE INDEX IF NOT EXISTS idx_erequests_patient_name_trgm ON erequests USING GIN (patient_name gin_trgm_ops)`,
+    referringProviderTrigramIdx: sql`CREATE INDEX IF NOT EXISTS idx_erequests_referring_provider_trgm ON erequests USING GIN (referring_provider gin_trgm_ops)`,
+    receivingProviderTrigramIdx: sql`CREATE INDEX IF NOT EXISTS idx_erequests_receiving_provider_trgm ON erequests USING GIN (receiving_provider gin_trgm_ops)`,
   })
 );
 

@@ -19,4 +19,12 @@ export const sendSmsTool: RoutingToolDefinition<
     const { sendSmsHandler } = await import("./handlers/send-sms-handler");
     return sendSmsHandler(action, eventContext, cxt, ruleName);
   },
+  dryRun: async (action) => {
+    const { phoneNumber, message } = action.input;
+    return {
+      payloadType: "sms",
+      summary: `SMS to ${phoneNumber}`,
+      payload: { to: phoneNumber, message },
+    };
+  },
 };

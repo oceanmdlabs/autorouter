@@ -47,9 +47,8 @@ const { data: siteConfig } = useAsyncData('site-config', async () => {
   }
 });
 
-// Function to get the Ocean host URL
 const getOceanHost = () => {
-  return getOceanServerUrl('ocean');
+  return getOceanServerUrl(siteConfig.value?.siteConfig?.oceanServer ?? 'ocean');
 };
 
 type RuleAction = { tool: string; input: Record<string, any>; result?: string } | string;
@@ -63,6 +62,7 @@ type StructuredDetails = {
     actions?: RuleAction[];
   }[];
   archival?: string;
+  match?: string;
 };
 
 function describeAction(action: RuleAction): { type: string; taken: string } {
@@ -177,6 +177,9 @@ async function clearLogs() {
                 <TableCell class="whitespace-pre-wrap text-xs">
                   <template v-if="parseStructuredDetails(log.details)">
                     <div class="space-y-2">
+                      <div v-if="parseStructuredDetails(log.details)!.match" class="text-foreground font-medium">
+                        {{ parseStructuredDetails(log.details)!.match }}
+                      </div>
                       <div
                         v-for="rule in parseStructuredDetails(log.details)!.rules"
                         :key="rule.ruleName"

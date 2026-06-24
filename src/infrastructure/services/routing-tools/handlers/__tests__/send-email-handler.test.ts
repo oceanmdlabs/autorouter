@@ -89,6 +89,7 @@ describe("sendEmailHandler", () => {
       emailProvider: "smtp2go",
       emailFromAddress: "noreply@example.com",
       emailApiKey: "test-api-key",
+      emailSendAllowlist: ["test@example.com"],
     };
     (mockSiteConfigRepo.getForTenant as any).mockResolvedValue(siteConfig);
 

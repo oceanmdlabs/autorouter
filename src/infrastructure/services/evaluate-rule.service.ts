@@ -48,12 +48,14 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
     eventType,
     requestDescription,
     attachmentSummary,
+    directoryListingsSummary,
   }: {
     rule: RoutingRule;
     routingEventMessage: RoutingEventMessage;
     eventType: RoutingEventType;
     requestDescription: string;
     attachmentSummary?: string;
+    directoryListingsSummary?: string;
   }): Promise<RuleEvaluationResult> {
     if (!rule.active) {
       return {
@@ -85,6 +87,10 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
 
     if (rule.allowedContextFields?.includes("attachments") && attachmentSummary) {
       prompt += `\n\nAttachment Contents:\n${attachmentSummary}`;
+    }
+
+    if (rule.allowedContextFields?.includes("directoryListings") && directoryListingsSummary) {
+      prompt += `\n\nProvider Directory:\n${directoryListingsSummary}`;
     }
 
     cxt.logger.info(

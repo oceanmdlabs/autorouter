@@ -45,6 +45,24 @@ export async function processServiceRequestEventUseCase(
         }
       }
 
+      let directoryListingsSummary: string | undefined;
+      const needsDirectoryListings = rules.some((r) =>
+        r.allowedContextFields?.includes("directoryListings")
+      );
+      if (needsDirectoryListings) {
+        try {
+          cxt.logger.info("Pre-fetching healthcare services for rule evaluation context");
+          const services = await cxt.getHealthcareServicesRepository().getAllAtTenant();
+          if (services.length > 0) {
+            directoryListingsSummary = services
+              .map((s) => `- ${s.name} (${s.oceanReference}): ${s.description}`)
+              .join("\n");
+          }
+        } catch (err) {
+          cxt.logger.warn(`Failed to pre-fetch healthcare services: ${(err as Error).message}`);
+        }
+      }
+
       evaluationResults = await evaluateRulesInOrder({
         rules,
         evaluateRule: evaluateRuleService.evaluateRule,
@@ -52,6 +70,7 @@ export async function processServiceRequestEventUseCase(
         eventType: event.triggeringEvent,
         requestDescription: event.referralRef || "pendingServiceRequest",
         attachmentSummary: event.attachmentSummary,
+        directoryListingsSummary,
       });
     }
 

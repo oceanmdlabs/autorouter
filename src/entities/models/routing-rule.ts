@@ -8,7 +8,7 @@ import {
 import { routingEventTypeSchema } from "./routing-event-type";
 import type { RoutingToolName } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
 
-export const allowedContextFieldValues = ["age", "gender", "postalCode", "attachments"] as const;
+export const allowedContextFieldValues = ["age", "gender", "postalCode", "attachments", "directoryListings"] as const;
 export type AllowedContextField = typeof allowedContextFieldValues[number];
 
 function validateAttachmentSettings(

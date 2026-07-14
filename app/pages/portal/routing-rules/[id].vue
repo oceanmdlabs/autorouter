@@ -124,6 +124,7 @@ const contextFieldLabels: Record<AllowedContextField, { label: string; descripti
 	gender: { label: 'Gender / Sex', description: 'Patient\'s sex or gender' },
 	postalCode: { label: 'Full Postal Code', description: 'Patient\'s full postal code for geographic routing' },
 	attachments: { label: 'Attachments', description: 'Allow AI to analyze referral attachments (requires privacy acknowledgement)' },
+	directoryListings: { label: 'Provider Directory', description: 'Inject all healthcare service listings into the rule prompt for central intake routing' },
 }
 
 // Form submission

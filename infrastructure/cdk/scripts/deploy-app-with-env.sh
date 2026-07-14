@@ -91,6 +91,11 @@ app_env="$(node -e '
   const out = {};
   if (env.NUXT_OAUTH_GOOGLE_CLIENT_ID) out.NUXT_OAUTH_GOOGLE_CLIENT_ID = env.NUXT_OAUTH_GOOGLE_CLIENT_ID;
   if (env.NUXT_OAUTH_GITHUB_CLIENT_ID) out.NUXT_OAUTH_GITHUB_CLIENT_ID = env.NUXT_OAUTH_GITHUB_CLIENT_ID;
+  // Optional per-site OAuth redirect overrides. When unset the app auto-detects
+  // the redirect URI from the request; pin these when the build baked a value
+  // (e.g. a dev .env) that would otherwise leak into this environment.
+  if (env.NUXT_OAUTH_GOOGLE_REDIRECT_URL) out.NUXT_OAUTH_GOOGLE_REDIRECT_URL = env.NUXT_OAUTH_GOOGLE_REDIRECT_URL;
+  if (env.NUXT_OAUTH_GITHUB_REDIRECT_URL) out.NUXT_OAUTH_GITHUB_REDIRECT_URL = env.NUXT_OAUTH_GITHUB_REDIRECT_URL;
   if (env.PUBLIC_URL) {
     out.URL = env.PUBLIC_URL;
     out.DEPLOY_URL = env.PUBLIC_URL;

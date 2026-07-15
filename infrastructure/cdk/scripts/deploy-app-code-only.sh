@@ -44,7 +44,7 @@ if [[ -z "$lambda_name" || "$lambda_name" == "None" ]]; then
   exit 1
 fi
 
-archive_path="$(mktemp "${TMPDIR:-/tmp}/autorouter-lambda-XXXXXX.zip")"
+archive_path="$(mktemp -d)/autorouter-lambda.zip"
 trap 'rm -f "$archive_path"' EXIT
 
 (

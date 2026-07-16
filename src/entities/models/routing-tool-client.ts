@@ -95,7 +95,10 @@ export const clientRoutingToolRegistry: Record<
       "Provide advice, warnings, or errors regarding the submission (via CDS Hooks)",
     supportsCdsHook: true,
     actionType: "Show CDS Card",
-    getActionTaken: (input) => `CDS card shown: ${input.summary ?? ""}`,
+    getActionTaken: (input) =>
+      `Showed ${input.severity ?? "info"} CDS card: ${input.title ?? ""}${
+        input.message ? ` — ${input.message}` : ""
+      }`,
   },
   markAsNeedsReview: {
     name: "markAsNeedsReview",

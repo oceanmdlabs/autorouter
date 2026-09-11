@@ -11,11 +11,13 @@ This is the **Ocean Autorouter** - a Nuxt/Vue.js application that uses AI to int
 ### Key Points for Agents
 
 2. **Before Creating PRs**:
+
    ```bash
    # Always check local branch is synced with origin/main
    git fetch origin
    git log --oneline HEAD..origin/main
    ```
+
    If commits are listed, pull/rebase before creating a PR.
 
 3. **Commit Workflow**:
@@ -37,6 +39,7 @@ This is the **Ocean Autorouter** - a Nuxt/Vue.js application that uses AI to int
 **Clean Architecture Pattern**: Business logic is separated from infrastructure.
 
 Key directories:
+
 - `src/entities/` - Business entities and models
 - `src/application/` - Use cases and business logic
 - `src/infrastructure/` - External services, databases, APIs
@@ -45,10 +48,24 @@ Key directories:
 - `components/` - Reusable Vue components
 
 **When making changes**:
+
 - Keep business logic in `application/` layer
 - Keep framework/library code in `infrastructure/` layer
 - Use dependency injection via ApplicationContext
 - Follow existing repository patterns
+
+## AI and PHI Policy
+
+Before designing or changing any workflow that may send personal health information (PHI) to an AI service, read and follow [`docs/privacy/ai-phi-policy.md`](docs/privacy/ai-phi-policy.md). The current CDS design and provider findings are in [`docs/privacy/cds-hooks-ai-phi-plan.md`](docs/privacy/cds-hooks-ai-phi-plan.md), [`docs/privacy/providers/google-gemini-phipa-review.md`](docs/privacy/providers/google-gemini-phipa-review.md), and [`docs/privacy/providers/aws-bedrock-phipa-review.md`](docs/privacy/providers/aws-bedrock-phipa-review.md).
+
+Required agent behavior:
+
+- Treat production PHI processing as disabled until the applicable contract, provider/model, residency, retention, PIA, TRA, clinical-safety, implementation, and approval gates have recorded evidence.
+- Do not add or enable a provider, model, fallback, grounding, logging, cache, memory, RAG, agent, batch, evaluation, or attachment pathway for PHI unless its provider review and deployment approval explicitly allow it.
+- Never log prompts, completions, clinical referral text, form answers, or attachments. Minimize model inputs and keep audit records content-free.
+- Keep structured facts and enforceable rules deterministic. LLM-derived clinical or routing output is advisory unless clinical governance explicitly approves otherwise.
+- Pin approved provider/model versions and Canadian endpoints, fail closed on configuration drift, and treat provider/model/region/retention changes as new review triggers.
+- Update the dated provider review and supporting evidence before relying on changed terms, models, regions, retention behaviour, or subprocessors.
 
 ## Code Style
 
@@ -61,6 +78,7 @@ Key directories:
 ## Testing
 
 Run tests before committing:
+
 ```bash
 npm run test
 ```
@@ -74,6 +92,7 @@ Use the "Nuxt: Server" debug target in VS Code/Cursor (see `.vscode/launch.json`
 Schema is in `drizzle/schema.ts`. Follow [`DATABASE_MIGRATION_POLICY.md`](DATABASE_MIGRATION_POLICY.md) for every SQL schema change.
 
 Required agent behavior:
+
 - Treat `drizzle/schema.ts` plus committed files in `drizzle/migrations/` as the only schema source of truth.
 - Never run `drizzle-kit push` or `npm run push` against shared, staging, or production databases.
 - Before generating a migration, point `DB_URL` at a dedicated local Postgres instance and run:

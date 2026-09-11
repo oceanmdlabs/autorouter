@@ -4,6 +4,8 @@ Ocean Autorouter is an Ocean Labs innovation project for AI-assisted eReferral a
 
 This document is implementation guidance for project maintainers and configuring organizations. It is not legal advice.
 
+The [AI and Personal Health Information Policy](ai-phi-policy.md) is the controlling project policy for any AI feature that may process PHI. Production PHI processing remains disabled until its contract, provider/model, privacy, security, clinical-safety, implementation, and approval gates have recorded evidence. Deterministic development and synthetic-data evaluation may continue while those gates are open.
+
 ## Default Demo Posture
 
 Hosted demo and proof-of-concept environments should use synthetic or non-PHI data unless there has been an explicit privacy and product review for real patient data.
@@ -14,7 +16,7 @@ Demo rules that summarize or analyze referral attachments should be treated as h
 
 If a real referral workflow is connected to the Autorouter, some PHI exposure to the configured AI provider may be inherent to the feature. The application can reduce obvious identifiers from structured referral fields, but it cannot guarantee that all clinical free text, referral form answers, or uploaded documents are de-identified.
 
-Before using the Autorouter with real patient data, the organization should document a discussion of:
+Before using the Autorouter with real patient data, the organization must complete the AI/PHI policy gates and document:
 
 - intended use case and clinical/administrative benefit;
 - AI provider and model choice;

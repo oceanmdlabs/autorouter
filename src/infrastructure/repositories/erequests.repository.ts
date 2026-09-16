@@ -61,11 +61,11 @@ export function createErequestsRepository({
     }
 
     if (options?.healthNumber) {
-      clauses.push(ilike(erequests.patientHealthNumber, `%${options.healthNumber}%`));
+      clauses.push(ilike(erequests.patientHealthNumber, `${options.healthNumber}%`));
     }
     if (options?.medicalRecordNumber) {
       clauses.push(
-        ilike(erequests.patientMedicalRecordNumber, `%${options.medicalRecordNumber}%`)
+        ilike(erequests.patientMedicalRecordNumber, `${options.medicalRecordNumber}%`)
       );
     }
     if (options?.patientName) {
@@ -78,13 +78,13 @@ export function createErequestsRepository({
       clauses.push(ilike(erequests.receivingProvider, `%${options.receivingProvider}%`));
     }
     if (options?.referralRef) {
-      clauses.push(ilike(erequests.referralRef, `%${options.referralRef}%`));
+      clauses.push(ilike(erequests.referralRef, `${options.referralRef}%`));
     }
     if (options?.requestedListing) {
       clauses.push(
         or(
           ilike(erequests.requestedListingTitle, `%${options.requestedListing}%`),
-          ilike(erequests.requestedListingRef, `%${options.requestedListing}%`)
+          ilike(erequests.requestedListingRef, `${options.requestedListing}%`)
         )!
       );
     }
@@ -104,6 +104,20 @@ export function createErequestsRepository({
         where: eq(erequests.messageChecksum, messageChecksum),
       });
       return record;
+    },
+
+    async findInboundReceivedByDateOfBirth(dob: Date) {
+      return await db
+        .select()
+        .from(erequests)
+        .where(
+          and(
+            eq(erequests.tenantId, cxt.getNonEmptyTenantId()),
+            eq(erequests.triggeringEvent, "request_received"),
+            eq(erequests.patientDateOfBirth, dob)
+          )
+        )
+        .orderBy(desc(erequests.receivedAt));
     },
 
     async create(record: NewErequest) {

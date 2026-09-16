@@ -43,6 +43,76 @@
       "when": 1779995657267,
       "tag": "0005_sturdy_patch",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1779996000000,
+      "tag": "0006_ses_email",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1779997000000,
+      "tag": "0007_email_send_allowlist",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1780513359671,
+      "tag": "0008_routing_rule_priority",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1780521519660,
+      "tag": "0009_stop_processing_on_match",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1780958222464,
+      "tag": "0010_chilly_may_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1781000000000,
+      "tag": "0011_aws_sms",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1781100000000,
+      "tag": "0012_sms_send_allowlist",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1781136000000,
+      "tag": "0013_trigram_indexes",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1781301440618,
+      "tag": "0014_grey_forgotten_one",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1781570374745,
+      "tag": "0015_productive_mathemanic",
+      "breakpoints": true
     }
   ]
 }

@@ -20,4 +20,16 @@ export const markAsNeedsReviewTool: RoutingToolDefinition<
     );
     return markAsNeedsReviewHandler(action, eventContext, cxt, ruleName);
   },
+  dryRun: async (action, eventContext) => {
+    const serviceRequestBundle = "serviceRequestBundle" in eventContext ? eventContext.serviceRequestBundle : null;
+    const summary = `Mark as needs review: "${action.input.message}"`;
+    if (!serviceRequestBundle) {
+      return { payloadType: "ocean-fhir-message", summary, payload: {}, error: "No service request bundle available" };
+    }
+    const { createSendCommunicationFromRequesterMessage } = await import("../ocean-message.service");
+    const message = createSendCommunicationFromRequesterMessage(serviceRequestBundle, {
+      message: "Autorouter marked as needing review: " + action.input.message,
+    });
+    return { payloadType: "ocean-fhir-message", summary, payload: message as unknown as Record<string, unknown> };
+  },
 };

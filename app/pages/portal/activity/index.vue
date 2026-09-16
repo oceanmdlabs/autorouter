@@ -7,8 +7,6 @@ import { formatTimestampWithMinutePrecision } from '@/shared/lib/utils';
 import type { PaginatedResult } from "@/src/entities/models/paginated-result";
 import { getOceanServerUrl } from '@/src/application/services/ocean-server.utils';
 import type { SiteConfiguration } from '@/src/entities/models/site-configuration';
-import { clientRoutingToolRegistry } from '@/src/entities/models/routing-tool-client';
-import type { RoutingToolName } from '@/src/infrastructure/services/routing-tools/routing-tool-registry';
 
 // Fetch activity logs
 const currentPage = ref(1);
@@ -47,34 +45,21 @@ const { data: siteConfig } = useAsyncData('site-config', async () => {
   }
 });
 
-// Function to get the Ocean host URL
 const getOceanHost = () => {
-  return getOceanServerUrl('ocean');
+  return getOceanServerUrl(siteConfig.value?.siteConfig?.oceanServer ?? 'ocean');
 };
 
-type RuleAction = { tool: string; input: Record<string, any>; result?: string } | string;
+type RuleAction = { tool: string };
 
 type StructuredDetails = {
   rules: {
     ruleName: string;
     triggered: boolean;
-    comment?: string;
-    reasoning?: string;
     actions?: RuleAction[];
   }[];
   archival?: string;
+  match?: string;
 };
-
-function describeAction(action: RuleAction): { type: string; taken: string } {
-  if (typeof action === 'string') {
-    return { type: '', taken: action };
-  }
-  const tool = clientRoutingToolRegistry[action.tool as RoutingToolName];
-  if (tool?.actionType && tool?.getActionTaken) {
-    return { type: tool.actionType, taken: tool.getActionTaken(action.input, action.result) };
-  }
-  return { type: action.tool, taken: action.result ?? 'Action taken' };
-}
 
 function parseStructuredDetails(details: string | null | undefined): StructuredDetails | null {
   if (!details) return null;
@@ -177,6 +162,9 @@ async function clearLogs() {
                 <TableCell class="whitespace-pre-wrap text-xs">
                   <template v-if="parseStructuredDetails(log.details)">
                     <div class="space-y-2">
+                      <div v-if="parseStructuredDetails(log.details)!.match" class="text-foreground font-medium">
+                        {{ parseStructuredDetails(log.details)!.match }}
+                      </div>
                       <div
                         v-for="rule in parseStructuredDetails(log.details)!.rules"
                         :key="rule.ruleName"
@@ -185,15 +173,10 @@ async function clearLogs() {
                         <div class="font-medium">{{ rule.ruleName }}</div>
                         <div :class="rule.triggered ? 'text-green-600' : 'text-red-500'">
                           {{ rule.triggered ? 'Triggered' : 'Not triggered' }}
-                          <span v-if="rule.comment" class="text-muted-foreground"> — {{ rule.comment }}</span>
                         </div>
-                        <div v-if="rule.reasoning" class="text-muted-foreground italic mt-0.5">{{ rule.reasoning }}</div>
                         <div v-if="rule.triggered && rule.actions?.length" class="pl-2 space-y-1 mt-0.5">
                           <div v-for="(action, i) in rule.actions" :key="i" class="text-muted-foreground whitespace-pre-wrap">
-                            <template v-if="describeAction(action).type">
-                              <span class="font-medium text-foreground">Action Type:</span> {{ describeAction(action).type }}<br/>
-                            </template>
-                            <span class="font-medium text-foreground">Action Taken:</span> {{ describeAction(action).taken }}
+                            <span class="font-medium text-foreground">Tool:</span> {{ action.tool }}
                           </div>
                         </div>
                       </div>

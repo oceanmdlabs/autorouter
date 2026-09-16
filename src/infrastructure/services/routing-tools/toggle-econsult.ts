@@ -20,4 +20,14 @@ export const toggleEConsultTool: RoutingToolDefinition<
     );
     return toggleEConsultHandler(action, eventContext, cxt, ruleName);
   },
+  dryRun: async (action, eventContext) => {
+    const serviceRequestBundle = "serviceRequestBundle" in eventContext ? eventContext.serviceRequestBundle : null;
+    const summary = `Toggle to ${action.input.changeToEConsult ? "eConsult" : "eReferral"}`;
+    if (!serviceRequestBundle) {
+      return { payloadType: "ocean-fhir-message", summary, payload: {}, error: "No service request bundle available" };
+    }
+    const { createToggleEConsultMessage } = await import("../ocean-message.service");
+    const message = createToggleEConsultMessage(serviceRequestBundle, { changeToEConsult: action.input.changeToEConsult });
+    return { payloadType: "ocean-fhir-message", summary, payload: message as unknown as Record<string, unknown> };
+  },
 };

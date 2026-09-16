@@ -122,26 +122,44 @@ describe("summarizeAttachmentsHandler", () => {
     );
   });
 
-  it("calls AI service and sends message when attachments are present", async () => {
+  it("sends message using pre-computed summary when attachments context is opted in", async () => {
     const eventContext = {
       triggeringEvent: "request_received" as const,
       serviceRequestBundle: sampleBundle,
       attachments: [
         { title: "referral.pdf", contentType: "application/pdf", data: new Blob(["pdf bytes"]) },
       ],
+      attachmentSummary: "Attachment summary text",
     };
 
     await summarizeAttachmentsHandler(baseAction, eventContext, cxt);
 
-    expect(mockAiService.summarizeAttachments).toHaveBeenCalledOnce();
-    expect(mockAiService.summarizeAttachments).toHaveBeenCalledWith(
-      "Summarize the attached documents.",
-      eventContext.attachments
-    );
+    expect(mockAiService.summarizeAttachments).not.toHaveBeenCalled();
     expect(mockOceanClientService.sendMessage).toHaveBeenCalledOnce();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
         details: 'Attachment analysis completed and sent: "Attachment summary text"',
+      })
+    );
+  });
+
+  it("refuses to summarize when attachments context field is not opted in", async () => {
+    const eventContext = {
+      triggeringEvent: "request_received" as const,
+      serviceRequestBundle: sampleBundle,
+      attachments: [
+        { title: "referral.pdf", contentType: "application/pdf", data: new Blob(["pdf bytes"]) },
+      ],
+      // no attachmentSummary — opt-in was not configured for this rule
+    };
+
+    await summarizeAttachmentsHandler(baseAction, eventContext, cxt);
+
+    expect(mockAiService.summarizeAttachments).not.toHaveBeenCalled();
+    expect(mockOceanClientService.sendMessage).not.toHaveBeenCalled();
+    expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        error: "Attachment summarization requires the Attachments context field to be enabled for this rule.",
       })
     );
   });

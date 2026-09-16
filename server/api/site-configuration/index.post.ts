@@ -86,14 +86,11 @@ function normalizeSiteConfigurationBody(
 
   if (clientSecret && clientSecret.length > 0) {
     normalizedBody.clientSecret = clientSecret;
-    return normalizedBody;
-  }
-
-  if (existingConfig?.clientSecret?.trim()) {
+  } else if (existingConfig?.clientSecret?.trim()) {
     delete normalizedBody.clientSecret;
-    return normalizedBody;
+  } else {
+    normalizedBody.clientSecret = uuid();
   }
 
-  normalizedBody.clientSecret = uuid();
   return normalizedBody;
 }

@@ -12,6 +12,18 @@ export type OceanServer = z.infer<typeof OceanServerEnum>;
 const AiProviderEnum = z.enum(["openai", "google", "cohere", "bedrock"]);
 export type AiProvider = z.infer<typeof AiProviderEnum>;
 
+const EmailProviderEnum = z.enum(["smtp2go", "ses"]);
+export type EmailProvider = z.infer<typeof EmailProviderEnum>;
+
+const SmsProviderEnum = z.enum(["twilio", "aws"]);
+export type SmsProvider = z.infer<typeof SmsProviderEnum>;
+
+export const smsAllowlistEntrySchema = z.object({
+  phoneNumber: z.string().trim().regex(/^\+1[2-9]\d{9}$/, "Phone number must be in E.164 format (+1XXXXXXXXXX)"),
+  label: z.string().trim().max(100).optional(),
+});
+export type SmsAllowlistEntry = z.infer<typeof smsAllowlistEntrySchema>;
+
 const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   name: z
     .string()
@@ -47,10 +59,14 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
   twilioAccountSid: z.string().trim().max(255).optional().nullable(),
   twilioAuthToken: z.string().trim().max(255).optional().nullable(),
   twilioPhoneNumber: z.string().trim().max(255).optional().nullable(),
+  smsProvider: SmsProviderEnum.optional().nullable(),
+  smsDailySentCount: z.number().int().nonnegative().optional().nullable(),
+  smsDailySentDate: z.string().optional().nullable(),
+  smsSendAllowlist: z.array(smsAllowlistEntrySchema).optional().nullable(),
   aiProvider: AiProviderEnum.optional().nullable(),
   aiApiKey: z.string().trim().max(255).optional().nullable(),
   aiModel: z.string().trim().max(255).optional().nullable(),
-  emailProvider: z.string().trim().max(255).optional().nullable(),
+  emailProvider: EmailProviderEnum.optional().nullable(),
   emailFromAddress: z
     .string()
     .email("Invalid email address")
@@ -58,6 +74,9 @@ const schema = baseResourceSchema.merge(tenantConfinedSchema).extend({
     .nullable(),
   emailFromName: z.string().trim().max(255).optional().nullable(),
   emailApiKey: z.string().trim().max(255).optional().nullable(),
+  emailDailySentCount: z.number().int().nonnegative().optional().nullable(),
+  emailDailySentDate: z.string().optional().nullable(),
+  emailSendAllowlist: z.array(z.string().email()).optional().nullable(),
   // Open API Credentials - Optional connection for Ocean patient engagement
   siteKey: z.string().trim().max(255).optional().nullable(),
   siteCredential: z.string().trim().max(255).optional().nullable(),

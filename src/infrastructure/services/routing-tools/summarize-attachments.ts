@@ -21,4 +21,9 @@ export const summarizeAttachmentsTool: RoutingToolDefinition<
     );
     return summarizeAttachmentsHandler(action, eventContext, cxt, ruleName);
   },
+  dryRun: async (action) => ({
+    payloadType: "internal",
+    summary: "Summarize attachments with AI",
+    payload: { instructions: action.input.instructions },
+  }),
 };

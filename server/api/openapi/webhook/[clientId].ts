@@ -1,12 +1,10 @@
 import { processPatientEngagementEventUseCase } from "@/src/application/use-cases/process-patient-engagement-event.use-case";
 import { isError } from "@/src/entities/errors/common";
-import type { ApplicationContext } from "@/src/entities/models/application-context";
 import {
   type PatientEngagementEventContext,
   type PatientEngagementEventType,
 } from "@/src/entities/models/patient-engagement-event-context";
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
-import { createHash, timingSafeEqual } from "node:crypto";
 import type { H3Event } from "h3";
 import { z } from "zod";
 import { getPatient, getPatientNote } from "../open-api-client";
@@ -30,20 +28,23 @@ export type OceanPatientEngagementWebhookEvent = z.infer<
 const WEBHOOK_RATE_WINDOW_MS = 60 * 1000;
 const WEBHOOK_RATE_MAX = 60;
 const WEBHOOK_REPLAY_WINDOW_MS = 10 * 60 * 1000;
-const AUTH_FAILURE_ALERT_THRESHOLD = 10;
 
 const webhookRateByClientIp = new Map<
   string,
   { count: number; resetAt: number }
 >();
 const processedWebhookEvents = new Map<string, number>();
-const webhookAuthFailures = new Map<string, { count: number; resetAt: number }>();
 
 export default defineEventHandler(async (event) => {
   const cxt = await toApplicationContext(event);
   const body = await readBody(event);
 
   const clientId = event.context.params?.clientId;
+  cxt.logger.info("Patient engagement webhook received", {
+    hasClientId: Boolean(clientId),
+    bodyKeys: body ? Object.keys(body) : [],
+  });
+
   if (!clientId) {
     cxt.logger.error("No clientId in the PE webhook request");
     throw createError({
@@ -57,20 +58,13 @@ export default defineEventHandler(async (event) => {
     .getSiteConfigurationRepository()
     .findByClientId(clientId);
   if (!siteConfig) {
-    cxt.logger.error(`No site configuration found with clientId ${clientId}`);
+    cxt.logger.error("No site configuration found for webhook client");
     throw createError({
       statusCode: 404,
       statusMessage: "Unknown clientId",
     });
   }
 
-  if (!verifyWebhookKey(siteConfig.webhookKey || "", getWebhookKey(event))) {
-    registerWebhookAuthFailure(cxt, clientId, getWebhookIp(event));
-    throw createError({
-      statusCode: 401,
-      statusMessage: "Invalid webhook key",
-    });
-  }
 
   const openApiCreds = {
     oceanHost: siteConfig.oceanServer,
@@ -84,9 +78,7 @@ export default defineEventHandler(async (event) => {
     !openApiCreds.siteCredential ||
     !openApiCreds.sharedEncryptionKey
   ) {
-    cxt.logger.error(
-      `No open API credentials found for site ${siteConfig.oceanSiteNum}`
-    );
+    cxt.logger.error("Open API credentials are not configured for webhook site");
     throw createError({
       statusCode: 503,
       statusMessage: "Open API credentials not configured",
@@ -95,19 +87,8 @@ export default defineEventHandler(async (event) => {
 
   const challenge = body?.challenge;
   if (typeof challenge === "string" && challenge.length > 0) {
-    if (!isUnsignedChallengeAllowed(siteConfig.webhookUnsignedChallengeUntil)) {
-      cxt.logger.warn(
-        `Rejected unsigned challenge for clientId ${clientId}: onboarding window closed`
-      );
-      throw createError({
-        statusCode: 403,
-        statusMessage: "Unsigned challenge not allowed",
-      });
-    }
     setResponseStatus(event, 200);
-    return {
-      challenge,
-    };
+    return { challenge };
   } else {
     cxt.logger.info("Received patient engagement webhook event");
 
@@ -120,9 +101,7 @@ export default defineEventHandler(async (event) => {
     }
     const peEvent = parseResult.data;
     if (peEvent.siteNum !== siteConfig.oceanSiteNum) {
-      cxt.logger.warn(
-        `Rejected webhook for clientId ${clientId}: payload siteNum ${peEvent.siteNum} does not match configured site ${siteConfig.oceanSiteNum}`
-      );
+      cxt.logger.warn("Rejected webhook because site configuration did not match");
       throw createError({
         statusCode: 403,
         statusMessage: "siteNum mismatch",
@@ -139,9 +118,9 @@ export default defineEventHandler(async (event) => {
 
     const replayKey = getReplayKey(clientId, peEvent, oceanSessionId);
     if (wasRecentlyProcessed(replayKey)) {
-      cxt.logger.warn(
-        `Ignoring replayed webhook event for clientId ${clientId}: ${peEvent.type} ${peEvent.ref}`
-      );
+      cxt.logger.warn("Ignoring replayed webhook event", {
+        eventType: peEvent.type,
+      });
       setResponseStatus(event, 202);
       return {
         status: "duplicate_ignored",
@@ -153,9 +132,9 @@ export default defineEventHandler(async (event) => {
       ptRef: peEvent.ref,
     });
     if (isError(patient) || !patient) {
-      cxt.logger.error(
-        `Error getting patient for event ${peEvent.type} ${peEvent.ref}: ${patient}`
-      );
+      cxt.logger.error("Failed to retrieve patient for webhook event", {
+        eventType: peEvent.type,
+      });
       throw createError({
         statusCode: 502,
         statusMessage: "Failed to fetch patient",
@@ -168,25 +147,27 @@ export default defineEventHandler(async (event) => {
       ptRef: peEvent.ref,
     });
     if (isError(note)) {
-      cxt.logger.error(
-        `Error getting note for event ${peEvent.type} ${peEvent.ref}: ${note}`
-      );
+      cxt.logger.error("Failed to retrieve note for webhook event", {
+        eventType: peEvent.type,
+      });
       throw createError({
         statusCode: 502,
         statusMessage: "Failed to fetch note",
       });
     }
     if (!note) {
-      cxt.logger.warn(`No note found for event ${peEvent.type} ${peEvent.ref}`);
+      cxt.logger.warn("No note found for webhook event", {
+        eventType: peEvent.type,
+      });
       rememberProcessedEvent(replayKey);
       setResponseStatus(event, 202);
       return {
         status: "accepted_no_note",
       };
     }
-    cxt.logger.info(
-      `Found note ${note.noteId} for event ${peEvent.type} ${peEvent.ref}`
-    );
+    cxt.logger.info("Found note for webhook event", {
+      eventType: peEvent.type,
+    });
 
     const triggeringEvent = mapOceanWebhookEventToLocalPeEventType(peEvent);
 
@@ -230,25 +211,6 @@ function mapOceanWebhookEventToLocalPeEventType(
   }
 }
 
-function verifyWebhookKey(expected: string, provided: string): boolean {
-  if (!expected || !provided) return false;
-  const expectedHash = createHash("sha256").update(expected).digest();
-  const providedHash = createHash("sha256").update(provided).digest();
-  return timingSafeEqual(expectedHash, providedHash);
-}
-
-function getWebhookKey(event: H3Event): string {
-  const headerValue = getHeader(event, "x-ocean-webhook-key");
-  if (headerValue) return headerValue;
-  const query = getQuery(event);
-  const queryKey = query.k;
-  if (typeof queryKey === "string") return queryKey;
-  if (Array.isArray(queryKey) && typeof queryKey[0] === "string") {
-    return queryKey[0];
-  }
-  return "";
-}
-
 function getWebhookIp(event: H3Event): string {
   return getRequestIP(event, { xForwardedFor: true }) ?? "unknown";
 }
@@ -275,32 +237,6 @@ function enforceWebhookRateLimit(event: H3Event, clientId: string): void {
       statusCode: 429,
       statusMessage: "Too many webhook requests",
     });
-  }
-}
-
-function registerWebhookAuthFailure(
-  cxt: ApplicationContext,
-  clientId: string,
-  ip: string
-): void {
-  const key = `${clientId}:${ip}`;
-  const now = Date.now();
-  const existing = webhookAuthFailures.get(key);
-  if (!existing || now > existing.resetAt) {
-    webhookAuthFailures.set(key, {
-      count: 1,
-      resetAt: now + WEBHOOK_RATE_WINDOW_MS,
-    });
-    cxt.logger.warn(`Webhook auth failure for clientId ${clientId} from IP ${ip}`);
-    return;
-  }
-  existing.count += 1;
-  webhookAuthFailures.set(key, existing);
-  cxt.logger.warn(`Webhook auth failure for clientId ${clientId} from IP ${ip}`);
-  if (existing.count === AUTH_FAILURE_ALERT_THRESHOLD) {
-    cxt.logger.error(
-      `Repeated webhook auth failures for clientId ${clientId} from IP ${ip}`
-    );
   }
 }
 
@@ -337,11 +273,4 @@ function cleanupExpiredReplayCache(): void {
       processedWebhookEvents.delete(key);
     }
   }
-}
-
-function isUnsignedChallengeAllowed(
-  webhookUnsignedChallengeUntil?: Date | null
-): boolean {
-  if (!webhookUnsignedChallengeUntil) return false;
-  return webhookUnsignedChallengeUntil.getTime() >= Date.now();
 }

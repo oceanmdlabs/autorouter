@@ -89,6 +89,7 @@ describe("sendEmailHandler", () => {
       emailProvider: "smtp2go",
       emailFromAddress: "noreply@example.com",
       emailApiKey: "test-api-key",
+      emailSendAllowlist: ["test@example.com"],
     };
     (mockSiteConfigRepo.getForTenant as any).mockResolvedValue(siteConfig);
 
@@ -105,7 +106,7 @@ describe("sendEmailHandler", () => {
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith({
       ...eventContext,
       tool: "sendEmail",
-      details: 'Sent email to test@example.com: "Test Subject"',
+      details: "EMAIL_SENT",
     });
   });
 });

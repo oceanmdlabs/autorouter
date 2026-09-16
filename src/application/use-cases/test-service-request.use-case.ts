@@ -3,17 +3,28 @@ import { ApplicationContext } from "@/src/entities/models/application-context";
 import { type RoutingEventType } from "@/src/entities/models/routing-event-type";
 import { startSpan } from "@sentry/node";
 import type { RuleEvaluationResult } from "@/src/entities/models/routing-evaluation";
+import { analyzeActionConflicts, type ActionConflict } from "@/src/entities/models/conflict-analysis";
 import { createEvaluateRuleService } from "@/src/infrastructure/services/evaluate-rule.service";
+import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
+import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
+import { routingToolRegistry } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
+
+export type TestServiceRequestResult = {
+  results: RuleEvaluationResult[];
+  conflicts: ActionConflict[];
+};
 
 export const testServiceRequestUseCase =
   (cxt: ApplicationContext) =>
   ({
     testServiceRequestId,
     eventType,
+    mode = "evaluate",
   }: {
     testServiceRequestId: string;
     eventType: RoutingEventType;
-  }): Promise<RuleEvaluationResult[]> => {
+    mode?: "evaluate" | "dry-run";
+  }): Promise<TestServiceRequestResult> => {
     return startSpan({ name: "testServiceRequestUseCase" }, async () => {
       const testServiceRequest = await cxt
         .getTestServiceRequestsRepository()
@@ -23,17 +34,43 @@ export const testServiceRequestUseCase =
       }
       const rules = await cxt.getRoutingRulesRepository().getAllAtTenant();
       const evaluateRuleService = createEvaluateRuleService({ cxt });
-      const evaluationResults: RuleEvaluationResult[] = [];
-      for (const rule of rules) {
-        evaluationResults.push(
-          await evaluateRuleService.evaluateRule({
-            rule,
-            routingEventMessage: testServiceRequest.content,
-            eventType,
-            requestDescription: "testServiceRequest",
-          })
-        );
+      const evaluationResults: RuleEvaluationResult[] = await evaluateRulesInOrder({
+        rules,
+        evaluateRule: evaluateRuleService.evaluateRule,
+        routingEventMessage: testServiceRequest.content,
+        eventType,
+        requestDescription: "testServiceRequest",
+      });
+      const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
+      const filtered = filterBlockedEmailActions(evaluationResults, siteConfig?.emailSendAllowlist);
+
+      if (mode === "dry-run") {
+        const eventContext = {
+          serviceRequestBundle: testServiceRequest.content,
+          triggeringEvent: eventType,
+        };
+        for (const result of filtered) {
+          if (result.stoppedByRuleId) continue;
+          for (const action of result.evaluation.actions) {
+            const toolDef = routingToolRegistry[action.tool];
+            if (toolDef?.dryRun) {
+              try {
+                action.dryRunPayload = await (toolDef.dryRun as any)(action, eventContext, cxt);
+              } catch (e) {
+                action.dryRunPayload = {
+                  payloadType: "internal",
+                  summary: "Error generating payload",
+                  payload: {},
+                  error: (e as Error).message,
+                };
+              }
+            }
+          }
+        }
       }
-      return evaluationResults;
+
+      const conflicts = analyzeActionConflicts(filtered);
+
+      return { results: filtered, conflicts };
     });
   };

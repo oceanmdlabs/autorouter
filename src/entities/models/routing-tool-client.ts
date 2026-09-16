@@ -1,5 +1,13 @@
 import type { RoutingToolName } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
 
+export type ConflictGroupId =
+  | "referral-status"
+  | "referral-destination"
+  | "review-flag"
+  | "econsult-toggle"
+  | "category"
+  | "booking-instructions";
+
 export interface ClientRoutingTool {
   name: RoutingToolName;
   description: string;
@@ -7,6 +15,8 @@ export interface ClientRoutingTool {
   supportsCdsHook?: boolean;
   actionType?: string;
   getActionTaken?: (input: Record<string, any>, result?: string) => string;
+  conflictGroup?: ConflictGroupId;
+  getConflictKey?: (input: Record<string, any>) => string;
 }
 
 export const clientRoutingToolRegistry: Record<
@@ -29,18 +39,24 @@ export const clientRoutingToolRegistry: Record<
         : input.status === "rejected"
           ? "Request declined"
           : "Request completed",
+    conflictGroup: "referral-status",
+    getConflictKey: (input) => input.status as string,
   },
   setBookingInstructions: {
     name: "setBookingInstructions",
     description: "Provide booking instructions",
     actionType: "Set Booking Instructions",
     getActionTaken: () => "Booking instructions set",
+    conflictGroup: "booking-instructions",
+    getConflictKey: () => "booking-instructions",
   },
   toggleEConsult: {
     name: "toggleEConsult",
     description: "Change an eReferral to an eConsult or vice versa",
     actionType: "Toggle eConsult",
     getActionTaken: () => "eConsult toggled",
+    conflictGroup: "econsult-toggle",
+    getConflictKey: () => "econsult-toggle",
   },
   updateCategory: {
     name: "updateCategory",
@@ -48,18 +64,24 @@ export const clientRoutingToolRegistry: Record<
     actionType: "Update Category",
     getActionTaken: (input) =>
       `Category updated to ${input.category ?? ""}`,
+    conflictGroup: "category",
+    getConflictKey: (input) => (input.category as string) ?? "unknown",
   },
   forward: {
     name: "forward",
     description: "Forward the request to a specific listing",
     actionType: "Forward",
     getActionTaken: () => "Request forwarded",
+    conflictGroup: "referral-destination",
+    getConflictKey: (input) => input.targetListingName as string,
   },
   assign: {
     name: "assign",
     description: "Assign the request to a specific provider",
     actionType: "Assign",
     getActionTaken: () => "Request assigned",
+    conflictGroup: "referral-destination",
+    getConflictKey: (input) => input.targetListingName as string,
   },
   sendSms: {
     name: "sendSms",
@@ -80,6 +102,8 @@ export const clientRoutingToolRegistry: Record<
     description: "Mark a service request as needing review with a message",
     actionType: "Flag for Review",
     getActionTaken: () => "Marked as needs review",
+    conflictGroup: "review-flag",
+    getConflictKey: () => "needs-review",
   },
   summarizeAttachments: {
     name: "summarizeAttachments",

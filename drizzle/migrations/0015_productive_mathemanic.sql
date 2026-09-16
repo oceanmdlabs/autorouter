@@ -1,0 +1,2 @@
+ALTER TYPE "public"."triggering_event" ADD VALUE 'intake_questionnaire_completed';--> statement-breakpoint
+ALTER TABLE "erequests" ALTER COLUMN "received_at" SET DATA TYPE timestamp with time zone USING "received_at" AT TIME ZONE 'UTC';

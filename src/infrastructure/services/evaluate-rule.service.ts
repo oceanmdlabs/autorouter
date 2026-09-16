@@ -47,11 +47,13 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
     routingEventMessage,
     eventType,
     requestDescription,
+    attachmentSummary,
   }: {
     rule: RoutingRule;
     routingEventMessage: RoutingEventMessage;
     eventType: RoutingEventType;
     requestDescription: string;
+    attachmentSummary?: string;
   }): Promise<RuleEvaluationResult> {
     if (!rule.active) {
       return {
@@ -75,15 +77,21 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
         },
       };
     }
-    const prompt = createEvaluationPrompt({
+    let prompt = createEvaluationPrompt({
       rule,
       routingEventMessage,
       eventType,
     });
 
-    cxt.logger.info(
-      `Evaluating rule ${rule.name} for request ${requestDescription} with prompt:\n${prompt}`
-    );
+    if (rule.allowedContextFields?.includes("attachments") && attachmentSummary) {
+      prompt += `\n\nAttachment Contents:\n${attachmentSummary}`;
+    }
+
+    cxt.logger.info("Evaluating routing rule", {
+      ruleId: rule.id,
+      eventType,
+      allowedContextFields: rule.allowedContextFields ?? [],
+    });
 
     try {
       const toolSet: ToolSet = Object.fromEntries(
@@ -109,14 +117,12 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
       );
 
       // ask the AI for tool calls:
-      const { toolCalls, reasoning } = await cxt
+      const { toolCalls } = await cxt
         .getAiService()
         .getToolCalls(prompt, toolSet);
-      cxt.logger.info(`Received tool calls for request ${requestDescription}`, {
-        toolCalls: toolCalls.map((toolCall) => ({
-          tool: toolCall.tool,
-          params: JSON.stringify(toolCall.input),
-        })),
+      cxt.logger.info("Received routing tool plan", {
+        ruleId: rule.id,
+        tools: toolCalls.map((toolCall) => toolCall.tool),
       });
 
       const aiSuggestedActions: RoutingToolAction<RoutingToolName>[] =
@@ -135,26 +141,24 @@ export const createEvaluateRuleService = (deps: Dependencies) => {
           actions: aiSuggestedActions,
           triggered: aiSuggestedActions.length > 0,
           comment: aiSuggestedActions.length === 0 ? "The AI determined no actions were required." : undefined,
-          reasoning,
-          prompt,
+          // Reasoning and prompts remain ephemeral and must never be persisted.
+          reasoning: undefined,
+          prompt: undefined,
         },
       };
     } catch (error) {
-      cxt.logger.error(
-        `Error evaluating rule ${rule.name} at tenant ${rule.tenantId}: ${
-          (error as Error).message
-        }`,
-        {
-          error,
-        }
-      );
+      cxt.logger.error("Routing rule evaluation failed", {
+        ruleId: rule.id,
+        eventType,
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      });
       return {
         ruleId: rule.id,
         ruleName: rule.name,
         evaluation: {
           actions: [],
-          triggered: true,
-          error: `The AI engine returned an error: ${(error as Error).message}`,
+          triggered: false,
+          error: "RULE_EVALUATION_FAILED",
         },
       };
     }

@@ -41,14 +41,13 @@ export const createLlmRuleDecisionAuditRepository = ({
         ruleId: record.ruleId,
         ruleName: record.ruleName,
         ruleVersion: record.ruleVersion,
-        confidence: record.confidence,
-        reasonSummary: record.reasonSummary,
-        modelName: record.modelName,
-        modelRequestId: record.modelRequestId,
-        validationError: record.validationError,
+        triggered: record.triggered,
+        reasonSummary: null,
+        reasoning: null,
+        validationError: record.validationError
+          ? "RULE_EVALUATION_FAILED"
+          : null,
         decision: sql`${record.decision}::llm_decision`,
-        reasonCode: record.reasonCode ? sql`${record.reasonCode}::llm_reason_code` : null,
-        validationStatus: sql`${record.validationStatus}::llm_validation_status`,
       });
       await dbService.insert(llmRuleDecisionAudit, inserted);
       return inserted.id;
@@ -107,16 +106,7 @@ export const createLlmRuleDecisionAuditRepository = ({
       if (filters.decision) {
         conditions.push(eq(llmRuleDecisionAudit.decision, filters.decision));
       }
-      if (filters.reasonCode) {
-        conditions.push(eq(llmRuleDecisionAudit.reasonCode, filters.reasonCode));
-      }
-      if (filters.validationStatus) {
-        conditions.push(
-          eq(llmRuleDecisionAudit.validationStatus, filters.validationStatus)
-        );
-      }
-
-      const whereClause = and(...conditions);
+const whereClause = and(...conditions);
       const orderBy =
         filters.sort === "createdAt_asc"
           ? asc(llmRuleDecisionAudit.createdAt)
@@ -162,22 +152,7 @@ export const createLlmRuleDecisionAuditRepository = ({
         toolsByDecisionId.set(tool.decisionAuditId, existing);
       }
 
-      let filteredDecisionIds: Set<string> | null = null;
-      if (filters.toolStatus) {
-        filteredDecisionIds = new Set<string>();
-        for (const [decisionId, tools] of toolsByDecisionId) {
-          if (tools.some((tool) => tool.status === filters.toolStatus)) {
-            filteredDecisionIds.add(decisionId);
-          }
-        }
-      }
-
-      const items: DecisionAuditItem[] = decisions
-        .filter((decision) => {
-          if (!filteredDecisionIds) return true;
-          return decision.id ? filteredDecisionIds.has(decision.id) : false;
-        })
-        .map((decision) => {
+      const items: DecisionAuditItem[] = decisions.map((decision) => {
           const tools = decision.id
             ? toolsByDecisionId.get(decision.id) ?? []
             : [];
@@ -196,9 +171,12 @@ export const createLlmRuleDecisionAuditRepository = ({
                 toolDisplay?.briefDescription ??
                 toolDisplay?.description ??
                 tool.toolName,
+              actionType: tool.actionType ?? toolDisplay?.actionType ?? null,
+              toolInput: null,
+              toolResult: null,
               status: tool.status,
               errorCode: tool.errorCode,
-              errorSummary: tool.errorSummary,
+              errorSummary: null,
               startedAt: tool.startedAt,
               finishedAt: tool.finishedAt,
               createdAt: tool.createdAt!,
@@ -212,8 +190,6 @@ export const createLlmRuleDecisionAuditRepository = ({
           const toolFailedCount = tools.filter(
             (tool) => tool.status === "FAILED"
           ).length;
-          const hasValidationError =
-            !!decision.validationError || decision.validationStatus !== "VALID";
 
           return {
             decisionAuditId: decision.id!,
@@ -223,30 +199,31 @@ export const createLlmRuleDecisionAuditRepository = ({
             ruleId: decision.ruleId,
             ruleName: decision.ruleName,
             ruleVersion: decision.ruleVersion,
+            triggered: decision.triggered,
             decision: decision.decision,
-            confidence: decision.confidence,
-            reasonCode: decision.reasonCode,
-            reasonSummary: decision.reasonSummary,
-            modelName: decision.modelName,
-            modelRequestId: decision.modelRequestId,
-            validationStatus: decision.validationStatus,
+            reasonSummary: null,
+            reasoning: null,
             validationError: decision.validationError,
             createdAt: decision.createdAt!,
+            actions: toolItems.map((t) => ({
+              tool: t.toolName,
+              actionType: t.actionType,
+              input: null,
+              result: null,
+            })),
             toolExecutions: toolItems,
             toolCount: tools.length,
             toolFailedCount,
-            hasErrors: hasValidationError || toolFailedCount > 0,
+            hasErrors: !!decision.validationError || toolFailedCount > 0,
           };
         });
 
-      const resultTotal = filteredDecisionIds ? items.length : total;
-
       return {
         items,
-        total: resultTotal,
+        total,
         page,
         pageSize,
-        totalPages: Math.ceil(resultTotal / pageSize),
+        totalPages: Math.ceil(total / pageSize),
       };
     },
 
@@ -289,9 +266,12 @@ export const createLlmRuleToolExecutionAuditRepository = ({
         ruleId: record.ruleId,
         toolIndex: record.toolIndex,
         toolName: record.toolName,
-        argsHash: record.argsHash,
+        argsHash: null,
+        toolInput: null,
+        toolResult: null,
+        actionType: record.actionType,
         errorCode: record.errorCode,
-        errorSummary: record.errorSummary,
+        errorSummary: null,
         startedAt: record.startedAt,
         finishedAt: record.finishedAt,
         status: sql`${record.status}::llm_tool_execution_status`,
@@ -311,9 +291,12 @@ export const createLlmRuleToolExecutionAuditRepository = ({
           ruleId: record.ruleId,
           toolIndex: record.toolIndex,
           toolName: record.toolName,
-          argsHash: record.argsHash,
+          argsHash: null,
+          toolInput: null,
+          toolResult: null,
+          actionType: record.actionType,
           errorCode: record.errorCode,
-          errorSummary: record.errorSummary,
+          errorSummary: null,
           startedAt: record.startedAt,
           finishedAt: record.finishedAt,
           status: sql`${record.status}::llm_tool_execution_status`,

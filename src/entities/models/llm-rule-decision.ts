@@ -115,13 +115,10 @@ export type LlmRuleDecisionAuditRecord = {
   ruleId: string;
   ruleName: string;
   ruleVersion: string;
+  triggered: boolean;
   decision: LlmDecision;
-  confidence: number | null;
-  reasonCode: LlmReasonCode | null;
   reasonSummary: string | null;
-  modelName: string | null;
-  modelRequestId: string | null;
-  validationStatus: LlmValidationStatus;
+  reasoning: string | null;
   validationError: string | null;
   createdAt?: Date;
 };
@@ -141,6 +138,9 @@ export type LlmRuleToolExecutionAuditRecord = {
   toolIndex: number;
   toolName: string;
   argsHash: string | null;
+  toolInput: Record<string, unknown> | null;
+  toolResult: string | null;
+  actionType: string | null;
   status: LlmToolExecutionStatus;
   errorCode: string | null;
   errorSummary: string | null;

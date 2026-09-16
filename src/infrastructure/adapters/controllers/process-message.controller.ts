@@ -10,8 +10,8 @@ import type {
   ServiceRequest,
 } from "fhir/r4";
 import { z } from "zod";
-import type { OceanClientCredentials } from "@/src/application/services/ocean-client.service.interface";
 import { archiveErequestUseCase } from "@/src/application/use-cases/archive-erequest.use-case";
+import { DocumentDownloadCache } from "@/src/infrastructure/services/document-download-cache";
 import { processServiceRequestEventUseCase } from "@/src/application/use-cases/process-service-request-event.use-case";
 import type { Attachment } from "@/src/entities/models/attachment";
 import type { ServiceRequestEventContext } from "@/src/entities/models/service-request-event-context";
@@ -59,11 +59,13 @@ export async function processMessageController(
     };
   }
 
-  const archivalResult = await archiveErequestUseCase(eventContext, cxt);
+  const downloadCache = new DocumentDownloadCache(cxt.getOceanClientService());
+
+  const archivalResult = await archiveErequestUseCase(eventContext, cxt, downloadCache);
   eventContext.archivalMessage = archivalResult.message;
   eventContext.archivalError = archivalResult.error;
 
-  await loadAttachmentsIfIndicated(eventContext, cxt, bundle);
+  await loadAttachmentsIfIndicated(eventContext, cxt, bundle, downloadCache);
 
   try {
     const result = await processServiceRequestEventUseCase(eventContext, cxt);
@@ -93,7 +95,8 @@ export async function processMessageController(
 async function loadAttachmentsIfIndicated(
   eventContext: ServiceRequestEventContext,
   cxt: ApplicationContext,
-  bundle: Bundle
+  bundle: Bundle,
+  downloadCache: DocumentDownloadCache
 ) {
   if (
     eventContext.triggeringEvent === "request_received" ||
@@ -134,7 +137,8 @@ async function loadAttachmentsIfIndicated(
     eventContext.attachments = await loadAttachments(
       bundle,
       cxt,
-      eventContext.referralRef
+      eventContext.referralRef,
+      downloadCache
     );
   }
 }
@@ -222,7 +226,8 @@ async function extractServiceRequestContextFromMessageBundle(
 async function loadAttachments(
   bundle: Bundle,
   cxt: ApplicationContext,
-  referralRef: string | undefined
+  referralRef: string | undefined,
+  downloadCache: DocumentDownloadCache
 ): Promise<Attachment[]> {
   const documentReferences =
     bundle.entry
@@ -235,28 +240,14 @@ async function loadAttachments(
     return [];
   }
 
-  let credentials: OceanClientCredentials | undefined;
   const attachments: Attachment[] = [];
 
   for (const docRef of documentReferences) {
-    if (!credentials) {
-      try {
-        credentials = await cxt
-          .getOceanClientService()
-          .fetchOceanClientCredentials();
-      } catch (error) {
-        cxt.logger.error(
-          "Error fetching Ocean client credentials to load the attachments",
-          error
-        );
-        return [];
-      }
-    }
     const attachment = await processDocumentReference(
       docRef,
       cxt,
-      credentials,
-      referralRef
+      referralRef,
+      downloadCache
     );
     if (attachment) {
       attachments.push(attachment);
@@ -269,8 +260,8 @@ async function loadAttachments(
 async function processDocumentReference(
   documentReference: DocumentReference,
   cxt: ApplicationContext,
-  credentials: OceanClientCredentials,
-  referralRef: string | undefined
+  referralRef: string | undefined,
+  downloadCache: DocumentDownloadCache
 ): Promise<Attachment | undefined> {
   cxt.logger.info(
     `Processing document reference: ${documentReference.id} for referral: ${
@@ -297,9 +288,7 @@ async function processDocumentReference(
       referralRef || "unknown"
     }`
   );
-  const blob = await cxt
-    .getOceanClientService()
-    .fetchLetterData({ letterUrl, credentials });
+  const blob = await downloadCache.fetchLetterData(letterUrl);
   return {
     title,
     contentType: attachment.contentType,

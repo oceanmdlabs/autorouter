@@ -1184,7 +1184,7 @@ function isMaskedSecretValue(value: string | null | undefined) {
                   Email Configuration
                 </span>
                 <span class="text-sm font-normal text-gray-600">
-                  SMTP2GO credentials and outbound email testing
+                  Outbound email credentials and testing
                 </span>
               </span>
             </AccordionTrigger>

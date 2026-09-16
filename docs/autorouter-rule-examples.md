@@ -296,3 +296,18 @@ Convert an eReferral to an eConsult, or an eConsult to an eReferral, when the co
 ### Metadata Updates
 
 Change the referral health service category, add booking instructions, add comments to the activity log, add AI-generated comments, or flag edge cases for manual review. Autorouter can recommend triage priority in comments or review notes, but it cannot currently set Ocean's discrete referral `Priority` field through the eReferral FHIR API.
+
+## Central Intake Safety Constraint
+
+Central-intake workflows must not ask a model to choose an eligible provider,
+rank destinations, or compose and send clinical outreach directly. Provider
+eligibility, exclusions, catchment, availability, and destination selection
+must be represented as structured configuration and evaluated
+deterministically.
+
+Where approved, a model may return one bounded semantic classification for
+free-text content. Deterministic policy must then map that classification to
+eligible providers and reviewed card or message templates. A human remains
+responsible for confirming the recommendation. Until the production gates in
+the AI/PHI policy are complete, develop and evaluate this workflow only with
+synthetic or privacy-approved de-identified data.

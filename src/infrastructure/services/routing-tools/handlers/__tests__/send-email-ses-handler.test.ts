@@ -115,7 +115,7 @@ describe("sendEmailHandler — provider selection and daily limit", () => {
     expect(mockSesTemplatedEmail).toHaveBeenCalledOnce();
     expect(mockSmtp2goTemplatedEmail).not.toHaveBeenCalled();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ details: expect.stringContaining("Sent email") })
+      expect.objectContaining({ details: "EMAIL_SENT" })
     );
   });
 
@@ -140,7 +140,7 @@ describe("sendEmailHandler — provider selection and daily limit", () => {
     await sendEmailHandler(baseAction, eventContext, cxt);
 
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ error: expect.stringContaining("not set up") })
+      expect.objectContaining({ error: "EMAIL_CONFIGURATION_MISSING" })
     );
     expect(mockSiteConfigRepo.update).not.toHaveBeenCalled();
   });
@@ -161,7 +161,7 @@ describe("sendEmailHandler — provider selection and daily limit", () => {
 
     expect(mockSesTemplatedEmail).not.toHaveBeenCalled();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ error: expect.stringContaining("Daily email limit") })
+      expect.objectContaining({ error: "EMAIL_DAILY_LIMIT_REACHED" })
     );
     expect(mockSiteConfigRepo.update).not.toHaveBeenCalled();
   });

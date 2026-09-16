@@ -37,7 +37,7 @@ export const sendSmsHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      error: `${rulePrefix}SMS blocked: ${phoneNumber} is not a Canadian phone number`,
+      error: `${rulePrefix}SMS_NON_CANADIAN_RECIPIENT`,
     });
     return;
   }
@@ -62,7 +62,7 @@ export const sendSmsHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      error: `${rulePrefix}SMS blocked: ${phoneNumber} is not in the approved phone number allowlist`,
+      error: `${rulePrefix}SMS_RECIPIENT_NOT_ALLOWLISTED`,
     });
     return;
   }
@@ -75,13 +75,11 @@ export const sendSmsHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
       : 0;
 
   if (currentCount >= SMS_DAILY_LIMIT) {
-    cxt.logger.warn(
-      `Daily SMS limit of ${SMS_DAILY_LIMIT} reached for tenant — skipping send to ${phoneNumber}`
-    );
+    cxt.logger.warn("Daily SMS limit reached", { actionId: action.id });
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      error: `${rulePrefix}Daily SMS limit (${SMS_DAILY_LIMIT}) reached — SMS to ${phoneNumber} not sent`,
+      error: `${rulePrefix}SMS_DAILY_LIMIT_REACHED`,
     });
     return;
   }
@@ -113,15 +111,18 @@ export const sendSmsHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      details: `${rulePrefix}Sent SMS: "${message}" to ${phoneNumber}`,
+      details: `${rulePrefix}SMS_SENT`,
     });
   } catch (error) {
-    cxt.logger.error(`Failed to send SMS to ${phoneNumber}`, { error });
+    cxt.logger.error("Routing SMS failed", {
+      actionId: action.id,
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    });
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      error: `${rulePrefix}Failed to send SMS to ${phoneNumber}`,
-      details: (error as Error).message,
+      error: `${rulePrefix}SMS_SEND_FAILED`,
+      details: null,
     });
   }
 };

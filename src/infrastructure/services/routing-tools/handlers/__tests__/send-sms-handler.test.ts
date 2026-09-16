@@ -111,7 +111,7 @@ describe("sendSmsHandler", () => {
     expect(mockTwilioSendSms).toHaveBeenCalledOnce();
     expect(mockAwsSendSms).not.toHaveBeenCalled();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ details: expect.stringContaining("Sent SMS") })
+      expect.objectContaining({ details: "SMS_SENT" })
     );
   });
 
@@ -127,7 +127,7 @@ describe("sendSmsHandler", () => {
     expect(mockAwsSendSms).toHaveBeenCalledOnce();
     expect(mockTwilioSendSms).not.toHaveBeenCalled();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ details: expect.stringContaining("Sent SMS") })
+      expect.objectContaining({ details: "SMS_SENT" })
     );
   });
 
@@ -145,7 +145,7 @@ describe("sendSmsHandler", () => {
     expect(mockTwilioSendSms).not.toHaveBeenCalled();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        error: expect.stringContaining("not a Canadian phone number"),
+        error: "SMS_NON_CANADIAN_RECIPIENT",
       })
     );
   });
@@ -176,7 +176,7 @@ describe("sendSmsHandler", () => {
     expect(mockTwilioSendSms).not.toHaveBeenCalled();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
       expect.objectContaining({
-        error: expect.stringContaining("Daily SMS limit"),
+        error: "SMS_DAILY_LIMIT_REACHED",
       })
     );
   });
@@ -219,7 +219,7 @@ describe("sendSmsHandler", () => {
 
     expect(mockTwilioSendSms).not.toHaveBeenCalled();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ error: expect.stringContaining("not in the approved phone number allowlist") })
+      expect.objectContaining({ error: "SMS_RECIPIENT_NOT_ALLOWLISTED" })
     );
   });
 
@@ -235,7 +235,7 @@ describe("sendSmsHandler", () => {
 
     expect(mockTwilioSendSms).toHaveBeenCalledOnce();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ details: expect.stringContaining("Sent SMS") })
+      expect.objectContaining({ details: "SMS_SENT" })
     );
   });
 

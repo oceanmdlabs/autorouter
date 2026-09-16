@@ -12,7 +12,10 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
   ruleName
 ) => {
   const { to, subject, message, cc, bcc } = action.input;
-  cxt.logger.info(`Planning to send email to ${to}: "${subject}"`);
+  cxt.logger.info("Planning routing email", {
+    actionId: action.id,
+    ruleName: ruleName ?? null,
+  });
 
   const siteConfig = await cxt.getSiteConfigurationRepository().getForTenant();
   const rulePrefix = ruleName ? `[${ruleName}] ` : "";
@@ -25,7 +28,7 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      error: `${rulePrefix}Email configuration is not set up — attempted to send to ${to}: "${subject}"`,
+      error: `${rulePrefix}EMAIL_CONFIGURATION_MISSING`,
     });
     return;
   }
@@ -57,13 +60,14 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
     (addr) => !allowlist.includes(addr)
   );
   if (blockedRecipients.length > 0) {
-    cxt.logger.warn(
-      `Email send blocked — recipients not in allowlist: ${blockedRecipients.join(", ")}`
-    );
+    cxt.logger.warn("Email send blocked by recipient allowlist", {
+      actionId: action.id,
+      blockedRecipientCount: blockedRecipients.length,
+    });
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      error: `${rulePrefix}Email send blocked: recipient(s) not in approved allowlist: ${blockedRecipients.join(", ")}`,
+      error: `${rulePrefix}EMAIL_RECIPIENT_NOT_ALLOWLISTED`,
     });
     return;
   }
@@ -76,13 +80,11 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
       : 0;
 
   if (currentCount >= EMAIL_DAILY_LIMIT) {
-    cxt.logger.warn(
-      `Daily email limit of ${EMAIL_DAILY_LIMIT} reached for tenant — skipping send to ${to}`
-    );
+    cxt.logger.warn("Daily email limit reached", { actionId: action.id });
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      error: `${rulePrefix}Daily email limit (${EMAIL_DAILY_LIMIT}) reached — email to ${to} not sent`,
+      error: `${rulePrefix}EMAIL_DAILY_LIMIT_REACHED`,
     });
     return;
   }
@@ -112,7 +114,7 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
       message,
       referralLink,
     });
-    cxt.logger.info(`Successfully sent email to ${to}: "${subject}"`);
+    cxt.logger.info("Routing email sent", { actionId: action.id });
 
     // Update daily count
     await cxt.getSiteConfigurationRepository().update({
@@ -124,15 +126,18 @@ export const sendEmailHandler: RoutingToolHandler<typeof TOOL_NAME> = async (
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      details: `${rulePrefix}Sent email to ${to}: "${subject}"`,
+      details: `${rulePrefix}EMAIL_SENT`,
     });
   } catch (error) {
-    cxt.logger.error(`Failed to send email to ${to}: "${subject}"`, { error });
+    cxt.logger.error("Routing email failed", {
+      actionId: action.id,
+      errorType: error instanceof Error ? error.name : "UnknownError",
+    });
     await cxt.getActivityLogEntriesRepository().create({
       ...eventContext,
       tool: TOOL_NAME,
-      error: `${rulePrefix}Failed to send email to ${to}: "${subject}"`,
-      details: (error as Error).message,
+      error: `${rulePrefix}EMAIL_SEND_FAILED`,
+      details: null,
     });
   }
 };

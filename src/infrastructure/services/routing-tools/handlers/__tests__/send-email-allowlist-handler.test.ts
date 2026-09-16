@@ -106,7 +106,7 @@ describe("sendEmailHandler — allowlist enforcement", () => {
 
     expect(mockSendTemplatedEmail).toHaveBeenCalledOnce();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ details: expect.stringContaining("Sent email") })
+      expect.objectContaining({ details: "EMAIL_SENT" })
     );
   });
 
@@ -120,7 +120,7 @@ describe("sendEmailHandler — allowlist enforcement", () => {
 
     expect(mockSendTemplatedEmail).not.toHaveBeenCalled();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ error: expect.stringContaining("not in approved allowlist") })
+      expect.objectContaining({ error: "EMAIL_RECIPIENT_NOT_ALLOWLISTED" })
     );
   });
 
@@ -181,7 +181,7 @@ describe("sendEmailHandler — allowlist enforcement", () => {
 
     expect(mockSendTemplatedEmail).not.toHaveBeenCalled();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ error: expect.stringContaining("blocked@example.com") })
+      expect.objectContaining({ error: "EMAIL_RECIPIENT_NOT_ALLOWLISTED" })
     );
   });
 
@@ -199,7 +199,7 @@ describe("sendEmailHandler — allowlist enforcement", () => {
 
     expect(mockSendTemplatedEmail).not.toHaveBeenCalled();
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith(
-      expect.objectContaining({ error: expect.stringContaining("cc@example.com") })
+      expect.objectContaining({ error: "EMAIL_RECIPIENT_NOT_ALLOWLISTED" })
     );
   });
 

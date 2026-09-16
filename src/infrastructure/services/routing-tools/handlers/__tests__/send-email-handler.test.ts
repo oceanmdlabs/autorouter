@@ -106,7 +106,7 @@ describe("sendEmailHandler", () => {
     expect(mockActivityLogRepo.create).toHaveBeenCalledWith({
       ...eventContext,
       tool: "sendEmail",
-      details: 'Sent email to test@example.com: "Test Subject"',
+      details: "EMAIL_SENT",
     });
   });
 });

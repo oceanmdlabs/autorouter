@@ -5,6 +5,7 @@ import type { ServiceRequestEventContext } from "@/src/entities/models/service-r
 import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
 import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
 import { writeDecisionAudits } from "./write-decision-audits";
+import { createContentFreeRuleSummary } from "./create-content-free-rule-summary";
 export interface ProcessServiceRequestEventOutput {
   message: string;
 }
@@ -41,7 +42,9 @@ export async function processServiceRequestEventUseCase(
             event.attachments!
           );
         } catch (err) {
-          cxt.logger.warn(`Failed to pre-summarize attachments: ${(err as Error).message}`);
+          cxt.logger.warn("Attachment summarization failed", {
+            errorType: err instanceof Error ? err.name : "UnknownError",
+          });
         }
       }
 
@@ -61,7 +64,6 @@ export async function processServiceRequestEventUseCase(
       siteConfig?.emailSendAllowlist
     );
 
-    const actionResults = new Map<string, string>();
     for (const result of filteredResults) {
       if (result.stoppedByRuleId) continue;
       cxt.logger.info(
@@ -70,37 +72,24 @@ export async function processServiceRequestEventUseCase(
         }: ${result.evaluation.actions.map((a) => a.tool).join(", ")}`
       );
       try {
-        const results = await cxt
+        await cxt
           .getRoutingToolActionService()
           .executeActions(result.evaluation.actions, event, result.ruleName);
-        results.forEach((v, k) => actionResults.set(k, v));
-      } catch (e) {
-        cxt.logger.error(
-          `Error executing actions for ${event.referralRef}: ${e}`
-        );
-        error = e instanceof Error ? e.message : "Unknown error";
+      } catch (actionError) {
+        cxt.logger.error("Routing action execution failed", {
+          eventType: event.triggeringEvent,
+          ruleId: result.ruleId,
+          errorType:
+            actionError instanceof Error ? actionError.name : "UnknownError",
+        });
+        error = "ROUTING_ACTION_EXECUTION_FAILED";
       }
     }
 
     if (filteredResults.length === 0) {
       details = details || "No actions taken.";
     } else {
-      const rulesSummary = filteredResults.map((r) => ({
-        ruleName: r.ruleName,
-        triggered: r.evaluation.triggered ?? false,
-        ...(r.stoppedByRuleId ? { skipped: true, skippedByRule: r.stoppedByRuleName } : {}),
-        ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
-        ...(r.evaluation.reasoning ? { reasoning: r.evaluation.reasoning } : {}),
-        ...(r.evaluation.triggered && r.evaluation.actions.length > 0
-          ? {
-              actions: r.evaluation.actions.map((a) => ({
-                tool: a.tool,
-                input: a.input,
-                ...(actionResults.has(a.id) ? { result: actionResults.get(a.id) } : {}),
-              })),
-            }
-          : {}),
-      }));
+      const rulesSummary = createContentFreeRuleSummary(filteredResults);
       details = JSON.stringify({ rules: rulesSummary });
     }
     error = filteredResults
@@ -114,7 +103,6 @@ export async function processServiceRequestEventUseCase(
         tenantId: cxt.getTenantId()!,
         siteId: siteConfig.id,
         referralId: event.referralRef ?? "unknown",
-        actionResults,
         cxt,
       });
     }

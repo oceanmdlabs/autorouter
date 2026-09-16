@@ -10,6 +10,7 @@ import { matchArchivedErequestForPatient } from "./match-archived-erequest";
 import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
 import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
 import { writeDecisionAudits } from "./write-decision-audits";
+import { createContentFreeRuleSummary } from "./create-content-free-rule-summary";
 
 const INTAKE_EVENT = "intake_questionnaire_completed" as const;
 
@@ -59,8 +60,7 @@ export async function processIntakeQuestionnaireCompletedUseCase(
           matchResult.match.referralRef ?? matchResult.match.id
         }) using the recency heuristic.`;
 
-  cxt.logger.info(`Intake questionnaire referral matching: ${matchSummary}`, {
-    patientRef: patient.ref,
+  cxt.logger.info("Intake questionnaire referral matching completed", {
     status: matchResult.status,
     matchMethod,
   });
@@ -111,7 +111,6 @@ export async function processIntakeQuestionnaireCompletedUseCase(
     siteConfig.emailSendAllowlist
   );
 
-  const actionResults = new Map<string, string>();
   let error: string | null = null;
   for (const result of filteredResults) {
     if (result.stoppedByRuleId) continue;
@@ -119,15 +118,16 @@ export async function processIntakeQuestionnaireCompletedUseCase(
       continue;
     }
     try {
-      const results = await cxt
+      await cxt
         .getRoutingToolActionService()
         .executeActions(result.evaluation.actions, intakeEvent, result.ruleName);
-      results.forEach((v, k) => actionResults.set(k, v));
-    } catch (e) {
-      cxt.logger.error(
-        `Error executing intake questionnaire actions for patient ${patient.ref}: ${e}`
-      );
-      error = e instanceof Error ? e.message : "Unknown error";
+    } catch (actionError) {
+      cxt.logger.error("Intake questionnaire routing action failed", {
+        ruleId: result.ruleId,
+        errorType:
+          actionError instanceof Error ? actionError.name : "UnknownError",
+      });
+      error = "ROUTING_ACTION_EXECUTION_FAILED";
     }
   }
 
@@ -137,30 +137,15 @@ export async function processIntakeQuestionnaireCompletedUseCase(
     .filter(Boolean)
     .join("\n");
 
-  const rulesSummary = filteredResults
-    .filter((r) => !r.stoppedByRuleId)
-    .map((r) => ({
-      ruleName: r.ruleName,
-      triggered: r.evaluation.triggered ?? false,
-      ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
-      ...(r.evaluation.reasoning ? { reasoning: r.evaluation.reasoning } : {}),
-      ...(r.evaluation.triggered && r.evaluation.actions.length > 0
-        ? {
-            actions: r.evaluation.actions.map((a) => ({
-              tool: a.tool,
-              input: a.input,
-              ...(actionResults.has(a.id) ? { result: actionResults.get(a.id) } : {}),
-            })),
-          }
-        : {}),
-    }));
+  const rulesSummary = createContentFreeRuleSummary(
+    filteredResults.filter((result) => !result.stoppedByRuleId)
+  );
 
   if (siteConfig.id && cxt.getTenantId()) {
     await writeDecisionAudits(filteredResults, rules, {
       tenantId: cxt.getTenantId()!,
       siteId: siteConfig.id,
       referralId: matched.referralRef ?? matched.id,
-      actionResults,
       cxt,
     });
   }

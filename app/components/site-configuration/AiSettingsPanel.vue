@@ -36,24 +36,9 @@ watch(
   { deep: true },
 );
 
-const BEDROCK_PRESET_MODELS = [
-  "mistral.mistral-large-2402-v1:0",
-  "anthropic.claude-3-haiku-20240307-v1:0",
-  "anthropic.claude-3-sonnet-20240229-v1:0",
-];
-
-const bedrockModelIsPreset = computed(() => {
-  const model = local.aiModel;
-  return model == null || BEDROCK_PRESET_MODELS.includes(model);
-});
-
 function onBedrockModelSelect(value: unknown) {
   if (typeof value !== "string") return;
-  if (value === "custom") {
-    local.aiModel = "";
-  } else {
-    local.aiModel = value;
-  }
+  local.aiModel = value;
 }
 </script>
 
@@ -76,6 +61,11 @@ function onBedrockModelSelect(value: unknown) {
       <p class="text-sm text-gray-600 mt-2 leading-relaxed">
         Configure your AI provider settings for enhanced routing
         capabilities.
+      </p>
+      <p class="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        PHI processing remains disabled unless the deployment has an approved,
+        pinned provider, model, Canadian region, zero-retention mode, and
+        deployment approval record.
       </p>
       <div class="space-y-2">
         <Label for="aiProvider">AI Provider</Label>
@@ -117,7 +107,7 @@ function onBedrockModelSelect(value: unknown) {
         <Label for="aiModel">Model</Label>
         <Select
           id="aiModel"
-          :model-value="bedrockModelIsPreset ? (local.aiModel ?? '') : 'custom'"
+          :model-value="local.aiModel ?? ''"
           @update:model-value="onBedrockModelSelect"
         >
           <SelectTrigger>
@@ -127,16 +117,12 @@ function onBedrockModelSelect(value: unknown) {
             <SelectItem value="mistral.mistral-large-2402-v1:0">Mistral Large</SelectItem>
             <SelectItem value="anthropic.claude-3-haiku-20240307-v1:0">Claude 3 Haiku</SelectItem>
             <SelectItem value="anthropic.claude-3-sonnet-20240229-v1:0">Claude 3 Sonnet</SelectItem>
-            <SelectItem value="custom">Custom model ID...</SelectItem>
           </SelectContent>
         </Select>
-        <Input
-          v-if="!bedrockModelIsPreset"
-          v-model="local.aiModel"
-          placeholder="e.g. anthropic.claude-3-5-sonnet-20241022-v2:0"
-          :aria-invalid="errors.aiModel ? 'true' : undefined"
-        />
-        <p class="text-xs text-muted-foreground">Uses the IAM role attached to the service. No API key required.</p>
+        <p class="text-xs text-muted-foreground">
+          Uses the workload IAM role. The selected model must exactly match the
+          deployment-approved model or inference fails closed.
+        </p>
         <p v-if="errors.aiModel" class="text-sm text-destructive">
           {{ errors.aiModel }}
         </p>

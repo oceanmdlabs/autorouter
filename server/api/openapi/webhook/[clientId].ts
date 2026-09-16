@@ -40,7 +40,10 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event);
 
   const clientId = event.context.params?.clientId;
-  cxt.logger.info(`Patient engagement webhook received`, { clientId: clientId ?? null, bodyKeys: body ? Object.keys(body) : [] });
+  cxt.logger.info("Patient engagement webhook received", {
+    hasClientId: Boolean(clientId),
+    bodyKeys: body ? Object.keys(body) : [],
+  });
 
   if (!clientId) {
     cxt.logger.error("No clientId in the PE webhook request");
@@ -55,7 +58,7 @@ export default defineEventHandler(async (event) => {
     .getSiteConfigurationRepository()
     .findByClientId(clientId);
   if (!siteConfig) {
-    cxt.logger.error(`No site configuration found with clientId ${clientId}`);
+    cxt.logger.error("No site configuration found for webhook client");
     throw createError({
       statusCode: 404,
       statusMessage: "Unknown clientId",
@@ -75,9 +78,7 @@ export default defineEventHandler(async (event) => {
     !openApiCreds.siteCredential ||
     !openApiCreds.sharedEncryptionKey
   ) {
-    cxt.logger.error(
-      `No open API credentials found for site ${siteConfig.oceanSiteNum}`
-    );
+    cxt.logger.error("Open API credentials are not configured for webhook site");
     throw createError({
       statusCode: 503,
       statusMessage: "Open API credentials not configured",
@@ -100,9 +101,7 @@ export default defineEventHandler(async (event) => {
     }
     const peEvent = parseResult.data;
     if (peEvent.siteNum !== siteConfig.oceanSiteNum) {
-      cxt.logger.warn(
-        `Rejected webhook for clientId ${clientId}: payload siteNum ${peEvent.siteNum} does not match configured site ${siteConfig.oceanSiteNum}`
-      );
+      cxt.logger.warn("Rejected webhook because site configuration did not match");
       throw createError({
         statusCode: 403,
         statusMessage: "siteNum mismatch",
@@ -119,9 +118,9 @@ export default defineEventHandler(async (event) => {
 
     const replayKey = getReplayKey(clientId, peEvent, oceanSessionId);
     if (wasRecentlyProcessed(replayKey)) {
-      cxt.logger.warn(
-        `Ignoring replayed webhook event for clientId ${clientId}: ${peEvent.type} ${peEvent.ref}`
-      );
+      cxt.logger.warn("Ignoring replayed webhook event", {
+        eventType: peEvent.type,
+      });
       setResponseStatus(event, 202);
       return {
         status: "duplicate_ignored",
@@ -133,9 +132,9 @@ export default defineEventHandler(async (event) => {
       ptRef: peEvent.ref,
     });
     if (isError(patient) || !patient) {
-      cxt.logger.error(
-        `Error getting patient for event ${peEvent.type} ${peEvent.ref}: ${patient}`
-      );
+      cxt.logger.error("Failed to retrieve patient for webhook event", {
+        eventType: peEvent.type,
+      });
       throw createError({
         statusCode: 502,
         statusMessage: "Failed to fetch patient",
@@ -148,25 +147,27 @@ export default defineEventHandler(async (event) => {
       ptRef: peEvent.ref,
     });
     if (isError(note)) {
-      cxt.logger.error(
-        `Error getting note for event ${peEvent.type} ${peEvent.ref}: ${note}`
-      );
+      cxt.logger.error("Failed to retrieve note for webhook event", {
+        eventType: peEvent.type,
+      });
       throw createError({
         statusCode: 502,
         statusMessage: "Failed to fetch note",
       });
     }
     if (!note) {
-      cxt.logger.warn(`No note found for event ${peEvent.type} ${peEvent.ref}`);
+      cxt.logger.warn("No note found for webhook event", {
+        eventType: peEvent.type,
+      });
       rememberProcessedEvent(replayKey);
       setResponseStatus(event, 202);
       return {
         status: "accepted_no_note",
       };
     }
-    cxt.logger.info(
-      `Found note ${note.noteId} for event ${peEvent.type} ${peEvent.ref}`
-    );
+    cxt.logger.info("Found note for webhook event", {
+      eventType: peEvent.type,
+    });
 
     const triggeringEvent = mapOceanWebhookEventToLocalPeEventType(peEvent);
 
@@ -273,4 +274,3 @@ function cleanupExpiredReplayCache(): void {
     }
   }
 }
-

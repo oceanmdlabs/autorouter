@@ -35,12 +35,10 @@ export const createRoutingToolActionService = (
     eventContext: RoutingEventContext,
     ruleName?: string
   ): Promise<string | undefined> {
-    // Log the action being executed
-    cxt.logger.info(
-      `Executing routing tool action with id ${action.id}: ${
-        action.tool
-      } ${JSON.stringify(action.input)}`
-    );
+    cxt.logger.info("Executing routing tool action", {
+      actionId: action.id,
+      tool: action.tool,
+    });
 
     const tool = routingToolRegistry[action.tool];
     if (!tool) {
@@ -58,8 +56,12 @@ export const createRoutingToolActionService = (
     try {
       const result = await handler(action, eventContext, cxt, ruleName);
       return result ?? undefined;
-    } catch (e) {
-      cxt.logger.error(e);
+    } catch (error) {
+      cxt.logger.error("Routing tool action failed", {
+        actionId: action.id,
+        tool: action.tool,
+        errorType: error instanceof Error ? error.name : "UnknownError",
+      });
     }
   }
 

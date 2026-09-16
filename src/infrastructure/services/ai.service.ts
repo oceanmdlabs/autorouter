@@ -16,6 +16,7 @@ import { InvalidArgumentsError } from "@/src/entities/errors/common";
 import type { Attachment } from "@/src/entities/models/attachment";
 import type { RoutingToolRegistry } from "../services/routing-tools/routing-tool-registry";
 import type { RoutingToolName } from "../services/routing-tools/routing-tool-registry";
+import { assertAiPhiDeploymentApproved } from "./ai-phi-approval";
 
 type BedrockModelId =
   | "mistral.mistral-large-2402-v1:0"
@@ -51,6 +52,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
 
   async function getAiModel() {
     const aiInfo = await getAiInfo();
+    assertAiPhiDeploymentApproved(aiInfo);
     switch (aiInfo.provider) {
       case "openai":
         return createOpenAI({

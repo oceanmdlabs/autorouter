@@ -9,6 +9,7 @@ import { filterBlockedEmailActions } from "./filter-blocked-email-actions";
 import { evaluateRulesInOrder } from "./evaluate-rules-in-order";
 import { writeDecisionAudits } from "./write-decision-audits";
 import { processIntakeQuestionnaireCompletedUseCase } from "./process-intake-questionnaire-completed.use-case";
+import { createContentFreeRuleSummary } from "./create-content-free-rule-summary";
 
 export interface ProcessPEEventOutput {
   message: string;
@@ -29,8 +30,6 @@ export async function processPatientEngagementEventUseCase(
   const ptUpdate = event.message.note.ptUpdate;
   cxt.logger.info("PE event context for rule evaluation", {
     triggeringEvent: event.triggeringEvent,
-    patientRef: event.message.patient.ref,
-    oceanSessionId: event.message.oceanSessionId,
     hasForms: !!ptUpdate.completedForms,
     hasProgressNote: !!ptUpdate.progressNote,
     contextFieldsAcrossRules: rules
@@ -52,51 +51,32 @@ export async function processPatientEngagementEventUseCase(
     siteConfig?.emailSendAllowlist
   );
 
-  const actionResults = new Map<string, string>();
   for (const result of filteredResults) {
     if (result.stoppedByRuleId) continue;
-    cxt.logger.info(
-      `Processing rule ${
-        result.ruleName
-      } evaluation actions for patient engagement event ${getPatientEngagementEventContextDescription(
-        event
-      )}
-      }: ${result.evaluation.actions.map((a) => a.tool).join(", ")}`
-    );
+    cxt.logger.info("Processing patient engagement routing actions", {
+      eventType: event.triggeringEvent,
+      ruleId: result.ruleId,
+      tools: result.evaluation.actions.map((action) => action.tool),
+    });
     try {
-      const results = await cxt
+      await cxt
         .getRoutingToolActionService()
         .executeActions(result.evaluation.actions, event, result.ruleName);
-      results.forEach((v, k) => actionResults.set(k, v));
-    } catch (e) {
-      cxt.logger.error(
-        `Error executing actions for patient engagement event ${getPatientEngagementEventContextDescription(
-          event
-        )}: ${e}`
-      );
-      error = e instanceof Error ? e.message : "Unknown error";
+    } catch (actionError) {
+      cxt.logger.error("Patient engagement routing action failed", {
+        eventType: event.triggeringEvent,
+        ruleId: result.ruleId,
+        errorType:
+          actionError instanceof Error ? actionError.name : "UnknownError",
+      });
+      error = "ROUTING_ACTION_EXECUTION_FAILED";
     }
   }
 
   if (filteredResults.length === 0) {
     details = details || "No actions taken.";
   } else {
-    const rulesSummary = filteredResults.map((r) => ({
-      ruleName: r.ruleName,
-      triggered: r.evaluation.triggered ?? false,
-      ...(r.stoppedByRuleId ? { skipped: true, skippedByRule: r.stoppedByRuleName } : {}),
-      ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
-      ...(r.evaluation.reasoning ? { reasoning: r.evaluation.reasoning } : {}),
-      ...(r.evaluation.triggered && r.evaluation.actions.length > 0
-        ? {
-            actions: r.evaluation.actions.map((a) => ({
-              tool: a.tool,
-              input: a.input,
-              ...(actionResults.has(a.id) ? { result: actionResults.get(a.id) } : {}),
-            })),
-          }
-        : {}),
-    }));
+    const rulesSummary = createContentFreeRuleSummary(filteredResults);
     details = JSON.stringify({ rules: rulesSummary });
   }
   error = filteredResults
@@ -110,7 +90,6 @@ export async function processPatientEngagementEventUseCase(
       tenantId: cxt.getTenantId()!,
       siteId: siteConfig.id,
       referralId: event.message.patient.ref ?? "unknown",
-      actionResults,
       cxt,
     });
   }
@@ -127,10 +106,12 @@ export async function processPatientEngagementEventUseCase(
   if (event.triggeringEvent === "patient_message_forms_completion") {
     try {
       await processIntakeQuestionnaireCompletedUseCase(event, cxt);
-    } catch (e) {
-      cxt.logger.error(
-        `Error processing intake questionnaire completion for patient ${event.message.patient.ref}: ${e}`
-      );
+    } catch (intakeError) {
+      cxt.logger.error("Intake questionnaire processing failed", {
+        eventType: event.triggeringEvent,
+        errorType:
+          intakeError instanceof Error ? intakeError.name : "UnknownError",
+      });
     }
   }
 

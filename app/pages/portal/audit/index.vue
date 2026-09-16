@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
 import { handleMissingActiveTenantError } from '@/app/lib/active-tenant';
-import type { DecisionAuditItem, ToolExecutionItem } from '@/src/entities/models/llm-audit-explorer';
+import type { DecisionAuditItem } from '@/src/entities/models/llm-audit-explorer';
 import type { PaginatedResult } from '@/src/entities/models/paginated-result';
 import { formatTimestampWithMinutePrecision } from '@/shared/lib/utils';
-import { clientRoutingToolRegistry } from '@/src/entities/models/routing-tool-client';
-import type { RoutingToolName } from '@/src/infrastructure/services/routing-tools/routing-tool-registry';
 
 const currentPage = ref(1);
 const itemsPerPage = ref(20);
@@ -37,15 +35,6 @@ watch([currentPage, itemsPerPage, filterReferralId, filterDecision], (newVals, o
   refresh();
 });
 
-function describeAction(tool: ToolExecutionItem): { type: string; taken: string } {
-  const registryEntry = clientRoutingToolRegistry[tool.toolName as RoutingToolName];
-  const type = registryEntry?.actionType ?? tool.actionType ?? tool.toolDisplayName ?? tool.toolName;
-  const input = (tool.toolInput ?? {}) as Record<string, any>;
-  if (registryEntry?.getActionTaken) {
-    return { type, taken: registryEntry.getActionTaken(input, tool.toolResult ?? undefined) };
-  }
-  return { type, taken: tool.toolResult ?? 'Executed' };
-}
 </script>
 
 <template>
@@ -99,15 +88,11 @@ function describeAction(tool: ToolExecutionItem): { type: string; taken: string 
                     <div class="font-medium">{{ item.ruleName }}</div>
                     <div :class="item.triggered ? 'text-green-600' : 'text-red-500'">
                       {{ item.triggered ? 'Triggered' : 'Not triggered' }}
-                      <span v-if="item.reasonSummary" class="text-muted-foreground"> — {{ item.reasonSummary }}</span>
                     </div>
-                    <div v-if="item.reasoning" class="text-muted-foreground italic mt-0.5">{{ item.reasoning }}</div>
                     <div v-if="item.triggered && item.toolExecutions.length" class="pl-2 space-y-1 mt-0.5">
                       <div v-for="tool in item.toolExecutions" :key="tool.toolExecutionId" class="text-muted-foreground whitespace-pre-wrap">
-                        <template v-if="describeAction(tool).type">
-                          <span class="font-medium text-foreground">Action Type:</span> {{ describeAction(tool).type }}<br/>
-                        </template>
-                        <span class="font-medium text-foreground">Action Taken:</span> {{ describeAction(tool).taken }}
+                        <span class="font-medium text-foreground">Tool:</span> {{ tool.toolName }}
+                        <span class="ml-2">Status: {{ tool.status }}</span>
                       </div>
                     </div>
                     <div v-if="item.validationError" class="text-red-500 mt-1">{{ item.validationError }}</div>

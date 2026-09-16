@@ -19,6 +19,7 @@ import {
 } from "@/src/infrastructure/services/routing-tools/routing-tool-registry";
 import type { Bundle } from "fhir/r4";
 import { writeDecisionAudits } from "./write-decision-audits";
+import { createContentFreeRuleSummary } from "./create-content-free-rule-summary";
 export const ORDER_SIGN_CDS_ID = "order-sign-cds";
 
 interface Deps {
@@ -47,7 +48,6 @@ export async function orderSignCds({
   const routingEventMessage: ServiceRequestEventMessage = request.prefetch
     ?.v11Bundle as Bundle;
   const evaluationResults: RuleEvaluationResult[] = [];
-  const actionResults = new Map<string, string>();
 
   for (const rule of orderSignRules) {
     const ruleEvaluationResult = await createEvaluateRuleService({
@@ -85,7 +85,6 @@ export async function orderSignCds({
           ],
           source: createSource(rule),
         });
-        actionResults.set(action.id, `CDS card shown: ${params.title}`);
       }
     }
   }
@@ -106,23 +105,7 @@ export async function orderSignCds({
   // Record the CDS hook evaluation in the activity log so pre-submission
   // (order-sign) rule runs are visible alongside the other event types.
   async function writeActivityLog(): Promise<void> {
-    const rulesSummary = evaluationResults.map((r) => ({
-      ruleName: r.ruleName,
-      triggered: r.evaluation.triggered ?? false,
-      ...(r.evaluation.comment ? { comment: r.evaluation.comment } : {}),
-      ...(r.evaluation.reasoning ? { reasoning: r.evaluation.reasoning } : {}),
-      ...(r.evaluation.triggered && r.evaluation.actions.length > 0
-        ? {
-            actions: r.evaluation.actions.map((a) => ({
-              tool: a.tool,
-              input: a.input,
-              ...(actionResults.has(a.id)
-                ? { result: actionResults.get(a.id) }
-                : {}),
-            })),
-          }
-        : {}),
-    }));
+    const rulesSummary = createContentFreeRuleSummary(evaluationResults);
 
     const details =
       evaluationResults.length === 0
@@ -141,10 +124,13 @@ export async function orderSignCds({
         details,
         error,
       });
-    } catch (err) {
-      cxt.logger.warn(
-        `Failed to write CDS hook activity log entry: ${(err as Error).message}`
-      );
+    } catch (activityError) {
+      cxt.logger.warn("Failed to write CDS hook activity log entry", {
+        errorType:
+          activityError instanceof Error
+            ? activityError.name
+            : "UnknownError",
+      });
     }
 
     // Persist per-rule LLM decision + tool-execution audits so the CDS
@@ -157,13 +143,13 @@ export async function orderSignCds({
           tenantId,
           siteId: siteConfig.id,
           referralId: "pre-submission",
-          actionResults,
           cxt,
         });
-      } catch (err) {
-        cxt.logger.warn(
-          `Failed to write CDS hook decision audits: ${(err as Error).message}`
-        );
+      } catch (auditError) {
+        cxt.logger.warn("Failed to write CDS hook decision audits", {
+          errorType:
+            auditError instanceof Error ? auditError.name : "UnknownError",
+        });
       }
     }
   }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { PlusCircle as IconPlusCircle } from '@lucide/vue';
 import { handleMissingActiveTenantError } from '@/app/lib/active-tenant';
 import type { HealthcareService } from '@/src/entities/models/healthcare-service';
 

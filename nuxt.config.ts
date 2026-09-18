@@ -69,12 +69,7 @@ export default defineNuxtConfig({
     "@nuxt/icon",
     ...(process.env.NODE_ENV === "development" ? ["@nuxt/devtools"] : []),
     "@nuxtjs/color-mode",
-    "nuxt-lucide-icons",
   ],
-
-  lucide: {
-    namePrefix: "Icon",
-  },
 
   app: {},
 

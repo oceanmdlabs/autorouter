@@ -3,7 +3,7 @@ import {
   AlertCircle,
   CheckCircle,
   Copy,
-} from "lucide-vue-next";
+} from "@lucide/vue";
 import { formatTimestampWithMinutePrecision } from "@/shared/lib/utils";
 
 const props = defineProps<{

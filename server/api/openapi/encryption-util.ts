@@ -1,4 +1,4 @@
-import CryptoJS from "crypto-js";
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import { type EncryptedBlockDto } from "@/src/entities/models/ocean-patient";
 
 const KEY_LEN_BYTES = 16;
@@ -15,15 +15,15 @@ export interface PrivateKey {
   coeff: string;
 }
 
-export type Bytes = CryptoJS.lib.WordArray;
+export type Bytes = Buffer;
 export type Key = Bytes;
 
 export function generateKey(): Key {
-  return CryptoJS.lib.WordArray.random(16);
+  return randomBytes(KEY_LEN_BYTES);
 }
 
-export function toBase64(bytes: CryptoJS.lib.WordArray): string {
-  return CryptoJS.enc.Base64.stringify(bytes);
+export function toBase64(bytes: Bytes): string {
+  return bytes.toString("base64");
 }
 
 export function decryptWithSharedEncryptionKey({
@@ -33,8 +33,10 @@ export function decryptWithSharedEncryptionKey({
   encryptedData: EncryptedBlockDto;
   sharedEncryptionKey: string;
 }): Bytes {
-  const sekAsBytes: Bytes = getSecretKeyBytes(sharedEncryptionKey);
-  return decrypt({ encryptedData, key: sekAsBytes });
+  return decrypt({
+    encryptedData,
+    key: getSecretKeyBytes(sharedEncryptionKey),
+  });
 }
 
 export function decryptWithBase64Key({
@@ -46,7 +48,7 @@ export function decryptWithBase64Key({
 }): Bytes {
   return decryptWithKey({
     encryptedData,
-    key: CryptoJS.enc.Base64.parse(key),
+    key: Buffer.from(key, "base64"),
   });
 }
 
@@ -57,11 +59,7 @@ export function decryptWithKey({
   encryptedData: EncryptedBlockDto;
   key: Bytes;
 }): Bytes {
-  const ivAsBytes: Bytes = CryptoJS.enc.Base64.parse(encryptedData.iv);
-  const decryptedBytes = CryptoJS.AES.decrypt(encryptedData.data, key, {
-    iv: ivAsBytes,
-  });
-  return decryptedBytes;
+  return decrypt({ encryptedData, key });
 }
 
 export function decrypt({
@@ -71,21 +69,25 @@ export function decrypt({
   encryptedData: EncryptedBlockDto;
   key: Bytes;
 }): Bytes {
-  const ivAsBytes: Bytes = CryptoJS.enc.Base64.parse(encryptedData.iv);
-  const decryptedBytes = CryptoJS.AES.decrypt(encryptedData.data, key, {
-    iv: ivAsBytes,
-  });
-  return decryptedBytes;
+  const algorithm = getAESAlgorithm(key);
+  const decipher = createDecipheriv(
+    algorithm,
+    key,
+    Buffer.from(encryptedData.iv, "base64"),
+  );
+
+  return Buffer.concat([
+    decipher.update(Buffer.from(encryptedData.data, "base64")),
+    decipher.final(),
+  ]);
 }
 
 export function toUtf8(bytes: Bytes): string {
-  return CryptoJS.enc.Utf8.stringify(bytes);
+  return bytes.toString("utf8");
 }
 
 function getSecretKeyBytes(secretKey: string): Bytes {
-  // We need the bytes of our keys to use in decryption
-  while (secretKey.length < 16) secretKey += "0"; //Zero pad the secretKey to 16 bytes
-  return CryptoJS.enc.Utf8.parse(secretKey);
+  return Buffer.from(secretKey.padEnd(KEY_LEN_BYTES, "0"), "utf8");
 }
 
 export function encryptObject(object: unknown, key: Key) {
@@ -93,31 +95,45 @@ export function encryptObject(object: unknown, key: Key) {
 }
 
 export function encryptString(plaintext: string, key: Key) {
-  return encryptBytes(CryptoJS.enc.Utf8.parse(plaintext), key);
+  return encryptBytes(Buffer.from(plaintext, "utf8"), key);
 }
 
 export function encryptBytes(bytes: Bytes, key: Key) {
-  const ivBytes: Bytes = CryptoJS.lib.WordArray.random(16);
+  const iv = randomBytes(IV_LEN_BYTES);
+  const usableKey = truncateToUsableAESKey(key);
+  const cipher = createCipheriv(getAESAlgorithm(usableKey), usableKey, iv);
+  const encrypted = Buffer.concat([cipher.update(bytes), cipher.final()]);
 
-  const encryptedCryptoJS = CryptoJS.AES.encrypt(
-    bytes,
-    truncateToUsableAESKey(key),
-    { iv: ivBytes }
-  );
-  const encryptedBlockDto = {
-    data: CryptoJS.enc.Base64.stringify(encryptedCryptoJS.ciphertext),
-    iv: CryptoJS.enc.Base64.stringify(ivBytes),
+  return {
+    data: encrypted.toString("base64"),
+    iv: iv.toString("base64"),
   };
-  return encryptedBlockDto;
 }
 
-function truncateToUsableAESKey(keyBytes: Bytes) {
-  if (keyBytes.sigBytes > 32) {
-    keyBytes.sigBytes = 32;
-  } else if (keyBytes.sigBytes > 24 && keyBytes.sigBytes < 32) {
-    keyBytes.sigBytes = 24;
-  } else if (keyBytes.sigBytes > 16 && keyBytes.sigBytes < 24) {
-    keyBytes.sigBytes = 16;
+function truncateToUsableAESKey(key: Bytes): Bytes {
+  if (key.length > 32) {
+    return key.subarray(0, 32);
   }
-  return keyBytes;
+  if (key.length > 24 && key.length < 32) {
+    return key.subarray(0, 24);
+  }
+  if (key.length > 16 && key.length < 24) {
+    return key.subarray(0, 16);
+  }
+  return key;
+}
+
+function getAESAlgorithm(
+  key: Bytes,
+): "aes-128-cbc" | "aes-192-cbc" | "aes-256-cbc" {
+  switch (key.length) {
+    case 16:
+      return "aes-128-cbc";
+    case 24:
+      return "aes-192-cbc";
+    case 32:
+      return "aes-256-cbc";
+    default:
+      throw new Error("AES keys must be 16, 24, or 32 bytes");
+  }
 }

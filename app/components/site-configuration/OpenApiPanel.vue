@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Copy } from "lucide-vue-next";
+import { Copy } from "@lucide/vue";
 const props = defineProps<{
   modelValue: {
     siteKey: string | null;

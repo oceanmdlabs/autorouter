@@ -129,7 +129,7 @@ export class AppConstruct extends Construct {
 
     const fn = new lambda.Function(this, "AppLambda", {
       functionName: `${props.namePrefix}-lambda`,
-      runtime: lambda.Runtime.NODEJS_20_X,
+      runtime: lambda.Runtime.NODEJS_22_X,
       handler: props.lambdaHandler,
       role,
       memorySize: props.memorySize,

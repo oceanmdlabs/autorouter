@@ -2,7 +2,7 @@ import { hydrateSessionUser } from "@/server/utils/session-user";
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
 import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 import { assertSystemAdminAccess } from "@/server/utils/system-admin-access";
-import { createTenantSiteConfiguration } from "@/server/utils/tenant-access";
+import { createTenantSiteConfiguration } from "@/server/utils/tenant-provisioning";
 import { z } from "zod";
 
 const createTenantSchema = z.object({

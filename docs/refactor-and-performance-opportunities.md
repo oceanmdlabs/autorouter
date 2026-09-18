@@ -35,15 +35,11 @@ This note captures code-health and perceived-performance opportunities identifie
   - Move reusable webhook security state into a dedicated server utility so the route reads as a request pipeline.
 - Expected benefit: safer webhook changes, simpler testing, clearer failure modes.
 
-### Tenant Access Utility
+### Tenant Access Utilities
 
-- File: `server/utils/tenant-access.ts`
-- Current shape: approximately 850 lines covering identity, users, system admins, memberships, invites, tenant provisioning, and site creation.
-- Issue: this is now a mixed service layer outside the clean architecture boundaries.
-- Opportunity:
-  - Split by responsibility: identity access, tenant memberships, tenant invites, tenant provisioning, and system-admin allowlist.
-  - Preserve existing exported functions initially and delegate internally to reduce route churn.
-- Expected benefit: lower merge conflict risk and clearer ownership of tenant/security behavior.
+- Status: completed.
+- The former `server/utils/tenant-access.ts` utility is split by responsibility into identity access, tenant memberships, tenant invites, tenant provisioning, and the system-admin allowlist.
+- Routes import the focused modules directly so Nuxt does not register duplicate server auto-imports through a compatibility barrel.
 
 ### Ocean FHIR Message Builder
 
@@ -142,4 +138,4 @@ The app already uses Nuxt route chunks, so the biggest wins are about showing ro
 3. Split `site-configuration/index.vue` into a composable plus panel components.
 4. Fix SQL-level filtering and pagination in the LLM audit repository.
 5. Share/defer document downloads in webhook processing.
-6. Split `tenant-access.ts` and `ocean-message.service.ts` after the higher-risk behavior is covered by tests.
+6. Split `ocean-message.service.ts` after the higher-risk behavior is covered by tests.

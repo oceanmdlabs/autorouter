@@ -1,8 +1,6 @@
 import { hydrateSessionUser } from "@/server/utils/session-user";
-import {
-  assertActiveMembership,
-  isKnownTenant,
-} from "@/server/utils/tenant-access";
+import { assertActiveMembership } from "@/server/utils/tenant-memberships";
+import { isKnownTenant } from "@/server/utils/tenant-provisioning";
 import { hasSystemAdminAccess } from "@/server/utils/system-admin-access";
 
 export default defineEventHandler(async (event) => {

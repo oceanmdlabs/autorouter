@@ -1,8 +1,8 @@
 import {
-  assertTenantAdmin,
   getTenantInvites,
   revokeTenantInvite,
-} from "@/server/utils/tenant-access";
+} from "@/server/utils/tenant-invites";
+import { assertTenantAdmin } from "@/server/utils/tenant-memberships";
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
 import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 

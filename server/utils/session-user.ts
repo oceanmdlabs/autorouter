@@ -6,20 +6,22 @@ import {
   getInviteAuthStatusMessage,
 } from "@/shared/invite-access";
 import {
-  ensureLegacyMembership,
-  getTenantInviteRedemptionState,
-  getMembershipsForUser,
   getUserById,
-  resolveActiveTenantId,
   upsertOAuthUser,
   type IdentityProvider,
   type UserIdentity,
-} from "./tenant-access";
+} from "./identity-access";
+import { getTenantInviteRedemptionState } from "./tenant-invites";
+import {
+  ensureLegacyMembership,
+  getMembershipsForUser,
+  resolveActiveTenantId,
+} from "./tenant-memberships";
 import { isSystemAdmin } from "../routes/auth/system-admin";
 
-function getIdentityFromSessionUser(user: Partial<User> | null | undefined):
-  | UserIdentity
-  | null {
+function getIdentityFromSessionUser(
+  user: Partial<User> | null | undefined,
+): UserIdentity | null {
   if (!user) {
     return null;
   }
@@ -83,7 +85,10 @@ async function assertSessionAccess(event: H3Event, sessionUser: User) {
     return;
   }
 
-  const pendingInviteCode = getCookie(event, PENDING_INVITE_CODE_COOKIE)?.trim();
+  const pendingInviteCode = getCookie(
+    event,
+    PENDING_INVITE_CODE_COOKIE,
+  )?.trim();
   if (!pendingInviteCode) {
     throw createError({
       statusCode: 403,
@@ -113,7 +118,7 @@ async function assertSessionAccess(event: H3Event, sessionUser: User) {
 
 export async function buildAuthorizedSessionUserFromIdentity(
   event: H3Event,
-  identity: UserIdentity
+  identity: UserIdentity,
 ) {
   const sessionUser = await buildSessionUserFromIdentity(identity);
   await assertSessionAccess(event, sessionUser);
@@ -121,7 +126,7 @@ export async function buildAuthorizedSessionUserFromIdentity(
 }
 
 export async function hydrateSessionUser(
-  sessionUser: Partial<User> | null | undefined
+  sessionUser: Partial<User> | null | undefined,
 ) {
   const identity = getIdentityFromSessionUser(sessionUser);
   const requestedTenantId =

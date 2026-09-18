@@ -5,7 +5,7 @@ import type {
   PrivacyAuditEventType,
 } from "@/src/entities/models/privacy-audit-log";
 import type { SiteConfiguration } from "@/src/entities/models/site-configuration";
-import { assertTenantAdmin } from "./tenant-access";
+import { assertTenantAdmin } from "./tenant-memberships";
 
 type LogPrivacyAuditEventArgs = {
   tenantId?: string | null;

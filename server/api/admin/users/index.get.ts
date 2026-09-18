@@ -1,5 +1,5 @@
 import { assertSystemAdminAccess } from "@/server/utils/system-admin-access";
-import { listActiveSystemUsers } from "@/server/utils/tenant-access";
+import { listActiveSystemUsers } from "@/server/utils/identity-access";
 import { z } from "zod";
 
 const querySchema = z.object({

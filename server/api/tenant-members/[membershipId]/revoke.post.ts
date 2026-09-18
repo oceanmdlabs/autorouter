@@ -2,7 +2,7 @@ import {
   assertTenantAdmin,
   getTenantMembers,
   revokeMembership,
-} from "@/server/utils/tenant-access";
+} from "@/server/utils/tenant-memberships";
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
 import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 

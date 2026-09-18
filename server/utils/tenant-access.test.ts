@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { mapActiveSystemUserRows } from "./identity-access";
 import {
   deriveLegacyTenantId,
-  mapActiveSystemUserRows,
   resolveActiveTenantId,
-} from "./tenant-access";
+} from "./tenant-memberships";
 
 describe("tenant access helpers", () => {
   it("preserves legacy tenant ids for Google users", () => {
@@ -11,7 +11,7 @@ describe("tenant access helpers", () => {
       deriveLegacyTenantId({
         provider: "google",
         subject: "google-subject",
-      })
+      }),
     ).toBe("google-subject");
   });
 
@@ -20,7 +20,7 @@ describe("tenant access helpers", () => {
       deriveLegacyTenantId({
         provider: "github",
         subject: "12345",
-      })
+      }),
     ).toBe("github12345");
   });
 
@@ -43,7 +43,7 @@ describe("tenant access helpers", () => {
             status: "active",
           },
         ],
-      })
+      }),
     ).toBe("tenant-b");
   });
 
@@ -66,7 +66,7 @@ describe("tenant access helpers", () => {
             status: "revoked",
           },
         ],
-      })
+      }),
     ).toBe("tenant-a");
   });
 
@@ -76,7 +76,7 @@ describe("tenant access helpers", () => {
         requestedTenantId: "tenant-z",
         isSystemAdmin: true,
         memberships: [],
-      })
+      }),
     ).toBe("tenant-z");
   });
 
@@ -119,7 +119,7 @@ describe("tenant access helpers", () => {
           membershipStatus: null,
           membershipCreatedAt: null,
         },
-      ])
+      ]),
     ).toEqual([
       {
         id: "user-1",

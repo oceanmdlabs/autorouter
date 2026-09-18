@@ -1,5 +1,5 @@
 import { hydrateSessionUser } from "@/server/utils/session-user";
-import { redeemTenantInvite } from "@/server/utils/tenant-access";
+import { redeemTenantInvite } from "@/server/utils/tenant-invites";
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
 import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 import { PENDING_INVITE_CODE_COOKIE } from "@/shared/invite-access";

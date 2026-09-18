@@ -58,7 +58,7 @@ This means:
 - Tenant-scoped repository wiring is centralized in [src/entities/models/application-context.ts](/Users/dougkavanagh/workspace/oceanmd-autorouter/src/entities/models/application-context.ts).
 - Routing-tool registration lives in [src/infrastructure/services/routing-tools/routing-tool-registry.ts](/Users/dougkavanagh/workspace/oceanmd-autorouter/src/infrastructure/services/routing-tools/routing-tool-registry.ts).
 - Routing-tool execution lives in [src/infrastructure/services/routing-tool-action.service.ts](/Users/dougkavanagh/workspace/oceanmd-autorouter/src/infrastructure/services/routing-tool-action.service.ts).
-- Tenant membership lookup already exists in [server/utils/tenant-access.ts](/Users/dougkavanagh/workspace/oceanmd-autorouter/server/utils/tenant-access.ts) and [server/api/tenant-members/index.get.ts](/Users/dougkavanagh/workspace/oceanmd-autorouter/server/api/tenant-members/index.get.ts).
+- Tenant membership lookup already exists in [server/utils/tenant-memberships.ts](/Users/dougkavanagh/workspace/oceanmd-autorouter/server/utils/tenant-memberships.ts) and [server/api/tenant-members/index.get.ts](/Users/dougkavanagh/workspace/oceanmd-autorouter/server/api/tenant-members/index.get.ts).
 - Portal navigation is defined in [app/layouts/default.vue](/Users/dougkavanagh/workspace/oceanmd-autorouter/app/layouts/default.vue).
 - Portal list/search patterns already exist in [app/pages/portal/erequests/index.vue](/Users/dougkavanagh/workspace/oceanmd-autorouter/app/pages/portal/erequests/index.vue).
 - Site defaults already live in [src/entities/models/site-configuration.ts](/Users/dougkavanagh/workspace/oceanmd-autorouter/src/entities/models/site-configuration.ts) plus the related site-configuration repository and API routes.

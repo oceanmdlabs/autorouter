@@ -1,7 +1,5 @@
-import {
-  assertTenantAdmin,
-  getTenantInvites,
-} from "@/server/utils/tenant-access";
+import { getTenantInvites } from "@/server/utils/tenant-invites";
+import { assertTenantAdmin } from "@/server/utils/tenant-memberships";
 
 export default defineEventHandler(async (event) => {
   const session = await requireUserSession(event);

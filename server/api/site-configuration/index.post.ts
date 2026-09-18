@@ -10,7 +10,7 @@ import {
   summarizeSiteConfigurationChange,
 } from "@/server/utils/privacy-audit";
 import { preserveMaskedSiteConfigurationSecrets } from "@/server/utils/site-configuration-secrets";
-import { assertTenantAdmin } from "@/server/utils/tenant-access";
+import { assertTenantAdmin } from "@/server/utils/tenant-memberships";
 export default defineEventHandler(async (event) => {
   const cxt = await toApplicationContext(event);
   const body = (await readBody<Record<string, unknown>>(event)) ?? {};

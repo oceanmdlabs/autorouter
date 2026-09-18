@@ -1,5 +1,5 @@
 import { assertSystemAdminAccess } from "@/server/utils/system-admin-access";
-import { assignUserToTenant } from "@/server/utils/tenant-access";
+import { assignUserToTenant } from "@/server/utils/tenant-memberships";
 import { toApplicationContext } from "@/src/infrastructure/adapters/h3.adapter";
 import { logPrivacyAuditEvent } from "@/server/utils/privacy-audit";
 import { z } from "zod";

@@ -69,6 +69,8 @@ export class AutorouterStack extends Stack {
       dataApi: database.outputs.dataApi,
       env: cfg.appEnv,
       secretEnv: cfg.appSecretEnv,
+      bedrockGuardrailIdentifier: cfg.bedrockGuardrailIdentifier,
+      bedrockGuardrailVersion: cfg.bedrockGuardrailVersion,
       publicUrl: cfg.publicUrl,
       memorySize: cfg.appMemorySize,
       timeoutSeconds: cfg.appTimeoutSeconds,

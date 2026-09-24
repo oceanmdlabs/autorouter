@@ -1,6 +1,7 @@
 import {
   Duration,
   RemovalPolicy,
+  Stack,
   aws_ec2 as ec2,
   aws_iam as iam,
   aws_lambda as lambda,
@@ -23,6 +24,8 @@ export type AppConstructProps = {
   };
   env: Record<string, string>;
   secretEnv: Record<string, string>;
+  bedrockGuardrailIdentifier?: string;
+  bedrockGuardrailVersion?: string;
   publicUrl?: string;
   memorySize: number;
   timeoutSeconds: number;
@@ -46,15 +49,19 @@ export class AppConstruct extends Construct {
       assumedBy: new iam.ServicePrincipal("lambda.amazonaws.com"),
       managedPolicies: [
         iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "service-role/AWSLambdaBasicExecutionRole"
+          "service-role/AWSLambdaBasicExecutionRole",
         ),
         iam.ManagedPolicy.fromAwsManagedPolicyName(
-          "service-role/AWSLambdaVPCAccessExecutionRole"
+          "service-role/AWSLambdaVPCAccessExecutionRole",
         ),
       ],
     });
 
-    if (props.dataApi?.enabled && props.dataApi.resourceArn && props.dataApi.secretArn) {
+    if (
+      props.dataApi?.enabled &&
+      props.dataApi.resourceArn &&
+      props.dataApi.secretArn
+    ) {
       role.addToPolicy(
         new iam.PolicyStatement({
           actions: [
@@ -65,36 +72,86 @@ export class AppConstruct extends Construct {
             "rds-data:RollbackTransaction",
           ],
           resources: [props.dataApi.resourceArn],
-        })
+        }),
       );
 
       role.addToPolicy(
         new iam.PolicyStatement({
           actions: ["secretsmanager:GetSecretValue"],
           resources: [props.dataApi.secretArn],
-        })
+        }),
+      );
+    }
+
+    const bedrockInvokeActions = [
+      "bedrock:InvokeModel",
+      "bedrock:InvokeModelWithResponseStream",
+    ];
+    const guardrailIdentifier = props.bedrockGuardrailIdentifier;
+    const guardrailVersion = props.bedrockGuardrailVersion;
+
+    if (guardrailIdentifier && guardrailVersion) {
+      const guardrailArn = guardrailIdentifier.startsWith("arn:")
+        ? guardrailIdentifier
+        : `arn:${Stack.of(this).partition}:bedrock:ca-central-1:${Stack.of(this).account}:guardrail/${guardrailIdentifier}`;
+      const versionedGuardrailArn = `${guardrailArn}:${guardrailVersion}`;
+      const foundationModelsArn = `arn:${Stack.of(this).partition}:bedrock:ca-central-1::foundation-model/*`;
+
+      role.addToPolicy(
+        new iam.PolicyStatement({
+          actions: bedrockInvokeActions,
+          resources: [foundationModelsArn],
+          conditions: {
+            StringEquals: {
+              "bedrock:GuardrailIdentifier": versionedGuardrailArn,
+            },
+          },
+        }),
+      );
+
+      // Keep this explicit deny even if another policy later grants model access.
+      role.addToPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.DENY,
+          actions: bedrockInvokeActions,
+          resources: ["*"],
+          conditions: {
+            StringNotEquals: {
+              "bedrock:GuardrailIdentifier": versionedGuardrailArn,
+            },
+          },
+        }),
+      );
+
+      role.addToPolicy(
+        new iam.PolicyStatement({
+          actions: ["bedrock:ApplyGuardrail"],
+          resources: [guardrailArn],
+        }),
+      );
+    } else {
+      // Bedrock is fail-closed until an approved, version-pinned guardrail is supplied.
+      role.addToPolicy(
+        new iam.PolicyStatement({
+          effect: iam.Effect.DENY,
+          actions: bedrockInvokeActions,
+          resources: ["*"],
+        }),
       );
     }
 
     role.addToPolicy(
       new iam.PolicyStatement({
-        actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
-        resources: ["*"],
-      })
-    );
-
-    role.addToPolicy(
-      new iam.PolicyStatement({
         actions: ["ses:SendEmail", "ses:SendRawEmail"],
         resources: ["*"],
-      })
+      }),
     );
 
     role.addToPolicy(
       new iam.PolicyStatement({
         actions: ["sms-voice:SendTextMessage"],
         resources: ["*"],
-      })
+      }),
     );
 
     const erequestsBucket = new s3.Bucket(this, "ErequestsBucket", {
@@ -113,6 +170,12 @@ export class AppConstruct extends Construct {
       URL: props.publicUrl ?? "",
       DEPLOY_URL: props.publicUrl ?? "",
       EREQUEST_S3_BUCKET: erequestsBucket.bucketName,
+      ...(guardrailIdentifier && guardrailVersion
+        ? {
+            BEDROCK_GUARDRAIL_IDENTIFIER: guardrailIdentifier,
+            BEDROCK_GUARDRAIL_VERSION: guardrailVersion,
+          }
+        : {}),
     };
 
     if (
@@ -148,7 +211,7 @@ export class AppConstruct extends Construct {
 
     const integration = new apigwv2Integrations.HttpLambdaIntegration(
       "DefaultIntegration",
-      fn
+      fn,
     );
 
     httpApi.addRoutes({

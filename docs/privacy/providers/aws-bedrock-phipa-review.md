@@ -1,6 +1,6 @@
 # Amazon Bedrock PHIPA Provider Review
 
-**Reviewed:** 2026-09-11
+**Reviewed:** 2026-09-24
 
 **Proposed service:** Amazon Bedrock direct in-region inference in AWS Canada (Central), `ca-central-1`
 
@@ -35,6 +35,7 @@ AWS's Canada privacy and healthcare pages are useful due-diligence evidence but 
 - Pin the Bedrock runtime endpoint to `ca-central-1` and an allowlisted direct model ID that is documented as **In-Region** there. Do not use geographic or global inference-profile IDs, application inference profiles that include other regions, or automatic cross-region fallback.
 - Set account- and project-level Bedrock data retention to `none`; do not leave either level at `inherit` or `default`. Verify the model's current `allowed_modes` includes `none`. Invocation must fail closed if it does not.
 - Enforce the allowed region, direct model ARN/ID, invocation actions, and absence of inference profiles with IAM and AWS Organizations service control policies. Alert on policy or model-access changes.
+- Require a separately approved, published Amazon Bedrock Guardrail on every model invocation. Pin its identifier and numeric version in both the application request and the `bedrock:GuardrailIdentifier` IAM condition, with an explicit deny for missing or different guardrails. A guardrail is defense in depth and does not replace clinical validation, human review, data minimization, or any approval gate in this policy.
 - Keep Bedrock model invocation logging disabled. Deny or tightly restrict `PutModelInvocationLoggingConfiguration`; continuously verify the setting in `ca-central-1`. Ordinary application logs must not contain prompts, completions, attachments, or model error bodies.
 - Disable or prohibit prompt caching, Responses API storage/background mode, agents, knowledge bases/RAG, flows, prompt management storage, batch inference, model customization, evaluation jobs, and any feature not separately assessed.
 - Use VPC endpoints/PrivateLink where supported, restrictive endpoint policies, private application networking, least-privilege security groups, and controlled egress.
@@ -73,6 +74,7 @@ If no suitable model meets every item, the correct decision is no Bedrock PHI pr
 - [Amazon Bedrock model regional availability](https://docs.aws.amazon.com/bedrock/latest/userguide/models-region-compatibility.html)
 - [Amazon Bedrock cross-region inference](https://docs.aws.amazon.com/bedrock/latest/userguide/cross-region-inference.html)
 - [Amazon Bedrock model invocation logging](https://docs.aws.amazon.com/bedrock/latest/userguide/model-invocation-logging.html)
+- [Enforce a specific guardrail in model inference requests](https://docs.aws.amazon.com/bedrock/latest/userguide/guardrails-permissions-id.html)
 - [AWS Canada data privacy](https://aws.amazon.com/compliance/canada-data-privacy/)
 - [AWS healthcare compliance](https://aws.amazon.com/health/healthcare-compliance/)
 - [AWS Shared Responsibility Model](https://aws.amazon.com/compliance/shared-responsibility-model/)

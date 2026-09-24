@@ -136,13 +136,37 @@ cp .env.deploy.example .env.deploy
 ```
 
 Fill in `.env.deploy`:
+
 - AWS target (`AWS_PROFILE`, `AWS_REGION`, optional `CDK_STACK_NAME`)
 - At least one OAuth provider pair (`*_CLIENT_ID` + `*_CLIENT_SECRET`)
 - `NUXT_SESSION_PASSWORD`
 - `ENCRYPTION_KEY`
 - `JWT_SECRET`
 - Optional `PUBLIC_URL` (recommended for stable OAuth callback URLs)
-  
+
+### Bedrock guardrail enforcement
+
+The Lambda role is denied all Bedrock model invocation by default. Bedrock can
+only be enabled after an approved guardrail has been provisioned separately and
+published with a numeric version. Set both of these values for a stack deploy:
+
+```bash
+BEDROCK_GUARDRAIL_IDENTIFIER=your-guardrail-id
+BEDROCK_GUARDRAIL_VERSION=1
+```
+
+The deployment then:
+
+- limits model access to direct foundation models in `ca-central-1`;
+- requires every `InvokeModel`/`Converse` request to carry that exact guardrail
+  and version, with an explicit IAM deny preventing bypass through another
+  allow policy; and
+- passes the guardrail configuration on every application inference request.
+
+Do not use `DRAFT`, an unpinned version, a Bedrock Agent, or an unapproved
+guardrail. This control does not by itself approve PHI processing; all gates in
+[`docs/privacy/ai-phi-policy.md`](../../docs/privacy/ai-phi-policy.md) still apply.
+
 ## 4) Build + deploy
 
 From `infrastructure/cdk`:

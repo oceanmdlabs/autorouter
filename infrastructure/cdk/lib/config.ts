@@ -18,6 +18,8 @@ export type InfraConfig = {
   appLambdaHandler: string;
   appEnv: Record<string, string>;
   appSecretEnv: Record<string, string>;
+  bedrockGuardrailIdentifier?: string;
+  bedrockGuardrailVersion?: string;
 
   dbEngine: DbEngine;
   dbUseDataApi: boolean;
@@ -57,9 +59,7 @@ function getString(scope: Construct, key: string): string | undefined {
   }
 
   const envKey = key.toUpperCase();
-  const snakeEnvKey = key
-    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
-    .toUpperCase();
+  const snakeEnvKey = key.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase();
   const envVal = process.env[envKey] ?? process.env[snakeEnvKey];
   if (envVal !== undefined && envVal !== "") {
     return envVal;
@@ -87,7 +87,9 @@ function getBoolean(scope: Construct, key: string): boolean | undefined {
   if (raw === "true") return true;
   if (raw === "false") return false;
 
-  throw new Error(`Invalid boolean for '${key}': ${raw} (use 'true' or 'false')`);
+  throw new Error(
+    `Invalid boolean for '${key}': ${raw} (use 'true' or 'false')`,
+  );
 }
 
 function getStackName(scope: Construct): string {
@@ -101,8 +103,8 @@ export function getInfraConfig(scope: Construct): InfraConfig {
 
   const vpcCidr = getString(scope, "vpcCidr") ?? "10.0.0.0/16";
   const natGatewayStrategy =
-    (getString(scope, "natGatewayStrategy") as NatGatewayStrategy | undefined) ??
-    "Single";
+    (getString(scope, "natGatewayStrategy") as
+      NatGatewayStrategy | undefined) ?? "Single";
 
   const publicUrl = getString(scope, "publicUrl");
 
@@ -114,6 +116,34 @@ export function getInfraConfig(scope: Construct): InfraConfig {
     getString(scope, "appLambdaHandler") ?? "server/index.handler";
   const appEnv = parseJsonObject(getString(scope, "appEnv"));
   const appSecretEnv = parseJsonObject(getString(scope, "appSecretEnv"));
+  const bedrockGuardrailIdentifier = getString(
+    scope,
+    "bedrockGuardrailIdentifier",
+  );
+  const bedrockGuardrailVersion = getString(scope, "bedrockGuardrailVersion");
+
+  if (
+    (bedrockGuardrailIdentifier && !bedrockGuardrailVersion) ||
+    (!bedrockGuardrailIdentifier && bedrockGuardrailVersion)
+  ) {
+    throw new Error(
+      "bedrockGuardrailIdentifier and bedrockGuardrailVersion must be configured together",
+    );
+  }
+
+  if (
+    bedrockGuardrailVersion &&
+    !/^[1-9][0-9]{0,7}$/.test(bedrockGuardrailVersion)
+  ) {
+    throw new Error("bedrockGuardrailVersion must be a pinned numeric version");
+  }
+
+  if (
+    bedrockGuardrailIdentifier?.startsWith("arn:") &&
+    !bedrockGuardrailIdentifier.includes(":bedrock:ca-central-1:")
+  ) {
+    throw new Error("bedrockGuardrailIdentifier must be in ca-central-1");
+  }
 
   const dbEngine =
     (getString(scope, "dbEngine") as DbEngine | undefined) ??
@@ -125,13 +155,17 @@ export function getInfraConfig(scope: Construct): InfraConfig {
   const rdsInstanceClass = getString(scope, "rdsInstanceClass") ?? "t4g.micro";
   const auroraMinAcu = getNumber(scope, "auroraMinAcu") ?? 0;
   const auroraMaxAcu = getNumber(scope, "auroraMaxAcu") ?? 2;
-  const auroraAutoPauseSeconds = getNumber(scope, "auroraAutoPauseSeconds") ?? 3600;
+  const auroraAutoPauseSeconds =
+    getNumber(scope, "auroraAutoPauseSeconds") ?? 3600;
 
   const isProdStack = /\bprod(uction)?\b/i.test(stackName);
-  const dbDeletionProtection = getBoolean(scope, "dbDeletionProtection") ?? isProdStack;
-  const dbSkipFinalSnapshot = getBoolean(scope, "dbSkipFinalSnapshot") ?? !isProdStack;
+  const dbDeletionProtection =
+    getBoolean(scope, "dbDeletionProtection") ?? isProdStack;
+  const dbSkipFinalSnapshot =
+    getBoolean(scope, "dbSkipFinalSnapshot") ?? !isProdStack;
   const dbFinalSnapshotIdentifierPrefix =
-    getString(scope, "dbFinalSnapshotIdentifierPrefix") ?? `${namePrefix}-${stackName}`;
+    getString(scope, "dbFinalSnapshotIdentifierPrefix") ??
+    `${namePrefix}-${stackName}`;
 
   const tags: Record<string, string> = {
     "ocean:app": "autorouter",
@@ -150,6 +184,8 @@ export function getInfraConfig(scope: Construct): InfraConfig {
     appLambdaHandler,
     appEnv,
     appSecretEnv,
+    bedrockGuardrailIdentifier,
+    bedrockGuardrailVersion,
     dbEngine,
     dbUseDataApi: dbEngine === "aurora-serverless-v2" && dbUseDataApi,
     dbName,

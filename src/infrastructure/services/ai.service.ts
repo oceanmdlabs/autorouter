@@ -33,6 +33,9 @@ type Dependencies = {
   cxt: ApplicationContext;
 };
 
+const BEDROCK_GUARDRAIL_CONFIGURATION_ERROR =
+  "Bedrock is disabled because a version-pinned guardrail is not configured.";
+
 // https://sdk.vercel.ai/
 
 export const createAiService = (deps: Dependencies): IAiService => {
@@ -50,27 +53,62 @@ export const createAiService = (deps: Dependencies): IAiService => {
     };
   }
 
-  async function getAiModel() {
+  async function getAiRuntime() {
     const aiInfo = await getAiInfo();
     assertAiPhiDeploymentApproved(aiInfo);
     switch (aiInfo.provider) {
       case "openai":
-        return createOpenAI({
-          apiKey: aiInfo.apiKey,
-        }).languageModel(aiInfo.model as unknown as OpenAIResponsesModelId);
+        return {
+          model: createOpenAI({
+            apiKey: aiInfo.apiKey,
+          }).languageModel(aiInfo.model as unknown as OpenAIResponsesModelId),
+        };
       case "cohere":
-        return createCohere({
-          apiKey: aiInfo.apiKey,
-        }).languageModel(aiInfo.model as unknown as CohereChatModelId);
+        return {
+          model: createCohere({
+            apiKey: aiInfo.apiKey,
+          }).languageModel(aiInfo.model as unknown as CohereChatModelId),
+        };
       case "google":
-        return createGoogleGenerativeAI({
-          apiKey: aiInfo.apiKey,
-        }).languageModel(aiInfo.model as unknown as GoogleGenerativeAIModelId);
-      case "bedrock":
-        return createAmazonBedrock({
-          region: "ca-central-1",
-          bedrockOptions: { region: "ca-central-1", credentials: fromNodeProviderChain() },
-        }).languageModel(aiInfo.model as unknown as BedrockModelId) as unknown as LanguageModel;
+        return {
+          model: createGoogleGenerativeAI({
+            apiKey: aiInfo.apiKey,
+          }).languageModel(
+            aiInfo.model as unknown as GoogleGenerativeAIModelId,
+          ),
+        };
+      case "bedrock": {
+        const guardrailIdentifier =
+          process.env.BEDROCK_GUARDRAIL_IDENTIFIER?.trim();
+        const guardrailVersion = process.env.BEDROCK_GUARDRAIL_VERSION?.trim();
+        if (
+          !guardrailIdentifier ||
+          !guardrailVersion ||
+          !/^[1-9][0-9]{0,7}$/.test(guardrailVersion)
+        ) {
+          throw new Error(BEDROCK_GUARDRAIL_CONFIGURATION_ERROR);
+        }
+
+        return {
+          model: createAmazonBedrock({
+            region: "ca-central-1",
+            bedrockOptions: {
+              region: "ca-central-1",
+              credentials: fromNodeProviderChain(),
+            },
+          }).languageModel(
+            aiInfo.model as unknown as BedrockModelId,
+          ) as unknown as LanguageModel,
+          providerOptions: {
+            bedrock: {
+              guardrailConfig: {
+                guardrailIdentifier,
+                guardrailVersion,
+              },
+            },
+          },
+        };
+      }
       default:
         throw new Error(`Unsupported AI provider: ${aiInfo.provider}`);
     }
@@ -78,15 +116,15 @@ export const createAiService = (deps: Dependencies): IAiService => {
 
   async function getToolCalls<TOOLS extends ToolSet>(
     prompt: string,
-    tools: TOOLS
+    tools: TOOLS,
   ): Promise<ToolCallResult> {
-    const model = await getAiModel();
+    const { model, providerOptions } = await getAiRuntime();
 
     const sdkTools = Object.fromEntries(
       Object.entries(tools).map(([name, t]) => [
         name,
         tool({ parameters: t.inputSchema, execute: async () => "scheduled" }),
-      ])
+      ]),
     );
 
     const response = await generateText({
@@ -95,20 +133,28 @@ export const createAiService = (deps: Dependencies): IAiService => {
       tools: sdkTools,
       toolChoice: "auto",
       maxSteps: 10,
+      providerOptions,
     });
     // With maxSteps > 1, response.toolCalls only covers the last step.
     // Flatten across all steps to capture sequential multi-tool calls.
     const allStepToolCalls = response.steps.flatMap((step) => step.toolCalls);
-    const allStepText = response.steps.map((step) => step.text).filter(Boolean).join("\n").trim();
+    const allStepText = response.steps
+      .map((step) => step.text)
+      .filter(Boolean)
+      .join("\n")
+      .trim();
 
     // Some models (e.g. Mistral on Bedrock) write multiple tool calls as JSON text
     // rather than returning them as structured tool calls. Parse them as a fallback.
-    const structuredToolCalls: ToolCall[] = allStepToolCalls.length > 0
-      ? allStepToolCalls.map((toolCall) => ({
-          tool: toolCall.toolName,
-          input: toolCall.args as z.infer<RoutingToolRegistry[RoutingToolName]["input"]>,
-        }))
-      : parseTextToolCalls(allStepText, Object.keys(tools)) as ToolCall[];
+    const structuredToolCalls: ToolCall[] =
+      allStepToolCalls.length > 0
+        ? allStepToolCalls.map((toolCall) => ({
+            tool: toolCall.toolName,
+            input: toolCall.args as z.infer<
+              RoutingToolRegistry[RoutingToolName]["input"]
+            >,
+          }))
+        : (parseTextToolCalls(allStepText, Object.keys(tools)) as ToolCall[]);
 
     if (allStepToolCalls.length === 0 && structuredToolCalls.length > 0) {
       cxt.logger.info("Parsed tool calls from text response", {
@@ -116,7 +162,10 @@ export const createAiService = (deps: Dependencies): IAiService => {
       });
     }
 
-    const reasoning = extractReasoning(allStepText, structuredToolCalls.length > 0 && allStepToolCalls.length === 0);
+    const reasoning = extractReasoning(
+      allStepText,
+      structuredToolCalls.length > 0 && allStepToolCalls.length === 0,
+    );
 
     return {
       toolCalls: structuredToolCalls,
@@ -125,19 +174,21 @@ export const createAiService = (deps: Dependencies): IAiService => {
   }
 
   async function prompt(prompt: string, schema: z.ZodSchema): Promise<object> {
+    const { model, providerOptions } = await getAiRuntime();
     const response = await generateObject({
-      model: await getAiModel(),
+      model,
       prompt,
       schema,
+      providerOptions,
     });
     return response.object;
   }
 
   async function summarizeAttachments(
     instructions: string,
-    attachments: Attachment[]
+    attachments: Attachment[],
   ): Promise<string> {
-    const model = await getAiModel();
+    const { model, providerOptions } = await getAiRuntime();
 
     const buildContent = (atts: Attachment[]) => [
       { type: "text" as const, text: instructions },
@@ -154,20 +205,22 @@ export const createAiService = (deps: Dependencies): IAiService => {
       const result = await generateText({
         model,
         messages: [{ role: "user", content: buildContent(attachments) as any }],
+        providerOptions,
       });
       return result.text;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      const isImageError =
-        /image|vision|multimodal|content block/i.test(message);
+      const isImageError = /image|vision|multimodal|content block/i.test(
+        message,
+      );
       const imageAttachments = attachments.filter((a) =>
-        (a.contentType ?? "").startsWith("image/")
+        (a.contentType ?? "").startsWith("image/"),
       );
 
       if (!isImageError || imageAttachments.length === 0) throw err;
 
       const nonImageAttachments = attachments.filter(
-        (a) => !(a.contentType ?? "").startsWith("image/")
+        (a) => !(a.contentType ?? "").startsWith("image/"),
       );
       const skippedNames = imageAttachments.map((a) => a.title).join(", ");
 
@@ -183,6 +236,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
             content: buildContent(nonImageAttachments) as any,
           },
         ],
+        providerOptions,
       });
       return `${result.text}\n\nNote: The following image attachment(s) were skipped because the configured AI model does not support image analysis: ${skippedNames}.`;
     }
@@ -200,7 +254,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
 // Format: [{"name": "toolName", "arguments": {...}}] — one per line.
 function parseTextToolCalls(
   text: string,
-  availableTools: string[]
+  availableTools: string[],
 ): Array<{ tool: string; input: Record<string, unknown> }> {
   const results: Array<{ tool: string; input: Record<string, unknown> }> = [];
   for (const line of text.split("\n")) {

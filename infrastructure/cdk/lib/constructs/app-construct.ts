@@ -3,6 +3,7 @@ import {
   RemovalPolicy,
   Stack,
   aws_ec2 as ec2,
+  aws_cloudtrail as cloudtrail,
   aws_iam as iam,
   aws_lambda as lambda,
   aws_s3 as s3,
@@ -159,6 +160,16 @@ export class AppConstruct extends Construct {
       removalPolicy: RemovalPolicy.RETAIN,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
       enforceSSL: true,
+    });
+
+    const auditTrail = new cloudtrail.Trail(this, "AuditTrail", {
+      includeGlobalServiceEvents: false,
+      isMultiRegionTrail: true,
+      managementEvents: cloudtrail.ReadWriteType.NONE,
+    });
+    auditTrail.logAllS3DataEvents({
+      includeManagementEvents: false,
+      readWriteType: cloudtrail.ReadWriteType.ALL,
     });
 
     erequestsBucket.grantReadWrite(role);

@@ -179,7 +179,7 @@ export function createTask({
 }
 
 export function prepareResourcesForResponse(
-  serviceRequestBundle: Bundle<FhirResource>
+  serviceRequestBundle: Bundle,
 ): FhirResource[] {
   return (
     serviceRequestBundle.entry
@@ -192,24 +192,22 @@ export function prepareResourcesForResponse(
   );
 }
 
-export function getReferralRef(
-  serviceRequestBundle: Bundle<FhirResource>
-): string {
+export function getReferralRef(serviceRequestBundle: Bundle): string {
   const messageHeader = serviceRequestBundle.entry?.find(
-    (entry) => entry.resource?.resourceType === "MessageHeader"
+    (entry) => entry.resource?.resourceType === "MessageHeader",
   )?.resource as MessageHeader;
   return (
     messageHeader?.extension?.find(
       (extension) =>
         extension.url ===
-        "http://ehealthontario.ca/fhir/StructureDefinition/ext-referral-identifier"
+        "http://ehealthontario.ca/fhir/StructureDefinition/ext-referral-identifier",
     )?.valueIdentifier?.value ?? ""
   );
 }
 
 export function getServiceRequest(resources: FhirResource[]): ServiceRequest {
   const serviceRequest = resources.find(
-    (resource) => resource.resourceType === "ServiceRequest"
+    (resource) => resource.resourceType === "ServiceRequest",
   );
   if (!serviceRequest) {
     throw new InvalidArgumentsError("ServiceRequest not found");
@@ -218,12 +216,11 @@ export function getServiceRequest(resources: FhirResource[]): ServiceRequest {
 }
 
 export function getOceanReferenceFromServiceRequest(
-  serviceRequest: ServiceRequest
+  serviceRequest: ServiceRequest,
 ): string | null {
   return (
     serviceRequest.identifier?.find(
-      (identifier) =>
-        identifier.system === OCEAN_REFERRAL_IDENTIFIER_SYSTEM
+      (identifier) => identifier.system === OCEAN_REFERRAL_IDENTIFIER_SYSTEM,
     )?.value ??
     serviceRequest.id ??
     null
@@ -233,13 +230,13 @@ export function getOceanReferenceFromServiceRequest(
 export function createCommunication(
   serviceRequest: ServiceRequest,
   message: string,
-  sender?: PractitionerRole
+  sender?: PractitionerRole,
 ): Communication {
   const oceanReferralRef = getOceanReferenceFromServiceRequest(serviceRequest);
   if (!oceanReferralRef) {
     throw new IOError(
       "No ocean referral reference found for service request: " +
-        serviceRequest.id
+        serviceRequest.id,
     );
   }
   return {

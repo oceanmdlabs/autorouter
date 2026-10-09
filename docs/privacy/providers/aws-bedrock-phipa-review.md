@@ -65,6 +65,27 @@ If no suitable model meets every item, the correct decision is no Bedrock PHI pr
 - Sanitized application logs demonstrating that prompts and completions are absent.
 - Approved PIA, TRA, AI/clinical safety assessment, deployment record, incident response, and rollback procedure.
 
+## SDK Security Update — 2026-10-09
+
+The application now pins `ai` to `6.0.302` and `@ai-sdk/amazon-bedrock`
+to `4.0.193`, which use patched `@ai-sdk/provider-utils` `4.0.57`.
+This is an engineering compatibility check; it does not approve a provider,
+model, contract, or PHI deployment, and the production approval gates remain
+unchanged.
+
+Offline tests with synthetic inputs and mocked HTTP responses exercise the
+actual SDK request generation. They verify the direct Canadian endpoint,
+SigV4 role credentials even when a bearer-token environment variable is set,
+the exact numeric guardrail version in every Converse request, schema-validated
+output, PDF/image serialization, and the ten-step routing limit. Missing PHI
+approval or an unpinned guardrail fails before network access. No real inference
+or patient data is used in these checks.
+
+The Bedrock adapter is pinned to the tested SDK 6-compatible release because it
+forwards `providerOptions.bedrock.guardrailConfig` into the signed Converse
+request. Re-run these request-level tests before changing this adapter; a
+successful type check alone does not prove that a guardrail reaches Bedrock.
+
 ## Sources Reviewed
 
 - [AWS Service Terms](https://aws.amazon.com/service-terms/)

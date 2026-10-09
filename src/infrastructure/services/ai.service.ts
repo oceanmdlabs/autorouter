@@ -4,7 +4,7 @@ import { fromNodeProviderChain } from "@aws-sdk/credential-providers";
 import { createCohere } from "@ai-sdk/cohere";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createOpenAI } from "@ai-sdk/openai";
-import { generateObject, generateText, tool, type LanguageModel } from "ai";
+import { generateObject, generateText, stepCountIs, tool } from "ai";
 import type { z } from "zod";
 import type {
   IAiService,
@@ -25,7 +25,7 @@ type BedrockModelId =
 
 type CohereChatModelId = "command-a-03-2025";
 
-type OpenAIResponsesModelId = "gpt-5";
+type OpenAIChatModelId = "gpt-5";
 
 type GoogleGenerativeAIModelId = "gemini-2.5-flash";
 
@@ -61,7 +61,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
         return {
           model: createOpenAI({
             apiKey: aiInfo.apiKey,
-          }).languageModel(aiInfo.model as unknown as OpenAIResponsesModelId),
+          }).chat(aiInfo.model as unknown as OpenAIChatModelId),
         };
       case "cohere":
         return {
@@ -92,13 +92,11 @@ export const createAiService = (deps: Dependencies): IAiService => {
         return {
           model: createAmazonBedrock({
             region: "ca-central-1",
-            bedrockOptions: {
-              region: "ca-central-1",
-              credentials: fromNodeProviderChain(),
-            },
-          }).languageModel(
-            aiInfo.model as unknown as BedrockModelId,
-          ) as unknown as LanguageModel,
+            baseURL: "https://bedrock-runtime.ca-central-1.amazonaws.com",
+            // Keep role credentials even if a bearer-token environment variable is set.
+            apiKey: "",
+            credentialProvider: fromNodeProviderChain(),
+          }).languageModel(aiInfo.model as unknown as BedrockModelId),
           providerOptions: {
             bedrock: {
               guardrailConfig: {
@@ -123,7 +121,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
     const sdkTools = Object.fromEntries(
       Object.entries(tools).map(([name, t]) => [
         name,
-        tool({ parameters: t.inputSchema, execute: async () => "scheduled" }),
+        tool({ inputSchema: t.inputSchema, execute: async () => "scheduled" }),
       ]),
     );
 
@@ -132,10 +130,10 @@ export const createAiService = (deps: Dependencies): IAiService => {
       prompt,
       tools: sdkTools,
       toolChoice: "auto",
-      maxSteps: 10,
+      stopWhen: stepCountIs(10),
       providerOptions,
     });
-    // With maxSteps > 1, response.toolCalls only covers the last step.
+    // With multiple steps, response.toolCalls only covers the last step.
     // Flatten across all steps to capture sequential multi-tool calls.
     const allStepToolCalls = response.steps.flatMap((step) => step.toolCalls);
     const allStepText = response.steps
@@ -150,7 +148,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
       allStepToolCalls.length > 0
         ? allStepToolCalls.map((toolCall) => ({
             tool: toolCall.toolName,
-            input: toolCall.args as z.infer<
+            input: toolCall.input as z.infer<
               RoutingToolRegistry[RoutingToolName]["input"]
             >,
           }))
@@ -193,18 +191,18 @@ export const createAiService = (deps: Dependencies): IAiService => {
     const buildContent = (atts: Attachment[]) => [
       { type: "text" as const, text: instructions },
       ...atts.map((attachment) => {
-        const mimeType = attachment.contentType ?? "application/pdf";
-        const isImage = mimeType.startsWith("image/");
+        const mediaType = attachment.contentType ?? "application/pdf";
+        const isImage = mediaType.startsWith("image/");
         return isImage
-          ? { type: "image" as const, mimeType, image: attachment.data }
-          : { type: "file" as const, mimeType, data: attachment.data };
+          ? { type: "image" as const, mediaType, image: attachment.data }
+          : { type: "file" as const, mediaType, data: attachment.data };
       }),
     ];
 
     try {
       const result = await generateText({
         model,
-        messages: [{ role: "user", content: buildContent(attachments) as any }],
+        messages: [{ role: "user", content: buildContent(attachments) }],
         providerOptions,
       });
       return result.text;
@@ -233,7 +231,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
         messages: [
           {
             role: "user",
-            content: buildContent(nonImageAttachments) as any,
+            content: buildContent(nonImageAttachments),
           },
         ],
         providerOptions,

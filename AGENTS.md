@@ -34,6 +34,12 @@ This is the **Ocean Autorouter** - a Nuxt/Vue.js application that uses AI to int
    - Let Prettier handle formatting in subsequent commits
    - Never skip or abort rebases without user approval
 
+## AWS Deployment Target
+
+- Use the `oceanmdlabs` AWS profile, account `049815584750`, and region `ca-central-1`.
+- Autorouter runs in the shared Labs account as the `dev-autorouter` stack.
+- The former `ocean-autorouter` local profile was redundant and has been removed.
+
 ## Architecture Guidelines
 
 **Clean Architecture Pattern**: Business logic is separated from infrastructure.

@@ -116,16 +116,16 @@ Avoid short, guessable, or reused secrets.
 ## 1) Configure and login with AWS SSO
 
 ```bash
-aws configure sso --profile ocean-autorouter
-aws sso login --profile ocean-autorouter
-aws sts get-caller-identity --profile ocean-autorouter
+aws configure sso --profile oceanmdlabs
+aws sso login --profile oceanmdlabs
+aws sts get-caller-identity --profile oceanmdlabs
 ```
 
 ## 2) Bootstrap CDK (first time per account/region)
 
 ```bash
 cd infrastructure/cdk
-AWS_PROFILE=ocean-autorouter AWS_REGION=ca-central-1 npx cdk bootstrap aws://145689193777/ca-central-1 --profile ocean-autorouter
+AWS_PROFILE=oceanmdlabs AWS_REGION=ca-central-1 npx cdk bootstrap aws://049815584750/ca-central-1 --profile oceanmdlabs
 ```
 
 ## 3) Create deployment environment file
@@ -398,9 +398,9 @@ For full key list, see [`lib/config.ts`](./lib/config.ts).
 cd infrastructure/cdk
 npm run build
 npm run cdk:synth
-npm run cdk:diff -- --profile ocean-autorouter
-npm run cdk:deploy -- --profile ocean-autorouter --require-approval never
-npm run cdk:destroy -- --profile ocean-autorouter --force
+npm run cdk:diff -- --profile oceanmdlabs
+npm run cdk:deploy -- --profile oceanmdlabs --require-approval never
+npm run cdk:destroy -- --profile oceanmdlabs --force
 ```
 
 ## Common deployment issues

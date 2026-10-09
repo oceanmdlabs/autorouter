@@ -139,7 +139,7 @@ If live AWS validation is required, run:
 
 ```bash
 cd /Users/dougkavanagh/workspace/oceanmd-autorouter/infrastructure/cdk
-AWS_PROFILE=ocean-autorouter AWS_REGION=ca-central-1 npm run cdk:deploy:app:env -- --profile "$AWS_PROFILE" --require-approval never --progress events 2>&1 | tee /tmp/autorouter-app-deploy.log
+AWS_PROFILE=oceanmdlabs AWS_REGION=ca-central-1 npm run cdk:deploy:app:env -- --profile "$AWS_PROFILE" --require-approval never --progress events 2>&1 | tee /tmp/autorouter-app-deploy.log
 ```
 
 Then capture CloudFormation evidence:

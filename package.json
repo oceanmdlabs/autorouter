@@ -11,7 +11,7 @@
     "deploy:aws": "npm --prefix infrastructure/cdk run cdk:deploy:app:env:migrate -- --require-approval never",
     "deploy:aws:app": "npm --prefix infrastructure/cdk run cdk:deploy:code:env",
     "deploy:aws:stack": "npm --prefix infrastructure/cdk run cdk:deploy:app:env -- --require-approval never",
-    "login:aws": "aws sso login --profile ocean-autorouter",
+    "login:aws": "aws sso login --profile oceanmdlabs",
     "logs:tail:aws": "npm --prefix infrastructure/cdk run logs:tail",
     "db:sql:aws": "NODE_EXTRA_CA_CERTS=/etc/ssl/cert.pem npm --prefix infrastructure/cdk run db:sql --",
     "postinstall": "node src/scripts/setup-git-hooks.mjs && nuxt prepare",

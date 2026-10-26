@@ -63,7 +63,7 @@ export const llmReasonCodeSummaryMap: Record<LlmReasonCode, string> = {
 
 export const llmToolPlanSchema = z.object({
   toolName: z.string(),
-  args: z.record(z.unknown()),
+  args: z.record(z.string(), z.unknown()),
 });
 
 export const llmRuleInfoSchema = z.object({

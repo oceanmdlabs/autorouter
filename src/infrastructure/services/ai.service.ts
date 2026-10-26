@@ -171,7 +171,7 @@ export const createAiService = (deps: Dependencies): IAiService => {
     };
   }
 
-  async function prompt(prompt: string, schema: z.ZodSchema): Promise<object> {
+  async function prompt(prompt: string, schema: z.ZodSchema<object>): Promise<object> {
     const { model, providerOptions } = await getAiRuntime();
     const response = await generateObject({
       model,

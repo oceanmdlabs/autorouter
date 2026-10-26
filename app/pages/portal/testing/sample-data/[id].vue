@@ -235,7 +235,7 @@ async function handleSubmit() {
 			const result = formSchema.safeParse(formValues.value)
 			if (!result.success) {
 				errors.value = withErrorSummary(Object.fromEntries(
-					Object.entries(result.error.formErrors.fieldErrors).map(([k, v]) => [k, v?.[0] ?? ''])
+					Object.entries(z.flattenError(result.error).fieldErrors).map(([k, v]) => [k, v?.[0] ?? ''])
 				))
 				return
 			}

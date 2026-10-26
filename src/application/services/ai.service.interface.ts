@@ -28,7 +28,7 @@ export interface IAiService {
    * @returns A promise that resolves to the parsed response object
    */
   getToolCalls(prompt: string, tools: ToolSet): Promise<ToolCallResult>;
-  prompt(prompt: string, schema?: z.ZodSchema): Promise<object>;
+  prompt(prompt: string, schema: z.ZodSchema<object>): Promise<object>;
 
   /**
    * Analyzes an attachment using AI and returns a summary

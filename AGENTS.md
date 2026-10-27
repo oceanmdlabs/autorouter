@@ -1,3 +1,7 @@
+# Repository host handoff
+
+Before any Git fetch, pull, push, or pull request from an older clone, run `bash scripts/check-repository-hosting.sh`. The published `docs/repository-hosting.conf` decides whether GitHub or Bitbucket is active; stop if the helper reports an error. After activation, OceanMD Bitbucket is the code master: [repository](https://bitbucket.org/oceanmd/autorouter/src/main/). Keep [GitHub Issues](https://github.com/oceanmdlabs/autorouter/issues) for work tracking during the transition. See [docs/repository-hosting.md](docs/repository-hosting.md) and [docs/work-tracking.md](docs/work-tracking.md). Preserve local work and use Bitbucket for new code and pull requests after activation. Existing release and deployment checks below still apply. Any older instruction to open a GitHub pull request applies only while `state=preparing`.
+
 # Guide for AI Coding Agents (Claude Code, Copilot, etc.)
 
 This file provides context for AI coding assistants working on this codebase.
